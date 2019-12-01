@@ -1,0 +1,136 @@
+library(Rcpp)
+library(RcppArmadillo)
+library(tidyverse)
+#library(tidyverse, lib="~/local/R_libs/")
+#library(ShortRead)
+library(mnlogit)
+library(foreach)
+library(doParallel)
+library(Formula)
+
+source("./read_data.R")
+source("~/Documents/Karin/GWAS/code/r/modified_mnlogit.R")
+source("~/Documents/Karin/GWAS/code/r/EM.R")
+source("~/Documents/Karin/GWAS/code/r/formula.R")
+source("~/Documents/Karin/GWAS/code/r/newton.R")
+source("~/Documents/Karin/GWAS/code/r/likelihood.R")
+sourceCpp("~/Documents/Karin/GWAS/code/r/data_format.cpp")
+sourceCpp("~/Documents/Karin/GWAS/code/r/mnlogit.cpp")
+sourceCpp("~/Documents/Karin/GWAS/code/r/e_step.cpp")
+sourceCpp("~/Documents/Karin/GWAS/code/r/m_hap.cpp")
+
+samfile = "../../data/tetraploid/308-TAN-A.sam"
+ref_name = "Adur420_2:199509_P2"
+datafile = "../../data/EM/308TANAP12.txt"
+fastq_file = "../../data/EM/test.fastq"
+FastaFile = "../../data/EM/308TANP12.fa"
+## Read a sam file given a reference name (it will give two files), then process the data
+tpphase <- function(samfile = NULL, ref_name = NULL, init = "in_file", FastaFile,
+                         fastq_file = "res.fastq", datafile = "res.txt", n_class = 4, num_cat = 4,
+                         seed = 0, max = 50, tol = 1e-06, ncores = 2, ini_iter = 5) {
+  
+  registerDoParallel(cores = ncores)
+  
+  read_sam(samfile, ref_name, fastq_file, datafile)
+  d <- read_data(datafile)
+  read_length <- d$length
+  hap_length <- d$ref_length_max
+  if(init == "in_file")
+    hapinit <- read_fasta(FastaFile)[1:n_class, 1:hap_length]
+  
+  if(init == "random") { ## length shoud be the same as the longest read, if only one longest not applicable
+    set.seed(seed)
+    hap_rand <- readFastq(fastq_file)
+    a <- sread(hap_rand)[sample(which(hap_rand@sread@ranges@width == hap_length), n_class)] %>% as.data.frame()
+    reads <- plyr::ldply(apply(a, MARGIN = 1, FUN = function(x) strsplit(x, "")) %>% flatten, rbind)
+    reads <- t(t(reads) %>% na.omit)[, -1]
+    ncol <- ncol(reads)
+    reads_num <- as.numeric(c("A" = "0", "T" = "2", "C" = "1", "G" = "3")[t(reads)])
+    hap_rand <- matrix(reads_num, ncol) %>% t()
+    #hap <- read_fastq(fastq_file)
+    #hap <- hap$reads[sample(1:nrow(hap$read), n_class), ]
+  }
+  
+  dat <- fromat_data(dat_info = d, haplotype = hapinit)
+  data <- dat
+  data$nuc <- as.character(c("0" = "A", "2" = "T", "1" = "C", "3" = "G")[as.character(data$nuc)])
+  data$hap_nuc <- as.character(c("0" = "A", "2" = "T", "1" = "C", "3" = "G")[as.character(data$hap_nuc)])
+  id <- data["id"]
+  data <- data[, !names(dat) %in% c("id")]
+  
+  ## Loop until stable (no reads been excluded)
+  par <- list()
+  par <- ini(dat = data, n_observation = d$n_observation, seed = seed)
+  old_id <- 0
+  flag <- 0
+  init_llk <- rep(0, ini_iter)
+  CE_llk <- rep(0, ini_iter)
+  change <- rep(0, ini_iter)
+  old_hap <- hapinit
+  hap <- hapinit
+  for (n in 1:max) {
+    res <- em_eta(par = par, dat_info = d, haplotype = hap)
+    init_llk[n] <- res$full_llk
+    if(all(res$excluded_id == old_id) && (n >= ini_iter)) {
+      flag <- 1
+      break;
+    } else if (any(res$excluded_id != old_id)){
+      change[n] <- 1
+    }
+    old_id <- res$excluded_id
+    use_d = 1
+    if(all(old_hap[, 1:ncol(hap)] == hap))
+      use_d = 0
+    tmp <- m_beta(res = res, d = d, id = id, data = data, use_d = use_d, hap = hap, reads_lengths = read_length, ncores)
+    par <- tmp$par
+    print(sum(log(par$eta)))
+    old_hap <- hap
+    hap <- m_hap(par, d, haplotype = old_hap)
+    CE_llk[n] <- tmp$CEllk
+  }
+  
+  full_llk <- rep(0, max)
+  CE_llk_iter <- rep(0, max)
+  haps <- list()
+  resu <- list()
+  ### Iteration
+  
+  for (m in 1:max) {
+    
+    ##skip the first one
+    if(flag == 0) {
+      #sink("debug_1.txt")
+      res <- em_eta(par = par, dat_info = d, haplotype = hap)
+      #sink()
+      resu[[m]] <- res
+    } else {
+      flag = 0
+      resu[[m]] <- res
+    }
+    
+    if(any(res$excluded_id != old_id))
+      stop("more initialial iterations for stabilizing")
+    full_llk[m] <- res$full_llk
+    # if(abs(par$eta - res$param$mixture_prop) < tol && abs(par$beta - res$param$beta) < tol)
+    # if(m > 1)
+    #   if(abs(full_llk[m] - full_llk[m-1]) < tol)
+    #     break;
+    
+    use_d = 1
+    if(all(old_hap[, 1:ncol(hap)] == hap)) ## Maybe it is slower than format data (write a C comparision func)
+      use_d = 0
+    tmp <- m_beta(res = res, d = d, id = id, data = data, use_d = use_d, hap = hap, reads_lengths = read_length, ncores)
+    par <- tmp$par
+    print(sum(log(par$eta)))
+    old_hap <- hap
+    #sink("hap1.txt")
+    hap <- m_hap(par, d, haplotype = old_hap)
+    #sink()
+    haps[[m]] <- hap
+    CE_llk_iter[m] <- tmp$CEllk
+  }
+}
+dat$mode %>% length()
+##### PLAN: look at the likelihhod, what waggle? And look at more datasets.
+
+

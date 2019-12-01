@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1575238682791.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "73CA080F",
+    "lastKnownWriteTime" : 1575238745,
+    "last_content_update" : 1575238745313,
+    "path" : "~/Documents/Karin/GWAS/code/r/EM.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "238,38",
+        "scrollLine" : "221"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
