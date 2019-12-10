@@ -1,33 +1,51 @@
 library(Rcpp)
 library(RcppArmadillo)
 library(tidyverse)
-library(mnlogit)
 library(foreach)
+library(mnlogit)
 library(doParallel)
 library(Formula)
 
 source("./read_data.R")
-source("~/Documents/Karin/GWAS/code/r/modified_mnlogit.R")
-source("~/Documents/Karin/GWAS/code/r/EM.R")
-source("~/Documents/Karin/GWAS/code/r/formula.R")
-source("~/Documents/Karin/GWAS/code/r/newton.R")
-source("~/Documents/Karin/GWAS/code/r/likelihood.R")
-sourceCpp("~/Documents/Karin/GWAS/code/r/data_format.cpp")
-sourceCpp("~/Documents/Karin/GWAS/code/r/mnlogit.cpp")
-sourceCpp("~/Documents/Karin/GWAS/code/r/e_step.cpp")
-sourceCpp("~/Documents/Karin/GWAS/code/r/m_hap.cpp")
-
+source("../r/modified_mnlogit.R")
+source("../r/EM.R")
+source("../r/formula.R")
+source("../r/newton.R")
+source("../r/likelihood.R")
+sourceCpp("../r/data_format.cpp")
+sourceCpp("../r/mnlogit.cpp")
+sourceCpp("../r/e_step.cpp")
+sourceCpp("../r/m_hap.cpp")
 
 #' @description 
-#' @usage final <- tpphase(samfile = "../../data/tetraploid/308-TAN-B.sam", ref_name = "Aipa71:5269634_P3", 
+#' @param samfile Input sam file
+#' @param ref_name Reference name in sam file
+#' @param init Initialization method (Options: "ampliclust", "in_file", "random", Default: "ampliclust")
+#' @param FastaFile Input a fasta file if initialization is "in_file"
+#' @param ampliclust_command "ampliclust" command (indicate path as well)
+#' @param snp Vector or file to indicate variation sites
+#' @param fastq_file fastq file output from sam file
+#' @param datafile data file output from sam file
+#' @param output Indicate if write results in a file
+#' @param max Max iteration
+#' @param n_class Number of classes in the mixture model
+#' @param num_cat Number of categories in the logistic regression
+#' @param ncores Number of cores to register
+#' @param seed Seed
+#' @param tol Convergence tolarance
+#' 
+#' @usage final <- tpphase(samfile = "./308-TAN-B.sam", ref_name = "Aipa71:5269634_P3", 
 #' ampliclust_command = "../amplici/run_ampliclust", output = "308TAN_B_P3.txt")
 #' @return assignments and haplotypes, etc
 
 tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaFile, ampliclust_command,
-                    fastq_file = "res.fastq", datafile = "res.txt", output = NULL, n_class = 4, 
-                    num_cat = 4, seed = 0, max = 50, tol = 1e-06, ncores = 2, ini_iter = 5) {
+                    fastq_file = "res.fastq", datafile = "res.txt", snp = NULL, output = NULL, n_class = 4, 
+                    num_cat = 4, seed = 0, max = 50, tol = 1e-06, ncores = 2) {
   
   registerDoParallel(cores = ncores)
+  
+  if(typeof(snp) == "character")
+    snp <- read.delim(snp, header = FALSE, sep = " ") %>% as.integer()
   
   if(is.null(samfile) == FALSE)
     sam <- read_sam(samfile, ref_name, fastq_file, datafile)
@@ -44,7 +62,8 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   if(init == "in_file")
     hapinit <- read_fasta(FastaFile)[1:n_class, 1:hap_length]
   
-  if(init == "random") { ## length shoud be the same as the longest read, if only one longest not applicable
+  if(init == "random") {
+    library(ShortRead) ## Temp, need to modify length
     set.seed(seed)
     hapinit <- readFastq(fastq_file)
     a <- sread(hapinit)[sample(which(hapinit@sread@ranges@width == hap_length), n_class)] %>% as.data.frame()
@@ -64,7 +83,7 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   data <- data[, !names(data) %in% c("id")]
   
   par <- list()
-  par <- ini(dat = data, n_observation = d$n_observation, seed = seed)
+  par <- ini(dat = data, n_observation = d$n_observation, seed = seed, n_class = n_class, num_cat = num_cat)
   old_hap <- hapinit
   hap <- hapinit
   
@@ -104,7 +123,7 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
     tmp <- m_beta(res = res, d = d, id = id, data = data, reads_lengths = read_length, ncores)
     par <- tmp$par
     old_hap <- hap
-    hap <- m_hap(par, d, haplotype = old_hap)
+    hap <- m_hap(par, d, haplotype = old_hap, SNP = snp)
     haps[[m]] <- hap
     CE_llk_iter[m] <- tmp$CEllk
   }
@@ -121,6 +140,10 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   
   return(final_res)
 }
+
+final <- tpphase(samfile = "../../../data/EM/308-TAN-consensus.sam", ref_name = "Adur122:1491484_P40", 
+                 ampliclust_command = "../../amplici/run_ampliclust", snp = "../../../data/EM/test_result.txt", 
+                 output = "308TAN_B_P40.txt")
 
 # old_id <- 0
 # flag <- 0

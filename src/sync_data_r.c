@@ -70,8 +70,8 @@ SEXP r_read_sam (SEXP samfile_r, SEXP ref_name_r, SEXP fastq_file_r, SEXP datafi
 			rchar += strlen(&sd->ref_names[rchar]) + 1;
 		}
 		if (!found)
-			exit(mmessage(ERROR_MSG, INVALID_USER_INPUT, "Bad "
-				      "reference name: '%s'\n", ref_name));
+			error("Bad reference name: '%s'\n", ref_name);
+//			exit(mmessage(ERROR_MSG, INVALID_USER_INPUT, "Bad reference name: '%s'\n", ref_name));
 	}
 
 	FILE *fp_dat = fopen(datafile, "w");
@@ -132,8 +132,7 @@ SEXP r_ampliclust_init(SEXP ampliclust_command_r, SEXP fastq_file_r)
 	sprintf(command, "%s -f %s -n --run -i amplici -lb 1.5 -ll -Inf -o %s",
 		ampliclust_command, fastq_file, ac_outfile);
 	
-	mmessage(INFO_MSG, NO_ERROR, "Running ampliclust: '%s'\n",
-		 command);
+	PRINTF("Running ampliclust: '%s'\n", command);
 	system(command);
 	free(command);
 	

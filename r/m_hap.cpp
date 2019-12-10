@@ -111,7 +111,7 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K,
     
     
 // [[Rcpp::export]]
-IntegerMatrix m_hap (List par, List dat_info, IntegerMatrix haplotype) {
+IntegerMatrix m_hap (List par, List dat_info, IntegerMatrix haplotype, Rcpp::Nullable<IntegerVector> SNP = R_NilValue) {
   NumericMatrix w_ic = par["wic"];
   IntegerVector excluded_read = par["excluded_read"];
   IntegerVector ref = dat_info["ref_pos"];
@@ -125,14 +125,18 @@ IntegerMatrix m_hap (List par, List dat_info, IntegerMatrix haplotype) {
   double max;
   double llk;
   
-  //IntegerMatrix haplotype(NUM_CLASS, hap_length);
+  IntegerVector snp(hap_length);
+  if (SNP.isNull())
+    snp = 0;
+  else
+    snp = clone(SNP);
   
   /* pick out the updated sites for each haplotype */
   for (k = 0; k < NUM_CLASS; ++k) {
     
     // Rprintf("k: %d\n", k);
     for (j = 0; j < hap_length; ++j) {
-      if(non_covered[j] == 1) {
+      if(non_covered[j] == 1 || snp[j] == 0) {
         m_haplotype(k, j) = haplotype(k, j);
         //Rprintf("%d is not covered by any of the reads!\n", j);
         continue;

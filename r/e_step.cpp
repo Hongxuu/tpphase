@@ -87,6 +87,7 @@ double site_likelihood (unsigned int i, unsigned int K,
     
     //Rcout << "predictor : " << predictor.t() << "\n";
     //Rcout << "beta_ar : " << beta_ar << "\n";
+    //Rcout << "pred_beta : " << pred_beta << "\n";
     
     sum = 0.0;
     for (l = 0; l < MLOGIT_CLASS - 1; ++l)
@@ -102,8 +103,7 @@ double site_likelihood (unsigned int i, unsigned int K,
     } else if(obs[index[i] + j] == 0) {
       xb = 0;
     }
-    //Rcout << "xb : " << xb << "\n";
-    //Rcout << exp(xb + tail) << "\t";
+    //Rcout << "xb + tail : " << xb + tail << "\t";
     read_llk += xb + tail; /* Notice here use log likelihood, not likelihood */
   }
   
