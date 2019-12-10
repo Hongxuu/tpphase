@@ -46,6 +46,8 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   
   if(typeof(snp) == "character")
     snp <- read.delim(snp, header = FALSE, sep = " ") %>% as.integer()
+  else
+    snp <- as.integer(snp)
   
   if(is.null(samfile) == FALSE)
     sam <- read_sam(samfile, ref_name, fastq_file, datafile)
