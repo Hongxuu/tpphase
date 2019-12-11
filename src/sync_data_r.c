@@ -115,16 +115,17 @@ SEXP r_read_sam (SEXP samfile_r, SEXP ref_name_r, SEXP fastq_file_r, SEXP datafi
 	return R_NilValue;
 }
 
-SEXP r_ampliclust_init(SEXP ampliclust_command_r, SEXP fastq_file_r)
+SEXP r_ampliclust_init(SEXP ampliclust_command_r, SEXP fastq_file_r, SEXP ac_outfile_r)
 {
 	int err = NO_ERROR;
 	const char *ampliclust_command = NULL;	/*<! screen reads w/ ampliCI command */
 	const char *fastq_file = NULL;	/*<! ampliCI fastq filename */
 	const char *fsa_file = NULL;
-	const char *ac_outfile = "init"; /*<! ampliCI output filename */
+	const char *ac_outfile = NULL; /*<! ampliCI output filename */
 	
 	ampliclust_command = CHAR(STRING_ELT(ampliclust_command_r, 0));
 	fastq_file = CHAR(STRING_ELT(fastq_file_r, 0));
+	ac_outfile = CHAR(STRING_ELT(ac_outfile_r, 0));
 	
 	unsigned int cmd_len = strlen(ampliclust_command) + strlen(fastq_file) + strlen(" -f  -n --run -i amplici -lb  -ll -Inf -o ") + strlen(ac_outfile) + 8;
 	//fprintf(stderr, "Length of command: %u\n", cmd_len);
@@ -136,7 +137,12 @@ SEXP r_ampliclust_init(SEXP ampliclust_command_r, SEXP fastq_file_r)
 	system(command);
 	free(command);
 	
-	fsa_file = "init.fa";
+	char *outfile_hap = malloc((strlen(ac_outfile)+5) * sizeof (char));
+	if (!outfile_hap)
+		error("ampliclust output file allocation wrong");
+	strcpy(outfile_hap, ac_outfile);
+	strcat(outfile_hap, ".fa");
+	fsa_file = outfile_hap;
 	
 	fastq_options *fqo = NULL;
 	fastq_data *fdata = NULL;

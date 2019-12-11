@@ -39,8 +39,8 @@ sourceCpp("../r/m_hap.cpp")
 #' @return assignments and haplotypes, etc
 
 tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaFile, ampliclust_command,
-                    fastq_file = "res.fastq", datafile = "res.txt", snp = NULL, output = NULL, n_class = 4, 
-                    num_cat = 4, seed = 0, max = 50, tol = 1e-06, ncores = 2) {
+                    fastq_file = "./res.fastq", datafile = "./res.txt", ac_outfile = "./init", snp = NULL, output = NULL, 
+                    n_class = 4, num_cat = 4, seed = 0, max = 50, tol = 1e-06, ncores = 2) {
   
   registerDoParallel(cores = ncores)
   
@@ -57,7 +57,7 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   hap_length <- d$ref_length_max
   
   if(init == "ampliclust") {
-    hapinit <- call_ampliclust(ampliclust_command, fastq_file)
+    hapinit <- call_ampliclust(ampliclust_command, fastq_file, ac_outfile)
     hapinit <- hapinit[1:n_class, 1:hap_length]
   }
     
@@ -146,38 +146,3 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
 final <- tpphase(samfile = "../../../data/EM/308-TAN-consensus.sam", ref_name = "Adur122:1491484_P40", 
                  ampliclust_command = "../../amplici/run_ampliclust", snp = "../../../data/EM/test_result.txt", 
                  output = "308TAN_B_P40.txt")
-
-# old_id <- 0
-# flag <- 0
-# init_llk <- rep(0, ini_iter)
-# CE_llk <- rep(0, ini_iter)
-# change <- rep(0, ini_iter)
-# 
-# for (n in 1:max) {
-#   res <- em_eta(par = par, dat_info = d, haplotype = hap)
-#   init_llk[n] <- res$full_llk
-#   if(all(res$excluded_id == old_id) && (n >= ini_iter)) {
-#     flag <- 1
-#     break;
-#   } else if (any(res$excluded_id != old_id)){
-#     change[n] <- 1
-#   }
-#   old_id <- res$excluded_id
-#   use_d = 1
-#   if(all(old_hap == hap)) ## Maybe it is slower than format data (write a C comparision func)
-#     use_d = 0
-#   if(use_d) {
-#     data <- fromat_data(dat_info = d, haplotype = hap)
-#     data$nuc <- as.character(c("0" = "A", "2" = "T", "1" = "C", "3" = "G")[as.character(data$nuc)])
-#     data$hap_nuc <- as.character(c("0" = "A", "2" = "T", "1" = "C", "3" = "G")[as.character(data$hap_nuc)])
-#   } else {
-#     data <- cbind(id, data)
-#   }
-#   
-#   tmp <- m_beta(res = res, d = d, id = id, data = data, reads_lengths = read_length, ncores)
-#   par <- tmp$par
-#   print(sum(log(par$eta)))
-#   old_hap <- hap
-#   hap <- m_hap(par, d, haplotype = old_hap)
-#   CE_llk[n] <- tmp$CEllk
-# }
