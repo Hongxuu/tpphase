@@ -16,15 +16,14 @@ using namespace Rcpp;
 #define NUM_CLASS 4
 #define PD_LENGTH 10
 
-double site_likelihood (unsigned int i, unsigned int K,
-                        List par, List dat_info, NumericMatrix haplotype);
+double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta,
+                        double rate, List dat_info, IntegerMatrix haplotype, unsigned int del_count);
 
-double site_likelihood (unsigned int i, unsigned int K, 
-                        List par, List dat_info, IntegerMatrix haplotype)
+double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta,
+                        double rate, List dat_info, IntegerMatrix haplotype, unsigned int del_count)
 {
   unsigned int j, l;
   double qua_in, read_pos_in, ref_pos_in;
-  //unsigned int index = 0;
   double tail, sum;
   double xb = 0;
   
@@ -35,7 +34,6 @@ double site_likelihood (unsigned int i, unsigned int K,
   IntegerVector length = dat_info["length"];
   IntegerVector index = dat_info["start_id"];
   IntegerMatrix ref_index = dat_info["ref_idx"];
-  NumericMatrix beta = par["beta"];
   
   NumericVector hap_nuc(MLOGIT_CLASS - 1);
   NumericVector hnuc_qua(MLOGIT_CLASS - 1);
@@ -49,7 +47,7 @@ double site_likelihood (unsigned int i, unsigned int K,
   //   for (k = 0; k < i; ++k)
   //     index += length[k];
   
-  /* Use XY_ENCODING */
+  /* non-indel position */
   for(j = 0; j < length[i]; ++j) {
     
     //Rprintf("j %d, position %d\n", j, index[i] + j);
@@ -78,9 +76,6 @@ double site_likelihood (unsigned int i, unsigned int K,
     
     arma::vec predictor = {1, read_pos_in, ref_pos_in, qua_in, hap_nuc[0], hap_nuc[1], 
                                    hap_nuc[2], hnuc_qua[0], hnuc_qua[1], hnuc_qua[2]};
-    
-    // cblas_dgemv(CblasRowMajor, CblasNoTrans, MLOGIT_CLASS - 1, PD_LENGTH, 1, beta, PD_LENGTH, 
-    //             predictor, 1, 0, pred_beta, 1);
     arma::mat beta_ar = as<arma::mat>(beta);
     arma::vec pb = beta_ar.t() * predictor;
     pred_beta = as<NumericVector>(wrap(pb));
@@ -103,8 +98,15 @@ double site_likelihood (unsigned int i, unsigned int K,
     } else if(obs[index[i] + j] == 0) {
       xb = 0;
     }
-    //Rcout << "xb + tail : " << xb + tail << "\t";
+    //Rcout << "xb + tail: " << xb + tail << "\n";
     read_llk += xb + tail; /* Notice here use log likelihood, not likelihood */
+  }
+  
+  /* deletion position */
+  if(!del_count)
+  {
+    int hap_length = dat_info["ref_length_max"];
+    read_llk += dpois(del_count, lambda = hap_length * rate, log = true);
   }
   
   return read_llk;
@@ -115,10 +117,9 @@ double site_likelihood (unsigned int i, unsigned int K,
 List em_eta (List par, List dat_info, IntegerMatrix haplotype) {
   
   int n_observation = dat_info["n_observation"];
-  //IntegerVector length = dat_info["length"];
-  //int hap_length = haplotype.ncol();
-  // int hap_length = max(dat_info["ref_pos"]);
+  int hap_length = dat_info["ref_length_max"];
   double full_llk;
+  unsigned int i, k, m;
   
   NumericMatrix w_ic(n_observation, NUM_CLASS);
   NumericVector eta = par["eta"];
@@ -127,26 +128,31 @@ List em_eta (List par, List dat_info, IntegerMatrix haplotype) {
   NumericMatrix read_class_llk(n_observation, NUM_CLASS);
   NumericMatrix sum_weight(n_observation);
   NumericMatrix beta = par["beta"];
+  double rate = par["rate"];
   // NumericVector m_hap_llk(NUM_CLASS * hap_length * MLOGIT_CLASS);
   // m_hap_llk.attr("dim") = Dimension(NUM_CLASS, hap_length, MLOGIT_CLASS);
   
-  unsigned int i, k;
-  //double sum_weight;
-  //Rcout << "eta" << eta << "\n";
-  //Rcout << "beta" << beta << "\n";
+  /* deletion */
+  List deletion = dat_info["deletion"];
+  IntegerVector del_length_all = deletion["del_length_all"];
+  IntegerVector del_length = deletion["del_length"];
+  IntegerVector del_id = deletion["del_id"];
+  unsigned int del_num = deletion["del_num"];
+  
   /* e step */
   for (i = 0; i < n_observation; ++i) {
     // Exclude the read has -inf likelihood
-    if(excluded_read[i] == 1)
+    if (excluded_read[i] == 1)
       continue;
+   
     /* reset eta %*% llk at each class for each read */
     NumericVector weight_llk(NUM_CLASS);
     /* compute the likelihood for each read under each haplotype */
     //sum_weight = 0.;
     for (k = 0; k < NUM_CLASS; ++k) {
-      read_class_llk(i, k) = site_likelihood(i, k, par, dat_info, haplotype);
+      read_class_llk(i, k) = site_likelihood(i, k, beta, rate, dat_info, haplotype, del_length_all[i]);
       weight_llk[k] = eta[k] * exp(read_class_llk(i, k));
-      //Rprintf("\n read %d class %d llk %f; wei_lk %.30lf\n", i, k, read_class_llk(i, k), weight_llk[k]);
+      Rprintf("\n read %d class %d llk %f; log wei_lk %.10lf\n", i, k, read_class_llk(i, k), log(weight_llk[k]));
       sum_weight[i] += weight_llk[k];
     }
     //Rprintf("sum_weight %.30lf\n", sum_weight[i]);
@@ -172,26 +178,31 @@ List em_eta (List par, List dat_info, IntegerMatrix haplotype) {
       count++;
       continue;
     }
-    //for (k = 0; k < NUM_CLASS; ++k)
-      //mixture_llk += eta[k] * exp(read_class_llk(i, k)); // Store weight_llk[i, k] to reduce time
     full_llk += log(sum_weight[i]);
   }
   
   /* update eta, still exclude nan */
-  int count_all;
-  for (k = 0; k < NUM_CLASS; ++k) {
-    //mixture_prop[k] = 0;
-    count_all = 0;
-    for (i = 0; i < n_observation; ++i) {
+  for (i = 0; i < n_observation; ++i) {
       if (excluded_read[i] == 1)
         continue;
-      count_all++;
+      for (k = 0; k < NUM_CLASS; ++k)
       mixture_prop_updated[k] += w_ic(i, k);
-    }
   }
   /* assume the excluded reads do not come from any of the haplotypes */
   for (k = 0; k < NUM_CLASS; ++k)
-    mixture_prop_updated[k] = mixture_prop_updated[k]/count_all;
+    mixture_prop_updated[k] = mixture_prop_updated[k]/(n_observation - count);
+  
+  /* update rate */
+  double wic_di = 0, wic_pc = 0;
+  for (i = 0; i < del_num; ++i) {
+    if (excluded_read[del_id[i]] == 1)
+      continue;
+    for (k = 0; k < NUM_CLASS; ++k) {
+      wic_di = w_ic(del_id[i], k) * del_length[i];
+      wic_pc = w_ic(del_id[i], k) * hap_length;
+    }
+  }
+  rate = wic_di/wic_pc;
   
   k = 0;
   IntegerVector excluded_id(count);
@@ -206,6 +217,7 @@ List em_eta (List par, List dat_info, IntegerMatrix haplotype) {
       Named("mixture_prop") = mixture_prop_updated,
       Named("w_ic") = w_ic, 
       Named("beta") = beta,
+      Named("rate") = rate,
       Named("excluded_read") = excluded_read);
   
   List ls = List::create(

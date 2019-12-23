@@ -57,7 +57,7 @@ read_fastq <- function(datafile = NULL)
 } #read_fastq
 #read_fastq(datafile = fastq_file)
 
-call_ampliclust <- function(ampliclust_command = NULL, fastq_file = NULL, ac_outfile = "./init") {
+call_ampliclust <- function(ampliclust_command = NULL, fastq_file = NULL, ac_outfile = NULL) {
   checkmate::expect_file_exists(fastq_file, access = "r")
   checkmate::expect_file_exists(ampliclust_command, access = "r")
   if (utils::tail(unlist(strsplit(fastq_file, "[.]")), 1) != "fastq")
@@ -79,9 +79,9 @@ call_ampliclust <- function(ampliclust_command = NULL, fastq_file = NULL, ac_out
 # samfile = "../../data/tetraploid/308-TAN-A.sam"
 # ref_name = "Adur420_2:199509_P2"
 # read_sam(samfile, ref_name, fastq_file = "res.fastq", datafile = "res.txt")
-haps <- call_ampliclust(ampliclust_command, fastq_file, ac_outfile = "../init")
-ampliclust_command = "../../amplici/run_ampliclust"
-fastq_file = "res.fastq"
+#haps <- call_ampliclust(ampliclust_command, fastq_file, ac_outfile = "../init")
+#ampliclust_command = "../../amplici/run_ampliclust"
+#fastq_file = "res.fastq"
 
 
 

@@ -18,10 +18,11 @@
 ini <- function(dat, n_observation, n_class = 4, num_cat = 4, seed = 0) {
   par <- list()
   set.seed(seed)
-  par$eta <- runif(n_class, 0, 1)
-  par$eta <- par$eta/sum(par$eta)
+  #par$eta <- runif(n_class, 0, 1)
+  #par$eta <- par$eta/sum(par$eta)
   par$eta <- rep(0.25, 4)
   par$wic <- 0
+  par$rate <- 1e-5
   par$excluded_read <- rep(0, n_observation)
   Mpar <- Mstep(dat, par, weights = FALSE)
   par$beta <- Mpar$beta
@@ -256,6 +257,7 @@ m_beta <- function(res, d, data, id, reads_lengths, ncores) {
   par$beta <- Mpar$beta 
   par$wic <- res$param$w_ic ## For the use of update haplotype
   par$eta <- res$param$mixture_prop
+  par$rate <- res$param$rate
   par$excluded_read <- res$param$excluded_read
   
   results <- list()

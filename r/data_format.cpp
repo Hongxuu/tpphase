@@ -69,64 +69,187 @@ inline xy_t char_to_xy(char c)
 } /* char_to_xy */
 
 unsigned char const xy_to_char[MLOGIT_CLASS] = {'A', 'C', 'T', 'G'};
+
+// FIND UNIQUE IF THE SEQUENCE IS ORDERED
+// int uniq(int *a, unsigned int len);
+// int uniq(int *a, unsigned int len)
+// {
+//   int i, j;
+//   for (i = j = 0; i < len; i++)
+//     if (a[i] != a[j]) a[++j] = a[i];
+//     return j + 1;
+// }
+
+// FIND UNIQUE UNDER MY CASE
+// List uniq(IntegerVector a, unsigned int len) {
+//   IntegerVector unique(len);
+//   unsigned int uniq_len;
+//   for (unsigned int m = 0; m < len; ++m) 
+//     if (m < len - 1 && a[m] != a[m + 1])
+//       unique[uniq_len++] = a[m];
+//     if(unique[uniq_len] != a[len])
+//       unique[uniq_len++] = a[len];
+//     
+//   return ls; 
+// }
+
 // [[Rcpp::export]]
 List read_data(std::string path) {
   int j, k, l;
-  unsigned int i, m, count = 0;
+  unsigned int i, m, count = 0, count_del = 0, count_ins = 0;
   char c;
   char str[100];
+  int n_observation = 0;
+  
   FILE* fp = fopen(path.c_str(), "r");
   if(!fp) {
     Rcpp::stop("File opening failed");
   }
+  int temp_n = -1;
   while (fgets(str, sizeof(str), fp)) {
     std::sscanf(str, "%d %d %d %d %c", &i, &j, &k, &l, &c);
     /* exclude -1 in ref_pos and qua */
-    if (k == -1 || l == -1) {
+    if (k == -1) {
+      count_ins++;
       continue;
     }
-    count++;
+    else if (l == -1)
+      count_del++;
+    else {
+      if (temp_n != i) {
+        temp_n = i;
+        n_observation++;
+      }
+      count++;
+    }
   }
+  
+  unsigned int del_num = 0;
+  IntegerVector del_obs_index(count_del);
+  IntegerVector del_ref_pos(count_del);
+  IntegerVector del_read_pos(count_del);
+  IntegerVector del_id(n_observation);
+  IntegerVector del_flag(n_observation);
+  
+  unsigned int ins_num = 0;
+  IntegerVector ins_obs_index(count_ins);
+  IntegerVector ins_id(n_observation);
+  IntegerVector ins_read_pos(count_ins);
+  IntegerVector ins_flag(n_observation);
   
   IntegerVector qua(count);
   IntegerVector obs(count);
+  StringVector obs_str(count);
   IntegerVector obs_index(count);
   IntegerVector ref_pos(count);
   IntegerVector read_pos(count);
   int total;
-  int n_observation = 0;
   
   rewind(fp);
   
   count = 0;
+  count_del = 0;
+  count_ins = 0;
   while (fgets(str, sizeof(str), fp)) {
     std::sscanf(str, "%d %d %d %d %c", &i, &j, &k, &l, &c);
     /* exclude -1 in ref_pos and qua */
-    if (k == -1 || l == -1) {
-      continue;
+    if (k == -1) {
+      ins_obs_index[count_ins] = i;
+      ins_read_pos[count_ins] = j;
+      ins_flag[i-1] = 1;
+      count_ins++;
     }
-    obs_index[count] = i;
-    read_pos[count] = j;
-    ref_pos[count] = k;
-    qua[count] = l;
-    obs[count] = c;
-    count++;
-  }
-  total = count;
-  
-  IntegerVector length(total);
-  
-  for (m = 0; m < count; ++m) {
-    i = obs_index[m];
-    if (!length[i-1]) {
-      n_observation++;
+    else if (l == -1) {
+      del_obs_index[count_del] = i;
+      del_read_pos[count_del] = j;
+      del_ref_pos[count_del] = k;
+      del_flag[i-1] = 1;
+      count_del++;
     }
-    ++length[i-1];
-    obs[m] = char_to_xy(obs[m]);
+    else {
+      obs_index[count] = i;
+      read_pos[count] = j;
+      ref_pos[count] = k;
+      qua[count] = l;
+      obs[count] = c;
+      count++;
+    }
   }
   fclose(fp);
   fp = NULL;
   
+  total = count;
+  IntegerVector length(n_observation);
+  
+  //insertion
+  for (m = 0; m < count_ins; ++m) 
+    if (m < count_ins - 1 && ins_obs_index[m] != ins_obs_index[m + 1])
+      ins_id[ins_num++] = ins_obs_index[m];
+  if(ins_id[ins_num] != ins_obs_index[count_ins])
+    ins_id[ins_num++] = ins_obs_index[count_ins];
+    
+  IntegerVector ins_count(ins_num);
+  for (m = 0; m < ins_num; ++m)
+    ins_count[m] = 1;
+  i = 0;
+  for (m = 0; m < count_ins; ++m) {
+    if (m < count_ins - 1 && ins_obs_index[m] == ins_obs_index[m + 1])
+      ins_count[i]++;
+    else
+      i++;
+  }
+  
+  IntegerVector ins_length_all(n_observation);
+  for (i = 0; i < n_observation; ++i)
+    if (ins_flag[i] == 1)
+      for (m = 0; m < ins_num; ++m)
+        if (ins_id[m] == i + 1)
+          ins_length_all[i] = ins_count[m];
+        
+  // deletion
+  for (m = 0; m < count_del; ++m)
+    if (m < count_del - 1 && del_obs_index[m] != del_obs_index[m + 1])
+      del_id[del_num++] = del_obs_index[m];
+  if(del_id[del_num] != del_obs_index[count_del])
+      del_id[del_num++] = del_obs_index[count_del];
+  
+  IntegerVector del_count(del_num);
+  for (m = 0; m < del_num; ++m)
+    del_count[m] = 1;
+  i = 0;
+  for (m = 0; m < count_del; ++m) {
+    if (m < count_del - 1 && del_obs_index[m] == del_obs_index[m + 1])
+      del_count[i]++;
+    else
+      i++;
+  }
+  
+  IntegerVector del_length_all(n_observation);
+  for (i = 0; i < n_observation; ++i)
+    if (del_flag[i] == 1)
+      for (m = 0; m < del_num; ++m)
+        if (del_id[m] == i + 1)
+          del_length_all[i] = del_count[m];
+  
+  // non indel
+  for (m = 0; m < count; ++m) {
+    i = obs_index[m];
+    // if (!length[i-1]) {
+    //   n_observation++;
+    // }
+    ++length[i-1];
+    obs[m] = char_to_xy(obs[m]);
+  }
+  
+  // true length
+  IntegerVector true_length(n_observation);
+  IntegerVector fake_length(n_observation);
+  for (i = 0; i < n_observation; ++i) {
+    true_length[i] = length[i] + ins_length_all[i];
+    fake_length[i] = length[i] + del_length_all[i];
+  }
+  
+  /* index of read */
   IntegerVector index(n_observation);
   for (m = 1; m < n_observation; ++m)
       index[m] = index[m - 1] + length[m - 1];
@@ -163,12 +286,24 @@ List read_data(std::string path) {
         non_covered_site[m] = 1;
   }
         
-  // DataFrame df = DataFrame::create(
-  //   Named("id") = obs_index,
-  //   Named("read_pos") = read_pos,
-  //   Named("ref_pos") = ref_pos,
-  //   Named("nuc") = obs,
-  //   Named("qua") = qua);
+  List del = List::create(
+    Named("del_id") = del_id[Range(0, del_num - 1)],
+    Named("del_id_all") = del_obs_index,
+    Named("del_flag") = del_flag,
+    Named("del_read_pos") = del_read_pos,
+    Named("del_ref_pos") = del_ref_pos,
+    Named("del_length") = del_count, //no. of deletion in each read that contains deletion
+    Named("del_num") = del_num,  //no. of reads have deletion
+    Named("del_total") = count_del,
+    Named("del_length_all") = del_length_all);
+  
+  List ins = List::create(
+    Named("ins_id") = ins_id[Range(0, ins_num - 1)],
+    Named("ins_read_pos") = ins_read_pos,
+    Named("ins_length") = ins_count,
+    Named("ins_num") = ins_num,
+    Named("ins_flag") = ins_flag,
+    Named("ins_length_all") = ins_length_all);
   
   List ls = List::create(
     Named("id") = obs_index,
@@ -177,35 +312,22 @@ List read_data(std::string path) {
     Named("nuc") = obs,
     Named("qua") = qua,
     Named("n_observation") = n_observation,
-    Named("length") = length[Range(0, n_observation - 1)], 
+    Named("length") = length, 
+    Named("true_length") = true_length, 
+    Named("fake_length") = fake_length, 
     Named("total") = total,
     Named("start_id") = index,
     Named("ref_length_max") = max_len, 
     Named("ref_idx") = ref_index, 
-    Named("non_covered_site") = non_covered_site);
+    Named("non_covered_site") = non_covered_site,
+    Named("deletion") = del,
+    Named("insertion") = ins);
   
   return ls;
 }
 
-
-// NumericVector read_fastq(std::string path){
-//   unsigned int i;
-//   FILE* fp = path.c_str();
-//   fastq_data *fdata;		/* fasta data */
-//   fastq_options fop = {.read_encoding = XY_ENCODING};	/* fastq file options */
-//   read_fastq(fp, fdata, &fop);
-//   
-//   NumericVector haplotype(NUM_CLASS * fdata->n_max_length);
-//   for(i = 0; i < NUM_CLASS * fdata->n_max_length; ++i)
-//     haplotype[i] = fdata->reads[i];
-//   
-//   haplotype.attr("dim") = Dimension(NUM_CLASS, fdata->n_max_length);
-//   
-//   return haplotype;
-// }
-
 // [[Rcpp::export]]
-DataFrame fromat_data(List dat_info, IntegerMatrix haplotype) {
+DataFrame format_data(List dat_info, IntegerMatrix haplotype) {
   unsigned int i, k, l;
   int input_arr[] = {0, 1, 2, 3};
   size_t input_arr_sz = sizeof input_arr / sizeof *input_arr;
@@ -258,6 +380,32 @@ DataFrame fromat_data(List dat_info, IntegerMatrix haplotype) {
     Named("hap_nuc") = r_hap_nuc);
 
   return(df_new);
+}
+
+// [[Rcpp::export]]
+IntegerMatrix sample_hap (List dat_info, IntegerVector start, IntegerVector idx) {
+  List deletion = dat_info["deletion"];
+  IntegerVector del_flag = deletion["del_flag"];
+  IntegerVector del_id_all = deletion["del_id_all"];
+  IntegerVector del_ref_pos = deletion["del_ref_pos"];
+  IntegerVector ref_pos = dat_info["ref_pos"];
+  IntegerVector obs = dat_info["nuc"];
+  IntegerVector length = dat_info["length"];
+  int del_total = deletion["del_total"];
+  int hap_length = dat_info["ref_length_max"];
+  unsigned int i, j, m;
+  
+  IntegerMatrix hap_nuc(NUM_CLASS, hap_length);
+  
+  for (i = 0; i < NUM_CLASS; ++i) {
+    for (j = 0; j < length[idx[i]]; ++j)
+      hap_nuc(i, ref_pos[start[i] + j]) = obs[start[i] + j];
+    if (del_flag[idx[i]] == 1)
+      for (m = 0; m < del_total; ++m)
+        if (del_id_all[m] == idx[i])
+          hap_nuc(i, del_ref_pos[m]) = -1;
+  }
+  return hap_nuc;
 }
 
 // [[Rcpp::export]] 

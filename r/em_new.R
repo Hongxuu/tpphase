@@ -16,8 +16,9 @@ sourceCpp("../r/data_format.cpp")
 sourceCpp("../r/mnlogit.cpp")
 sourceCpp("../r/e_step.cpp")
 sourceCpp("../r/m_hap.cpp")
+sourceCpp("../r/extra.cpp")
 
-#' @description 
+#' @description The data used filter soft and hard clip
 #' @param samfile Input sam file
 #' @param ref_name Reference name in sam file
 #' @param init Initialization method (Options: "ampliclust", "in_file", "random", Default: "ampliclust")
@@ -65,20 +66,26 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
     hapinit <- read_fasta(FastaFile)[1:n_class, 1:hap_length]
   
   if(init == "random") {
-    library(ShortRead) ## Temp, need to modify length
     set.seed(seed)
-    hapinit <- readFastq(fastq_file)
-    a <- sread(hapinit)[sample(which(hapinit@sread@ranges@width == hap_length), n_class)] %>% as.data.frame()
-    reads <- plyr::ldply(apply(a, MARGIN = 1, FUN = function(x) strsplit(x, "")) %>% flatten, rbind)
-    reads <- t(t(reads) %>% na.omit)[, -1]
-    ncol <- ncol(reads)
-    reads_num <- to_xy_r(reads)
-    hapinit <- matrix(reads_num, ncol) %>% t()
-    #hap <- read_fastq(fastq_file) // TODO: read with different length 
-    #hap <- hap$reads[sample(1:nrow(hap$read), n_class), ]
+    samp <- which(d$fake_length == hap_length)
+    if(length(samp) < n_class)
+      stop("Not enough sample with the same length as the haplotypes to infer, 
+           adjust the longest length with coverage reads more than 4!")
+    samp_id <- sample(samp, n_class)
+    # hapinit <- readFastq(fastq_file)
+    # samp <- sample(which(hapinit@sread@ranges@width == hap_length), n_class) # id starts from 1 in data
+    start <- d$start_id[samp_id]
+    hapinit2 <- sample_hap(d, start, samp_id)
+    
+    # a <- sread(hapinit)[samp] %>% as.data.frame()
+    # reads <- plyr::ldply(apply(a, MARGIN = 1, FUN = function(x) strsplit(x, "")) %>% flatten, rbind)
+    # reads <- t(t(reads) %>% na.omit)[, -1]
+    # ncol <- ncol(reads)
+    # reads_num <- to_xy_r(reads)
+    # hapinit <- matrix(reads_num, ncol) %>% t()
   }
   
-  data <- fromat_data(dat_info = d, haplotype = hapinit)
+  data <- format_data(dat_info = d, haplotype = hapinit)
   data$nuc <- to_char_r(data$nuc)
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
@@ -107,7 +114,7 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
     #}
     
     if(length(res$excluded_id) != 0)
-      cat(res$excluded_id, "don't belong to any of the haplotypes\n")
+      cat(res$excluded_id, "don't (doesn't) belong to any of the haplotypes\n")
     full_llk[m] <- res$full_llk
     #if(abs(par$eta - res$param$mixture_prop) < tol && abs(par$beta - res$param$beta) < tol)
     if(m > 1)
@@ -117,7 +124,7 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
         break;
     
     if(any(old_hap != hap)) {
-      data <- fromat_data(dat_info = d, haplotype = hap)
+      data <- format_data(dat_info = d, haplotype = hap)
       data$nuc <- to_char_r(data$nuc)
       data$hap_nuc <- to_char_r(data$hap_nuc)
     } 
@@ -143,6 +150,11 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   return(final_res)
 }
 
-final <- tpphase(samfile = "../../../data/EM/308-TAN-consensus.sam", ref_name = "Adur122:1491484_P40", 
-                 ampliclust_command = "../../amplici/run_ampliclust", snp = "../../../data/EM/test_result.txt", 
-                 output = "308TAN_B_P40.txt")
+final <- tpphase(samfile = "../../../data/peanut_consensus/308-TAN-consensus.sam", ref_name = "Adur313:17300_Adur313:17334_P30", init = "random",
+                 ampliclust_command = "../../amplici/run_ampliclust", fastq_file = "../../../data/tpphase_res_consensus/308TAN/resp30.fastq",
+                 datafile = "../../../data/tpphase_res_consensus/308TAN/resp30.txt",
+                 ac_outfile = "../../../data/tpphase_res_consensus/initp30", 
+                 output = "../../../data/tpphase_res_consensus/308TAN_p30.txt")
+
+
+

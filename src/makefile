@@ -1,6 +1,6 @@
 CC = gcc
 
-CFLAGS = -Wall -Wextra -pedantic -O3 -std=c11 -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=500		# c11 with POSIX 20 112L and optimization
+CFLAGS = -Wall -Wextra -pedantic -O3 -std=c11 -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=500 -I/usr/include/R/ -FPIC		# c11 with POSIX 20 112L and optimization
 
 # -e DBG=1
 ifdef DBG
@@ -26,7 +26,7 @@ deps = $(srcs:.c=.d)
 sam_objs = sync_data_r.o sam.o sequence.o nuc.o qual.o error.o fastq.o align.o io.o cmdline.o
 
 Rlib: $(sam_objs)
-	R CMD SHLIB $(sam_objs)
+	R CMD SHLIB $(sam_objs) $(LDFLAGS)
 
 include $(deps)
 

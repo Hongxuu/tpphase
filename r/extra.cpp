@@ -47,5 +47,6 @@ mat m2 = as<mat>(m2in);
 mat cp = trans(m1) * m2;
 return(wrap(cp));
 '
+library(inline)
 crossprodC <- cxxfunction(signature(m1in="numeric", m2in="numeric"), src_cp, plugin='RcppArmadillo', rcpp_inc)
 */
