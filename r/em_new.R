@@ -16,7 +16,6 @@ sourceCpp("../r/data_format.cpp")
 sourceCpp("../r/mnlogit.cpp")
 sourceCpp("../r/e_step.cpp")
 sourceCpp("../r/m_hap.cpp")
-sourceCpp("../r/extra.cpp")
 
 #' @description The data used filter soft and hard clip
 #' @param samfile Input sam file
@@ -67,22 +66,15 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   
   if(init == "random") {
     set.seed(seed)
-    samp <- which(d$fake_length == hap_length)
+    samp <- which(d$fake_length == hap_length & d$deletion$del_length_all <=2)
     if(length(samp) < n_class)
       stop("Not enough sample with the same length as the haplotypes to infer, 
            adjust the longest length with coverage reads more than 4!")
     samp_id <- sample(samp, n_class)
-    # hapinit <- readFastq(fastq_file)
-    # samp <- sample(which(hapinit@sread@ranges@width == hap_length), n_class) # id starts from 1 in data
-    start <- d$start_id[samp_id]
-    hapinit2 <- sample_hap(d, start, samp_id)
-    
-    # a <- sread(hapinit)[samp] %>% as.data.frame()
-    # reads <- plyr::ldply(apply(a, MARGIN = 1, FUN = function(x) strsplit(x, "")) %>% flatten, rbind)
-    # reads <- t(t(reads) %>% na.omit)[, -1]
-    # ncol <- ncol(reads)
-    # reads_num <- to_xy_r(reads)
-    # hapinit <- matrix(reads_num, ncol) %>% t()
+    start <- d$start_id[samp_id] #index is right in R!
+    hapinit <- sample_hap(d, start, samp_id)
+    # if (any(d$deletion$del_flag[samp_id] == 1))
+    #   N_in = 1
   }
   
   data <- format_data(dat_info = d, haplotype = hapinit)
@@ -93,7 +85,7 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   
   par <- list()
   par <- ini(dat = data, n_observation = d$n_observation, seed = seed, n_class = n_class, num_cat = num_cat)
-  old_hap <- hapinit
+  #old_hap <- hapinit
   hap <- hapinit
   
   full_llk <- rep(0, max)
@@ -105,23 +97,21 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   ### Iteration
   for (m in 1:max) {
     cat("iteartion", m, "\n")
-    #if(flag == 0) {
-      res <- em_eta(par = par, dat_info = d, haplotype = hap)
-      resu[[m]] <- res
-    #} else {
-      #flag = 0
-      #resu[[m]] <- res
-    #}
+    if(nrow(par$beta) > 10)
+      N_in = 1
+    else 
+      N_in = 0
     
+    res <- em_eta(par = par, dat_info = d, haplotype = hap, PD_LENGTH = nrow(par$beta), N_in = N_in)
+    par$wic <- res$param$w_ic
+    resu[[m]] <- res
     if(length(res$excluded_id) != 0)
       cat(res$excluded_id, "don't (doesn't) belong to any of the haplotypes\n")
     full_llk[m] <- res$full_llk
-    #if(abs(par$eta - res$param$mixture_prop) < tol && abs(par$beta - res$param$beta) < tol)
-    if(m > 1)
-      if(abs(full_llk[m] - full_llk[m-1]) < tol && 
-         abs(par$eta - res$param$mixture_prop) < tol && 
-         abs(par$beta - res$param$beta) < tol)
-        break;
+    
+    old_hap <- hap
+    hap <- m_hap(par = par, dat_info = d, PD_LENGTH = nrow(par$beta), N_in = N_in, haplotype = old_hap, SNP = snp)
+    haps[[m]] <- hap
     
     if(any(old_hap != hap)) {
       data <- format_data(dat_info = d, haplotype = hap)
@@ -129,12 +119,16 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
       data$hap_nuc <- to_char_r(data$hap_nuc)
     } 
     
-    tmp <- m_beta(res = res, d = d, id = id, data = data, reads_lengths = read_length, ncores)
+    tmp <- m_beta(res = res, d = d, id = id, data = data, N_in = N_in, reads_lengths = read_length, ncores)
     par <- tmp$par
-    old_hap <- hap
-    hap <- m_hap(par, d, haplotype = old_hap, SNP = snp)
-    haps[[m]] <- hap
     CE_llk_iter[m] <- tmp$CEllk
+    
+    #if(abs(par$eta - res$param$mixture_prop) < tol && abs(par$beta - res$param$beta) < tol)
+    if(m > 1)
+      if(abs(full_llk[m] - full_llk[m-1]) < tol && 
+         abs(par$eta - res$param$mixture_prop) < tol && 
+         abs(par$beta - res$param$beta) < tol)
+        break;
   }
   
   final_res <- list()
@@ -157,4 +151,11 @@ final <- tpphase(samfile = "../../../data/peanut_consensus/308-TAN-consensus.sam
                  output = "../../../data/tpphase_res_consensus/308TAN_p30.txt")
 
 
-
+# hapinit <- readFastq(fastq_file)
+# samp <- sample(which(hapinit@sread@ranges@width == hap_length), n_class) # id starts from 1 in data
+# a <- sread(hapinit)[samp] %>% as.data.frame()
+# reads <- plyr::ldply(apply(a, MARGIN = 1, FUN = function(x) strsplit(x, "")) %>% flatten, rbind)
+# reads <- t(t(reads) %>% na.omit)[, -1]
+# ncol <- ncol(reads)
+# reads_num <- to_xy_r(reads)
+# hapinit <- matrix(reads_num, ncol) %>% t()

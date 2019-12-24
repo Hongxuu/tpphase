@@ -8,7 +8,6 @@ using namespace Rcpp;
 
 #define MLOGIT_CLASS 4
 #define NUM_CLASS 4
-#define PD_LENGTH 10
 
 //https://stackoverflow.com/questions/51110244/in-rcpp-how-to-get-a-user-defined-structure-from-c-into-r
 // namespace Rcpp {
@@ -26,27 +25,6 @@ using namespace Rcpp;
 //   };
 // }
 
-// 
-// par init_par(NumericVector beta) {
-//   par *par;
-//   par->beta = NULL;
-//   par->eta = NULL;
-//   par->w_ic = NULL;
-//   MAKE_1DOUBLEARRAY(par->eta, 4);
-//   MAKE_1DOUBLEARRAY(par->beta, (MLOGIT_CLASS - 1) * PD_LENGTH);
-//   
-//   unsigned int i;
-//   double sum = 0.;
-//   
-//   for (i = 0; i < 4; ++i) {
-//     par->eta[i] = (double) rand() / RAND_MAX;
-//     sum += par->eta[i];
-//   }
-//   for(i = 0; i < beta.length(); ++i) {
-//     par->beta[i] = beta[i];
-//   }
-//   return par;
-// }
 typedef unsigned char xy_t;
 /**
  * Convert char to xy.
@@ -69,16 +47,6 @@ inline xy_t char_to_xy(char c)
 } /* char_to_xy */
 
 unsigned char const xy_to_char[MLOGIT_CLASS] = {'A', 'C', 'T', 'G'};
-
-// FIND UNIQUE IF THE SEQUENCE IS ORDERED
-// int uniq(int *a, unsigned int len);
-// int uniq(int *a, unsigned int len)
-// {
-//   int i, j;
-//   for (i = j = 0; i < len; i++)
-//     if (a[i] != a[j]) a[++j] = a[i];
-//     return j + 1;
-// }
 
 // FIND UNIQUE UNDER MY CASE
 // List uniq(IntegerVector a, unsigned int len) {
@@ -185,8 +153,8 @@ List read_data(std::string path) {
   for (m = 0; m < count_ins; ++m) 
     if (m < count_ins - 1 && ins_obs_index[m] != ins_obs_index[m + 1])
       ins_id[ins_num++] = ins_obs_index[m];
-  if(ins_id[ins_num] != ins_obs_index[count_ins])
-    ins_id[ins_num++] = ins_obs_index[count_ins];
+  if(ins_id[ins_num- 1] != ins_obs_index[count_ins - 1])
+    ins_id[ins_num++] = ins_obs_index[count_ins - 1];
     
   IntegerVector ins_count(ins_num);
   for (m = 0; m < ins_num; ++m)
@@ -200,18 +168,15 @@ List read_data(std::string path) {
   }
   
   IntegerVector ins_length_all(n_observation);
-  for (i = 0; i < n_observation; ++i)
-    if (ins_flag[i] == 1)
-      for (m = 0; m < ins_num; ++m)
-        if (ins_id[m] == i + 1)
-          ins_length_all[i] = ins_count[m];
+  for (m = 0; m < ins_num; ++m)
+        ins_length_all[ins_id[m] - 1] = ins_count[m];
         
   // deletion
   for (m = 0; m < count_del; ++m)
     if (m < count_del - 1 && del_obs_index[m] != del_obs_index[m + 1])
       del_id[del_num++] = del_obs_index[m];
-  if(del_id[del_num] != del_obs_index[count_del])
-      del_id[del_num++] = del_obs_index[count_del];
+  if(del_id[del_num - 1] != del_obs_index[count_del - 1])
+      del_id[del_num++] = del_obs_index[count_del - 1];
   
   IntegerVector del_count(del_num);
   for (m = 0; m < del_num; ++m)
@@ -225,11 +190,8 @@ List read_data(std::string path) {
   }
   
   IntegerVector del_length_all(n_observation);
-  for (i = 0; i < n_observation; ++i)
-    if (del_flag[i] == 1)
-      for (m = 0; m < del_num; ++m)
-        if (del_id[m] == i + 1)
-          del_length_all[i] = del_count[m];
+  for (m = 0; m < del_num; ++m)
+        del_length_all[del_id[m] - 1] = del_count[m];
   
   // non indel
   for (m = 0; m < count; ++m) {
@@ -398,9 +360,9 @@ IntegerMatrix sample_hap (List dat_info, IntegerVector start, IntegerVector idx)
   IntegerMatrix hap_nuc(NUM_CLASS, hap_length);
   
   for (i = 0; i < NUM_CLASS; ++i) {
-    for (j = 0; j < length[idx[i]]; ++j)
-      hap_nuc(i, ref_pos[start[i] + j]) = obs[start[i] + j];
-    if (del_flag[idx[i]] == 1)
+    for (j = 0; j < length[idx[i] - 1]; ++j)
+      hap_nuc(i, ref_pos[start[i] + j]) = obs[start[i] + j]; //idx start from 1!!!
+    if (del_flag[idx[i] - 1] == 1)
       for (m = 0; m < del_total; ++m)
         if (del_id_all[m] == idx[i])
           hap_nuc(i, del_ref_pos[m]) = -1;

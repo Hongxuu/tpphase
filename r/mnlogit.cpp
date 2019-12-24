@@ -12,8 +12,6 @@
 using namespace Rcpp;
 using namespace arma;
 
-#define PD_LENGTH 10
-
 // [[Rcpp::export]]
 NumericVector sort_ind(CharacterVector input, int n) {
   int i;
@@ -41,35 +39,35 @@ NumericVector sort_ind(CharacterVector input, int n) {
   return(re);
 }
 
-// [[Rcpp::export]]
-NumericMatrix formDesignMat(DataFrame dat, int N) {
-    IntegerVector qua = dat["qua"];
-    IntegerVector ref_pos = dat["ref_pos"];
-    IntegerVector read_pos = dat["read_pos"];
-    CharacterVector hap_nuc = dat["hap_nuc"];
-    
-    NumericMatrix X(N, PD_LENGTH);
-    
-    for (int i = 0; i < N; ++i) {
-    	X(i, 0) = 1;
-    	X(i, 1) = read_pos[i];
-    	X(i, 2) = ref_pos[i];
-    	X(i, 3) = qua[i];
-    	if (hap_nuc[i] == "C") {
-    		X(i, 4) = 1;
-    		X(i, 7) = qua[i];
-    	}
-    	if (hap_nuc[i] == "G") {
-    		X(i, 5) = 1;
-    		X(i, 8) = qua[i];
-    	}
-    	if (hap_nuc[i] == "T") {
-    		X(i, 6) = 1;
-    		X(i, 9) = qua[i];
-    	}
-    }
-    return(X);
-}
+// TODO: model.matrix in cpp
+// NumericMatrix formDesignMat(DataFrame dat, int N, int PD_LENGTH) {
+//     IntegerVector qua = dat["qua"];
+//     IntegerVector ref_pos = dat["ref_pos"];
+//     IntegerVector read_pos = dat["read_pos"];
+//     CharacterVector hap_nuc = dat["hap_nuc"];
+//     
+//     NumericMatrix X(N, PD_LENGTH);
+//     
+//     for (int i = 0; i < N; ++i) {
+//     	X(i, 0) = 1;
+//     	X(i, 1) = read_pos[i];
+//     	X(i, 2) = ref_pos[i];
+//     	X(i, 3) = qua[i];
+//     	if (hap_nuc[i] == "C") {
+//     		X(i, 4) = 1;
+//     		X(i, 7) = qua[i];
+//     	}
+//     	if (hap_nuc[i] == "G") {
+//     		X(i, 5) = 1;
+//     		X(i, 8) = qua[i];
+//     	}
+//     	if (hap_nuc[i] == "T") {
+//     		X(i, 6) = 1;
+//     		X(i, 9) = qua[i];
+//     	}
+//     }
+//     return(X);
+// }
 
 // 
 // DataFrame sort_df(DataFrame dat, vec index) {

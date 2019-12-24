@@ -14,14 +14,12 @@ using namespace Rcpp;
 
 #define MLOGIT_CLASS 4
 #define NUM_CLASS 4
-#define PD_LENGTH 10
 
-double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K,
-                        List par, List dat_info, NumericMatrix w_ic);
+double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned int PD_LENGTH, unsigned int N_in,
+                        List par, List dat_info, NumericMatrix w_ic, IntegerVector excluded_read);
 
-double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, 
-                        NumericVector beta, List dat_info, NumericMatrix w_ic,
-                        IntegerVector excluded_read)
+double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned int PD_LENGTH, unsigned int N_in,
+                        NumericVector beta, List dat_info, NumericMatrix w_ic, IntegerVector excluded_read)
 {
   unsigned int i, k, c;
   double qua_in, read_pos_in, ref_pos_in;
@@ -39,9 +37,10 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K,
   IntegerVector index = dat_info["start_id"];
   IntegerMatrix ref_index = dat_info["ref_idx"];
   
-  NumericVector hap_nuc(MLOGIT_CLASS - 1);
-  NumericVector hnuc_qua(MLOGIT_CLASS - 1);
+  NumericVector hap_nuc(MLOGIT_CLASS);
+  NumericVector hnuc_qua(MLOGIT_CLASS);
   NumericVector pred_beta(MLOGIT_CLASS - 1);
+  arma::vec predictor(PD_LENGTH);
   
   for (i = 0; i < n_observation; ++i) {
     // if (i != 0)
@@ -54,10 +53,9 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K,
     read_pos_in = read_pos[index[i] + ref_index(i, j)];
     ref_pos_in = ref_pos[index[i] + ref_index(i, j)];
     
-    for (k = 0; k < MLOGIT_CLASS - 1; ++k) {
+    for (k = 0; k < MLOGIT_CLASS; ++k) {
       hap_nuc[k] = 0;
       hnuc_qua[k] = 0;
-      pred_beta[k] = 0;
     }
     
     if (l == 1) {
@@ -67,13 +65,17 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K,
       hap_nuc[1] = 1;
       hnuc_qua[1] = qua_in;
     } else if (l == 2) {
-      hap_nuc[2] = 1;
-      hnuc_qua[2] = qua_in;
+      hap_nuc[3] = 1;
+      hnuc_qua[3] = qua_in;
     }
     
-    arma::vec predictor = {1, read_pos_in, ref_pos_in, qua_in, hap_nuc[0], hap_nuc[1], 
-                           hap_nuc[2], hnuc_qua[0], hnuc_qua[1], hnuc_qua[2]};
-    
+    if(!N_in) {
+      predictor = {1, read_pos_in, ref_pos_in, qua_in, hap_nuc[0], hap_nuc[1], 
+                   hap_nuc[3], hnuc_qua[0], hnuc_qua[1], hnuc_qua[3]};
+    } else {
+      predictor = {1, read_pos_in, ref_pos_in, qua_in, hap_nuc[0], hap_nuc[1], 
+                   hap_nuc[2], hap_nuc[3], hnuc_qua[0], hnuc_qua[1], hnuc_qua[2], hnuc_qua[3]};
+    }
     // cblas_dgemv(CblasRowMajor, CblasNoTrans, MLOGIT_CLASS - 1, PD_LENGTH, 1, beta, PD_LENGTH, 
     //             predictor, 1, 0, pred_beta, 1);
     arma::mat beta_ar = as<arma::mat>(beta);
@@ -111,7 +113,8 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K,
     
     
 // [[Rcpp::export]]
-IntegerMatrix m_hap (List par, List dat_info, IntegerMatrix haplotype, Rcpp::Nullable<IntegerVector> SNP = R_NilValue) {
+IntegerMatrix m_hap (List par, List dat_info, IntegerMatrix haplotype, unsigned int PD_LENGTH, unsigned int N_in,
+                     Rcpp::Nullable<IntegerVector> SNP = R_NilValue) {
   NumericMatrix w_ic = par["wic"];
   IntegerVector excluded_read = par["excluded_read"];
   IntegerVector ref = dat_info["ref_pos"];
@@ -142,15 +145,11 @@ IntegerMatrix m_hap (List par, List dat_info, IntegerMatrix haplotype, Rcpp::Nul
         continue;
       }
       
-      // Rprintf("j: %d\n", j);
-      // For future reference, only update variation sites
-      // if (excluded_site(k, j) == 1)
-      //   continue;
       max = 0;
       max_id = 0;
-      //llk = 0;
+      
       for (l = 0; l < MLOGIT_CLASS; ++l) {
-        llk = m_haplotype_llk(j, l, k, beta, dat_info, w_ic, excluded_read);
+        llk = m_haplotype_llk(j, l, k, PD_LENGTH, N_in, beta, dat_info, w_ic, excluded_read);
         // Rprintf("neu likelihood %d %f\t\t", l, llk);
         if (llk > max) {
           max = llk;

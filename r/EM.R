@@ -17,17 +17,121 @@
 
 ini <- function(dat, n_observation, n_class = 4, num_cat = 4, seed = 0) {
   par <- list()
-  set.seed(seed)
+  #set.seed(seed)
   #par$eta <- runif(n_class, 0, 1)
   #par$eta <- par$eta/sum(par$eta)
   par$eta <- rep(0.25, 4)
   par$wic <- 0
   par$rate <- 1e-5
   par$excluded_read <- rep(0, n_observation)
-  Mpar <- Mstep(dat, par, weights = FALSE)
+  Mpar <- Mstep(dat, par = par, weights = FALSE)
   par$beta <- Mpar$beta
   return(par)
 }
+
+#' @description fit mnlogit and update beta
+#' @param dat expanded data
+#' @param par parameters
+#' @param ncores number of ncores to run mnlogit
+#' @return betas and CE_llk
+
+Mstep <- function(dat, read_length, par, N_in, num_cat = 4, ncores = 2, weights = TRUE) {
+  #give a initial value for optimization
+  if (weights) {
+    weights <- data.table::rbindlist(foreach(i = 1:ncol(par$wic)) %dopar% {
+      data.frame(wic = rep(par$wic[, i], read_length[i]))
+    })
+    weights <- weights$wic
+    if (N_in) 
+      start = NULL
+    else
+      start = par$beta %>% as.vector
+    fit <- modified_mnlogit(formula(mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc),
+                   data = dat, weights = weights, choiceVar = "nuc", ncores = ncores, start = start)
+  }
+  else {
+    fit <- modified_mnlogit(formula(mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc),
+                   data = dat, choiceVar = "nuc", ncores = ncores)
+  }
+  
+  #A <- fit$coefficients[which(str_detect(attr(fit$coefficients, "names"), ":A") == 1)]
+  C <- fit$coefficients[which(str_detect(attr(fit$coefficients, "names"), ":C") == 1)]
+  G <- fit$coefficients[which(str_detect(attr(fit$coefficients, "names"), ":G") == 1)]
+  T <- fit$coefficients[which(str_detect(attr(fit$coefficients, "names"), ":T") == 1)]
+  
+  mat <- matrix(cbind(C, G, T), ncol = 3)
+  beta <- mat
+  logLik <- fit$logLik
+  
+  res <- list()
+  res$logLik <- logLik
+  res$beta <- beta
+  
+  return(res)
+}
+
+#' @description prepare data and call mnlogit
+#' @return logLik of mnlogit and betas
+
+m_beta <- function(res, d, data, id, N_in, reads_lengths, ncores) {
+  par <- list()
+  
+  if(length(res$excluded_id) != 0) {
+    data <- data %>% filter(!(id %in% res$excluded_id))
+    read_length <- reads_lengths[-res$excluded_id]
+    par$wic <- t(res$param$w_ic[-res$excluded_id,])
+  } else {
+    read_length <- reads_lengths
+    par$wic <- t(res$param$w_ic)
+  }
+  par$beta <- res$param$beta #beta from last step as starting value
+  data <- data[, !names(data) %in% c("id")] # (modified_moligit exclude first column: id)
+  
+  Mpar <- Mstep(dat = data, read_length = read_length, N_in = N_in, par = par, ncores = ncores)
+  par$beta <- Mpar$beta 
+  par$wic <- res$param$w_ic ## For the use of update haplotype
+  par$eta <- res$param$mixture_prop
+  par$rate <- res$param$rate
+  par$excluded_read <- res$param$excluded_read
+  
+  results <- list()
+  results$par <- par
+  results$CEllk <- Mpar$logLik
+  
+  return(results)
+}
+
+fnlist <- function(x, fil){ 
+  nams <- names(x) 
+  for (i in seq_along(x)) {
+    if(nams[i] == "haplotypes") {
+      cat(nams[i], ":", "\n", file = fil, append = TRUE)
+      write.table(x[[i]], file = fil, append = T, quote = FALSE, row.names=FALSE, col.names=FALSE)
+    } else {
+      cat(nams[i], ":", "\n", x[[i]], "\n", file = fil, append = TRUE) 
+    }
+  }
+}
+
+to_char_r <- function(x) {
+  as.character(c("0" = "A", "2" = "T", "1" = "C", "3" = "G", "-1" = "N")[as.character(x)])
+}
+
+to_xy_r <- function(x) {
+  as.numeric(c("A" = "0", "T" = "2", "C" = "1", "G" = "3")[t(x)])
+}
+
+
+###################################################################################################
+
+# read_hap <- function(path, n_class = 4) {
+#   init_hap <- readFastq(path)
+#   reads <- as(sread(init_hap), "matrix")[1:n_class, ]
+#   ncol = ncol(reads)
+#   reads_num <- as.numeric(c("A" = "0", "T" = "2", "C" = "1", "G" = "3")[t(reads)])
+#   reads_num <- matrix(reads_num, ncol)
+#   t(reads_num)
+# }
 
 #' @description Compute the likelihood for each position of a read and likelihood for that read
 #' @param i ith observation
@@ -197,103 +301,6 @@ ini <- function(dat, n_observation, n_class = 4, num_cat = 4, seed = 0) {
 #     left_join(., res$hap, by = c("ref_pos", "hap_name"))
 #   
 #   return(res)
-# }
-
-#' @description fit mnlogit and update beta
-#' @param dat expanded data
-#' @param par parameters
-#' @param ncores number of ncores to run mnlogit
-#' @return betas and CE_llk
-
-Mstep <- function(dat, read_length, par, num_cat = 4, ncores = 2, weights = TRUE) {
-  #give a initial value for optimization
-  if (weights) {
-    weights <- data.table::rbindlist(foreach(i = 1:ncol(par$wic)) %dopar% {
-      data.frame(wic = rep(par$wic[, i], read_length[i]))
-    })
-    weights <- weights$wic
-    fit <- modified_mnlogit(formula(mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc),
-                   data = dat, weights = weights, choiceVar = "nuc", ncores = ncores, start = par$beta %>% as.vector)
-  }
-  else {
-    fit <- modified_mnlogit(formula(mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc),
-                   data = dat, choiceVar = "nuc")
-  }
-  
-  #A <- fit$coefficients[which(str_detect(attr(fit$coefficients, "names"), ":A") == 1)]
-  C <- fit$coefficients[which(str_detect(attr(fit$coefficients, "names"), ":C") == 1)]
-  G <- fit$coefficients[which(str_detect(attr(fit$coefficients, "names"), ":G") == 1)]
-  T <- fit$coefficients[which(str_detect(attr(fit$coefficients, "names"), ":T") == 1)]
-  
-  mat <- matrix(cbind(C, G, T), ncol = 3)
-  beta <- mat
-  logLik <- fit$logLik
-  
-  res <- list()
-  res$logLik <- logLik
-  res$beta <- beta
-  
-  return(res)
-}
-
-#' @description prepare data and call mnlogit
-#' @return logLik of mnlogit and betas
-
-m_beta <- function(res, d, data, id, reads_lengths, ncores) {
-  par <- list()
-  
-  if(length(res$excluded_id) != 0) {
-    data <- data %>% filter(!(id %in% res$excluded_id))
-    read_length <- reads_lengths[-res$excluded_id]
-    par$wic <- t(res$param$w_ic[-res$excluded_id,])
-  } else {
-    read_length <- reads_lengths
-    par$wic <- t(res$param$w_ic)
-  }
-  par$beta <- res$param$beta #beta from last step as starting value
-  data <- data[, !names(data) %in% c("id")] # (modified_moligit exclude first column: id)
-  
-  Mpar <- Mstep(dat = data, read_length = read_length, par = par, ncores = ncores)
-  par$beta <- Mpar$beta 
-  par$wic <- res$param$w_ic ## For the use of update haplotype
-  par$eta <- res$param$mixture_prop
-  par$rate <- res$param$rate
-  par$excluded_read <- res$param$excluded_read
-  
-  results <- list()
-  results$par <- par
-  results$CEllk <- Mpar$logLik
-  
-  return(results)
-}
-
-fnlist <- function(x, fil){ 
-  nams <- names(x) 
-  for (i in seq_along(x)) {
-    if(nams[i] == "haplotypes") {
-      cat(nams[i], ":", "\n", file = fil, append = TRUE)
-      write.table(x[[i]], file = fil, append = T, quote = FALSE, row.names=FALSE, col.names=FALSE)
-    } else {
-      cat(nams[i], ":", "\n", x[[i]], "\n", file = fil, append = TRUE) 
-    }
-  }
-}
-
-to_char_r <- function(x) {
-  as.character(c("0" = "A", "2" = "T", "1" = "C", "3" = "G")[as.character(x)])
-}
-
-to_xy_r <- function(x) {
-  as.numeric(c("A" = "0", "T" = "2", "C" = "1", "G" = "3")[t(x)])
-}
-
-# read_hap <- function(path, n_class = 4) {
-#   init_hap <- readFastq(path)
-#   reads <- as(sread(init_hap), "matrix")[1:n_class, ]
-#   ncol = ncol(reads)
-#   reads_num <- as.numeric(c("A" = "0", "T" = "2", "C" = "1", "G" = "3")[t(reads)])
-#   reads_num <- matrix(reads_num, ncol)
-#   t(reads_num)
 # }
 
 ################ TRY OTHER METHODS

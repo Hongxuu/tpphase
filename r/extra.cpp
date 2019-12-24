@@ -35,6 +35,8 @@ arma::colvec solveC (NumericMatrix ar, NumericVector br) {
   return(x);
 }
 
+// [[Rcpp::export]]
+
 /*** R
 ### Slower
 rcpp_inc <- '

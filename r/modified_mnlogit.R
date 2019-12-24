@@ -113,7 +113,7 @@ modified_mnlogit <- function (formula, data, choiceVar = NULL, maxiter = 50, fto
   # if (print.level && Ndropped > 0) 
   #   cat(paste("Num of dropped observations (due to NA)  =", 
   #             Ndropped, "\n"))
-  ind <- sort_ind(data[[choiceVar]], nrow(data)) + 1
+  ind <- sort_ind(data[[choiceVar]], nrow(data)) + 1 #sort_ind only sort ATCG
   data <- data[ind[, 1], ]
   # choice.set <- unique(data[[choiceVar]])
   respVec <- data[[attr(formula, "response")]]
@@ -137,22 +137,12 @@ modified_mnlogit <- function (formula, data, choiceVar = NULL, maxiter = 50, fto
   #   stop(paste("Frequency, in response, of choice:", loChoice, 
   #              "< 1e-7."))
   # }
-  # formDesignMat <- function(varVec = NULL, includeIntercept = TRUE) {
-  #   if (is.null(varVec) && !includeIntercept) 
-  #     return(NULL)
-  #   fm <- paste(attr(formula, "response"), "~")
-  #   if (!is.null(varVec)) 
-  #     fm <- paste(fm, paste(varVec, collapse = "+"))
-  #   if (!includeIntercept) 
-  #     fm <- paste(fm, "-1 ")
-  #   else fm <- paste(fm, "+1 ")
-  #   modMat <- model.matrix(as.formula(fm), data[1:N, ])
-  # }
   
-  # X <- formDesignMat(varVec = attr(formula, "indSpVar"), includeIntercept = attr(formula, "Intercept"))
-  X <- formDesignMat(dat = data, N = N)
-  colnames(X) <- c("(Intercept)", "read_pos", "ref_pos", "qua", "hap_nucC", "hap_nucG", "hap_nucT", 
-                   "qua:hap_nucC", "qua:hap_nucG", "qua:hap_nucT")
+  X <- formDesignMat_r(dat = data, N = N, formula = formula, varVec = attr(formula, "indSpVar"), 
+                       includeIntercept = attr(formula, "Intercept"))
+  #X <- formDesignMat(dat = data, N = N)
+  #colnames(X) <- c("(Intercept)", "read_pos", "ref_pos", "qua", "hap_nucC", "hap_nucG", "hap_nucT", 
+                   #"qua:hap_nucC", "qua:hap_nucG", "qua:hap_nucT")
   # X <- if (!is.null(X)) 
   # X <- X[1:N, , drop = FALSE]
   # Y <- formDesignMat(varVec = attr(formula, "csvChCoeff"), 
@@ -241,7 +231,7 @@ modified_mnlogit <- function (formula, data, choiceVar = NULL, maxiter = 50, fto
   # index <- data.frame(chid = rep(1:result$model.size$N, result$model.size$K), 
   #                     alt = data[[choiceVar]])
   # attr(data, "index") <- index
-  fit <- structure(list(coefficients = coefficients, logLik = logLik, 
+  fit <- structure(list(coefficients = coefficients, logLik = logLik,
                         gradient = -result$grad, hessian = result$hessMat, est.stat = result$est.stats, 
                         fitted.values = 1 - attr(result$residual, "outcome"), 
                         probabilities = result$probability, residuals = result$residual, AIC = AIC), class = "mnlogit")
@@ -291,4 +281,16 @@ getNullSpaceCols <- function(mat, tol = 1e-07) {
     return(NULL)
   nullSpCols <- qrdecomp$pivot[(rank + 1):ncol(mat)]
   return(nullSpCols)
+}
+
+formDesignMat_r <- function(data, N, formula, varVec = NULL, includeIntercept = TRUE) {
+  # if (is.null(varVec) && !includeIntercept)
+  #   return(NULL)
+  fm <- paste(attr(formula, "response"), "~")
+  if (!is.null(varVec))
+    fm <- paste(fm, paste(varVec, collapse = "+"))
+  if (!includeIntercept)
+    fm <- paste(fm, "-1 ")
+  else fm <- paste(fm, "+1 ")
+  return(model.matrix(as.formula(fm), data[1:N, ]))
 }
