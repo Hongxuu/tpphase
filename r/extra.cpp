@@ -36,6 +36,23 @@ arma::colvec solveC (NumericMatrix ar, NumericVector br) {
 }
 
 // [[Rcpp::export]]
+IntegerVector match_c (NumericVector ar, NumericVector br){
+  unsigned int n = ar.length(), k = br.length();
+  IntegerVector index(n);
+  unsigned int m = 0;
+  
+  for(unsigned int i = 0; i < n; ++i) 
+    for (unsigned int j = 0; j < k; ++j)
+      if(ar[i] == br[j])
+        index[m++] = i;
+  
+  return index(Range(0, m - 1));
+}
+
+// [[Rcpp::export]]
+
+// Find the mutural deletions in reads and haps
+
 
 /*** R
 ### Slower

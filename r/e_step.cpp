@@ -41,11 +41,6 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
   arma::vec predictor(PD_LENGTH);
   //NumericVector site_llk(length[i]);
   
-  // /* find the index of ith observation (except for the first one) */
-  // if (i != 0)
-  //   for (k = 0; k < i; ++k)
-  //     index += length[k];
-  
   /* non-indel position */
   for(j = 0; j < length[i]; ++j) {
     
@@ -65,7 +60,7 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
     } else if(haplotype(K, ref_pos_in) == 3) {
       hap_nuc[1] = 1;
       hnuc_qua[1] = qua_in;
-    } else if(haplotype(K, ref_pos_in) == -1) {
+    } else if(haplotype(K, ref_pos_in) == 4) {
       hap_nuc[2] = 1;
       hnuc_qua[2] = qua_in;
     } else if(haplotype(K, ref_pos_in) == 2) {
@@ -102,29 +97,30 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
     } else if(obs[index[i] + j] == 0) {
       xb = 0;
     }
-    //Rcout << "xb + tail: " << xb + tail << "\n";
+    //Rcout << "xb + tail: " << xb + tail << "\t";
     read_llk += xb + tail; /* Notice here use log likelihood, not likelihood */
   }
   
-  /* deletion position */
-  // if(del_count != 0)
-  // {
-  //   int hap_length = dat_info["ref_length_max"];
-  //   read_llk += R::dpois(del_count, hap_length * rate, true);
-  //   Rcout << "deletion llk" << R::dpois(del_count, hap_length * rate, true) << "\n";
-  // }
+  /* deletion penalty */
+  if(del_count != 0)
+  {
+    int hap_length = dat_info["ref_length_max"];
+    read_llk += R::dpois(del_count, hap_length * rate, true);
+    //Rcout << "deletion llk" << R::dpois(del_count, hap_length * rate, true) << "\t";
+  }
   
   return read_llk;
 } /* site_likelihood */
 
 
 // [[Rcpp::export]]
-List em_eta (List par, List dat_info, IntegerMatrix haplotype, unsigned int PD_LENGTH, unsigned int N_in) {
+List em_eta (List par, List dat_info, List hap_info, IntegerMatrix haplotype,
+             unsigned int PD_LENGTH, unsigned int N_in) {
   
   int n_observation = dat_info["n_observation"];
   int hap_length = dat_info["ref_length_max"];
   double full_llk;
-  unsigned int i, k;
+  unsigned int i, k, l, m;
   
   NumericMatrix w_ic(n_observation, NUM_CLASS);
   NumericVector eta = par["eta"];
@@ -139,24 +135,51 @@ List em_eta (List par, List dat_info, IntegerMatrix haplotype, unsigned int PD_L
   
   /* deletion */
   List deletion = dat_info["deletion"];
+  IntegerVector del_ref_pos = deletion["del_ref_pos"];
   IntegerVector del_length_all = deletion["del_length_all"];
-  IntegerVector del_length = deletion["del_length"];
-  IntegerVector del_id = deletion["del_id"];
-  unsigned int del_num = deletion["del_num"];
+  //IntegerVector del_length = deletion["del_length"];
+  IntegerVector del_flag = deletion["del_flag"];
+  IntegerVector del_strat_id = deletion["del_strat_id"];
+  IntegerVector hap_deletion_len = hap_info["hap_deletion_len"];
+  IntegerVector hap_deletion_pos = hap_info["deletion_pos"];
+  IntegerVector hap_del_start_id = hap_info["hap_del_start_id"];
+  IntegerMatrix del_count(n_observation, NUM_CLASS);
   
   /* e step */
   for (i = 0; i < n_observation; ++i) {
     // Exclude the read has -inf likelihood
     if (excluded_read[i] == 1)
       continue;
+    
+    IntegerVector read_del_pos(del_length_all[i]);
+    if (del_flag[i])
+      for (l = 0; l < del_length_all[i]; ++l) 
+        read_del_pos[l] = del_ref_pos[del_strat_id[i] + l];
+    
+    //Rcout << "del_length: " << del_length_all[i] << "read_del_pos: " << read_del_pos << "\n";
     /* reset eta %*% llk at each class for each read */
     NumericVector weight_llk(NUM_CLASS);
     /* compute the likelihood for each read under each haplotype */
     //sum_weight = 0.;
     for (k = 0; k < NUM_CLASS; ++k) {
-      read_class_llk(i, k) = site_likelihood(i, k, beta, PD_LENGTH, N_in, rate, dat_info, haplotype, del_length_all[i]);
+      // find how many deletion positions are the NOT same between read and haplotype 
+      // (both read and haplotype need to contain deletion)
+      if (del_flag[i]) {
+        if (hap_del_start_id[k] != -1) {
+          IntegerVector hap_del_pos(hap_deletion_len[k]);
+          for (l = 0; l < hap_deletion_len[k]; ++l) 
+            hap_del_pos[l] = hap_deletion_pos[hap_del_start_id[k] + l];
+          //Rcout<< "del_length: " << hap_deletion_len[k] << "hap_del_pos: " << hap_del_pos << "\n";
+          for (m = 0; m < del_length_all[i]; ++m)
+            for (l = 0; l < hap_deletion_len[k]; ++l) 
+              if (read_del_pos[m] == hap_del_pos[l])
+                del_count(i, k)++;
+          del_count(i, k) = del_length_all[i] - del_count(i, k);
+        } 
+      }
+      read_class_llk(i, k) = site_likelihood(i, k, beta, PD_LENGTH, N_in, rate, dat_info, haplotype, del_count(i, k));
       weight_llk[k] = eta[k] * exp(read_class_llk(i, k));
-      //Rprintf("\n read %d class %d llk %f; log wei_lk %.10lf\n", i, k, read_class_llk(i, k), log(weight_llk[k]));
+      //Rprintf("\n read %d class %d llk %f; log wei_lk %.10lf; del count %d\n", i, k, read_class_llk(i, k), log(weight_llk[k]), del_count(i, k));
       sum_weight[i] += weight_llk[k];
     }
     //Rprintf("sum_weight %.30lf\n", sum_weight[i]);
@@ -198,12 +221,12 @@ List em_eta (List par, List dat_info, IntegerMatrix haplotype, unsigned int PD_L
   
   /* update rate */
   double wic_di = 0, wic_pc = 0;
-  for (i = 0; i < del_num; ++i) {
-    if (excluded_read[del_id[i] - 1] == 1)
+  for (i = 0; i < n_observation; ++i) {
+    if (excluded_read[i] == 1 || del_count(i, k) == 0)
       continue;
     for (k = 0; k < NUM_CLASS; ++k) {
-      wic_di = w_ic(del_id[i] - 1, k) * del_length[i];
-      wic_pc = w_ic(del_id[i] - 1, k) * hap_length;
+      wic_di += w_ic(i, k) * del_count(i, k);
+      wic_pc += w_ic(i, k) * hap_length;
     }
   }
   rate = wic_di/wic_pc;

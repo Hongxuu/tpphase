@@ -1,56 +1,26 @@
 
-###### Compute the read llk and position llk for each read under a specific class
-## preporcess the parameters: beta regards to matrix: A, C, G
-##par$beta <- matrix(0, ncol = n_category - 1, nrow = length(pred))
-####### mnlogit use the choice indexed by k = 0 as the base, in this case it should be A???
-
-#' @description Random initialize parameters. Uniform(0, 1) for now to initialize etas, but for betas
-#' use mnlogit to initialize since it is important to get roughly good betas to compute llk. According to 
-#' Hongxu interaction term associated with position are not that significant compared with other terms, so 
-#' exclude them for now, so we have 10 beta under each category
-#' 
-#' @param n_class number of class (A1 A2 D1 D2 here).
-#' @param num_cat number of category (for multinomial logistic regression ATCG here)
-#' @param num_beta number of betas
-#' @param seed
-#' @return parameters for EM
-
-ini <- function(dat, n_observation, n_class = 4, num_cat = 4, seed = 0) {
-  par <- list()
-  #set.seed(seed)
-  #par$eta <- runif(n_class, 0, 1)
-  #par$eta <- par$eta/sum(par$eta)
-  par$eta <- rep(0.25, 4)
-  par$wic <- 0
-  par$rate <- 1e-5
-  par$excluded_read <- rep(0, n_observation)
-  Mpar <- Mstep(dat, par = par, weights = FALSE)
-  par$beta <- Mpar$beta
-  return(par)
-}
-
 #' @description fit mnlogit and update beta
 #' @param dat expanded data
 #' @param par parameters
 #' @param ncores number of ncores to run mnlogit
 #' @return betas and CE_llk
 
-Mstep <- function(dat, read_length, par, N_in, num_cat = 4, ncores = 2, weights = TRUE) {
+Mstep <- function(dat, read_length, par, formula, change, num_cat = 4, ncores = 2, weights = TRUE) {
   #give a initial value for optimization
   if (weights) {
     weights <- data.table::rbindlist(foreach(i = 1:ncol(par$wic)) %dopar% {
       data.frame(wic = rep(par$wic[, i], read_length[i]))
     })
     weights <- weights$wic
-    if (N_in) 
+    if (change) 
       start = NULL
     else
-      start = par$beta %>% as.vector
-    fit <- modified_mnlogit(formula(mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc),
+      start = par$beta %>% as.vector #might exist some problems
+    fit <- modified_mnlogit(formula,
                    data = dat, weights = weights, choiceVar = "nuc", ncores = ncores, start = start)
   }
   else {
-    fit <- modified_mnlogit(formula(mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc),
+    fit <- modified_mnlogit(formula,
                    data = dat, choiceVar = "nuc", ncores = ncores)
   }
   
@@ -73,7 +43,7 @@ Mstep <- function(dat, read_length, par, N_in, num_cat = 4, ncores = 2, weights 
 #' @description prepare data and call mnlogit
 #' @return logLik of mnlogit and betas
 
-m_beta <- function(res, d, data, id, N_in, reads_lengths, ncores) {
+m_beta <- function(res, d, data, id, formula, change, reads_lengths, ncores) {
   par <- list()
   
   if(length(res$excluded_id) != 0) {
@@ -87,7 +57,7 @@ m_beta <- function(res, d, data, id, N_in, reads_lengths, ncores) {
   par$beta <- res$param$beta #beta from last step as starting value
   data <- data[, !names(data) %in% c("id")] # (modified_moligit exclude first column: id)
   
-  Mpar <- Mstep(dat = data, read_length = read_length, N_in = N_in, par = par, ncores = ncores)
+  Mpar <- Mstep(dat = data, read_length = read_length, formula = formula, change = change, par = par, ncores = ncores, weights = TRUE)
   par$beta <- Mpar$beta 
   par$wic <- res$param$w_ic ## For the use of update haplotype
   par$eta <- res$param$mixture_prop
@@ -100,27 +70,6 @@ m_beta <- function(res, d, data, id, N_in, reads_lengths, ncores) {
   
   return(results)
 }
-
-fnlist <- function(x, fil){ 
-  nams <- names(x) 
-  for (i in seq_along(x)) {
-    if(nams[i] == "haplotypes") {
-      cat(nams[i], ":", "\n", file = fil, append = TRUE)
-      write.table(x[[i]], file = fil, append = T, quote = FALSE, row.names=FALSE, col.names=FALSE)
-    } else {
-      cat(nams[i], ":", "\n", x[[i]], "\n", file = fil, append = TRUE) 
-    }
-  }
-}
-
-to_char_r <- function(x) {
-  as.character(c("0" = "A", "2" = "T", "1" = "C", "3" = "G", "-1" = "N")[as.character(x)])
-}
-
-to_xy_r <- function(x) {
-  as.numeric(c("A" = "0", "T" = "2", "C" = "1", "G" = "3")[t(x)])
-}
-
 
 ###################################################################################################
 
