@@ -35,22 +35,44 @@ arma::colvec solveC (NumericMatrix ar, NumericVector br) {
   return(x);
 }
 
+// IntegerVector match_c (NumericVector ar, NumericVector br){
+//   unsigned int n = ar.length(), k = br.length();
+//   IntegerVector index(n);
+//   unsigned int m = 0;
+//   
+//   for(unsigned int i = 0; i < n; ++i) 
+//     for (unsigned int j = 0; j < k; ++j)
+//       if(ar[i] == br[j])
+//         index[m++] = i;
+//   
+//   return index(Range(0, m - 1));
+// }
+
 // [[Rcpp::export]]
-IntegerVector match_c (NumericVector ar, NumericVector br){
-  unsigned int n = ar.length(), k = br.length();
-  IntegerVector index(n);
-  unsigned int m = 0;
+DataFrame filter_c(DataFrame x, int condition, String selection) {
+  StringVector sub = x[selection];
+  LogicalVector ind(sub.size());
+  for (int i = 0; i < sub.size(); i++) {
+    ind[i] = (sub[i] == condition);
+  }
   
-  for(unsigned int i = 0; i < n; ++i) 
-    for (unsigned int j = 0; j < k; ++j)
-      if(ar[i] == br[j])
-        index[m++] = i;
+  // extracting each column into a vector
+  IntegerVector id = x["id"];
+  IntegerVector mode = x["mode"];
+  IntegerVector read_pos = x["read_pos"];
+  IntegerVector ref_pos = x["ref_pos"];
+  IntegerVector qua = x["qua"];
+  IntegerVector nuc = x["nuc"];
+  IntegerVector hap_nuc = x["hap_nuc"];
   
-  return index(Range(0, m - 1));
+  return DataFrame::create(Named("id") = id[ind],
+                           Named("mode") = mode[ind],
+                           Named("read_pos") = read_pos[ind],
+                           Named("ref_pos") = ref_pos[ind],
+                           Named("qua") = qua[ind],
+                           Named("nuc") = nuc[ind],
+                           Named("hap_nuc") = hap_nuc[ind]);
 }
-
-// [[Rcpp::export]]
-
 // Find the mutural deletions in reads and haps
 
 

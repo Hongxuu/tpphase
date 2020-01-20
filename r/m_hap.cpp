@@ -18,10 +18,10 @@ using namespace Rcpp;
 
 // A C G T N: 0 1 2 3 4
 
-double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned int PD_LENGTH, unsigned int N_in,
-                        List par, List dat_info, NumericMatrix w_ic, IntegerVector excluded_read, double lambda);
+double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned int PD_LENGTH,
+                        NumericVector beta, List dat_info, NumericMatrix w_ic, IntegerVector excluded_read, double lambda);
 
-double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned int PD_LENGTH, unsigned int N_in,
+double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned int PD_LENGTH,
                         NumericVector beta, List dat_info, NumericMatrix w_ic, IntegerVector excluded_read, double lambda)
 {
   unsigned int i, k, c;
@@ -67,21 +67,18 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned
       } else if (l == 3) {
         hap_nuc[1] = 1;
         hnuc_qua[1] = qua_in;
-      } else if (l == 4) {
-        hap_nuc[2] = 1;
-        hnuc_qua[2] = qua_in;
       } else if (l == 2) {
         hap_nuc[3] = 1;
         hnuc_qua[3] = qua_in;
       }
       
-      if(!N_in) {
+      //if(!N_in) {
         predictor = {1, read_pos_in, ref_pos_in, qua_in, hap_nuc[0], hap_nuc[1], 
                      hap_nuc[3], hnuc_qua[0], hnuc_qua[1], hnuc_qua[3]};
-      } else {
-        predictor = {1, read_pos_in, ref_pos_in, qua_in, hap_nuc[0], hap_nuc[1], 
-                     hap_nuc[2], hap_nuc[3], hnuc_qua[0], hnuc_qua[1], hnuc_qua[2], hnuc_qua[3]};
-      }
+      // } else {
+      //   predictor = {1, read_pos_in, ref_pos_in, qua_in, hap_nuc[0], hap_nuc[1], 
+      //                hap_nuc[2], hap_nuc[3], hnuc_qua[0], hnuc_qua[1], hnuc_qua[2], hnuc_qua[3]};
+      // }
       
       arma::mat beta_ar = as<arma::mat>(beta);
       arma::vec pb = beta_ar.t() * predictor;
@@ -119,7 +116,6 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned
   }
   return likelihood;
 }/* m_haplotype_llk */
-    
 
 // [[Rcpp::export]]
 // Consider deletion as a state
@@ -159,7 +155,7 @@ List m_hap (List par, List dat_info, IntegerMatrix haplotype, unsigned int PD_LE
       max = 0;
       max_id = 0;
       for (l = 0; l < HAP_STATE; ++l) {
-        llk = m_haplotype_llk(j, l, k, PD_LENGTH, N_in, beta, dat_info, w_ic, excluded_read, lambda);
+        llk = m_haplotype_llk(j, l, k, PD_LENGTH, beta, dat_info, w_ic, excluded_read, lambda);
         //Rprintf("\n neu likelihood %d %f\n", l, log(llk));
         if (llk > max) {
           max = llk;

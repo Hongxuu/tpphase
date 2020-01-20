@@ -297,6 +297,7 @@ List read_data(std::string path) {
   return ls;
 }
 
+//prepare data for mnlogit, mnlogit only takes data without indels in read or in haplotypes
 // [[Rcpp::export]]
 DataFrame format_data(List dat_info, IntegerMatrix haplotype) {
   unsigned int i, k, l;
@@ -323,7 +324,7 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype) {
     for (k = 0; k < NUM_CLASS; ++k)
       for (l = 0; l < MLOGIT_CLASS; ++l)
         r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i]);
-
+  
   /* repeat the data for mnlogit */
   for (k = 0; k < total; ++k)
     for (i = 0; i < MLOGIT_CLASS * NUM_CLASS; ++i) {

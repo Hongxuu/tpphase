@@ -47,6 +47,9 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   
   registerDoParallel(cores = ncores)
   
+  if(is.null(samfile) == FALSE)
+    sam <- read_sam(samfile, ref_name, fastq_file, datafile)
+  
   d <- read_data(datafile)
   read_length <- d$length
   hap_length <- d$ref_length_max
@@ -57,9 +60,6 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
     snp <- read.delim(snp, header = FALSE, sep = " ") %>% as.integer
   else
     snp <- as.integer(snp)
-  
-  if(is.null(samfile) == FALSE)
-    sam <- read_sam(samfile, ref_name, fastq_file, datafile)
   
   if(init == "ampliclust") {
     hapinit <- call_ampliclust(ampliclust_command, fastq_file, ac_outfile)
@@ -85,6 +85,7 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   }
   
   data <- format_data(dat_info = d, haplotype = hapinit)
+  data <- data %>% filter(hap_nuc != 4) # mnlogit only takes data without indels in read or in haplotypes
   data$nuc <- to_char_r(data$nuc)
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
@@ -101,15 +102,15 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   
   data <- cbind(id, data)
   ### Iteration
-  for (m in 1:10) {
+  for (m in 1:max) {
     cat("iteartion", m, "\n")
-    if(nrow(par$beta) > n_predictor) {
-      N_in = 1
-    } else 
-      N_in = 0
+    # if(nrow(par$beta) > n_predictor) {
+    #   N_in = 1
+    # } else 
+    #   N_in = 0
     
     #sink(paste0("~/Documents/debug",m,".txt"))
-    res <- em_eta(par = par, dat_info = d, haplotype = hap, hap_info = hap_info, PD_LENGTH = nrow(par$beta), N_in = N_in)
+    res <- em_eta(par = par, dat_info = d, haplotype = hap, hap_info = hap_info, PD_LENGTH = nrow(par$beta))
     #sink()
     par$wic <- res$param$w_ic
     par$rate <- res$param$rate
@@ -121,7 +122,7 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
     
     old_hap <- hap
     #sink(paste0("~/Documents/debug_hap",m,".txt"))
-    hap_info <- m_hap(par = par, dat_info = d, PD_LENGTH = nrow(par$beta), N_in = N_in, haplotype = old_hap, SNP = snp)
+    hap_info <- m_hap(par = par, dat_info = d, PD_LENGTH = nrow(par$beta), haplotype = old_hap, SNP = snp)
     hap <- hap_info$hap
     haps[[m]] <- hap_info
     #sink()
@@ -131,12 +132,12 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
       data$hap_nuc <- to_char_r(data$hap_nuc)
     } 
     
-    if (nrow(res$param$beta) == nrow(par$beta)) {
-      change = 1
-    } else 
-      change = 0
-      
-    tmp <- m_beta(res = res, d = d, id = id, data = data, formula = formula, change = change, reads_lengths = read_length, ncores)
+    # if (nrow(res$param$beta) == nrow(par$beta)) {
+    #   change = 1
+    # } else 
+    #   change = 0
+    #   
+    tmp <- m_beta(res = res, d = d, id = id, data = data, formula = formula, reads_lengths = read_length, ncores)
     par <- tmp$par
     CE_llk_iter[m] <- tmp$CEllk
     
@@ -166,7 +167,6 @@ final <- tpphase(samfile = "../../../data/peanut_consensus/308-TAN-consensus.sam
                  datafile = "../../../data/tpphase_res_consensus/308TAN/resp30.txt",
                  ac_outfile = "../../../data/tpphase_res_consensus/initp30", 
                  output = "../../../data/tpphase_res_consensus/308TAN_p30.txt")
-
 
 # hapinit <- readFastq(fastq_file)
 # samp <- sample(which(hapinit@sread@ranges@width == hap_length), n_class) # id starts from 1 in data

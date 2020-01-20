@@ -17,7 +17,8 @@ ini <- function(dat, n_observation, formula, n_class = 4, num_cat = 4, seed = 0)
   #par$eta <- par$eta/sum(par$eta)
   par$eta <- rep(0.25, 4)
   par$wic <- 0
-  par$rate <- 1e-5
+  par$ins_rate <- 1e-5
+  par$del_rate <- 1e-5
   par$excluded_read <- rep(0, n_observation)
   Mpar <- Mstep(dat, par = par, formula = formula, weights = FALSE)
   par$beta <- Mpar$beta

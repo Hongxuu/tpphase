@@ -5,17 +5,14 @@
 #' @param ncores number of ncores to run mnlogit
 #' @return betas and CE_llk
 
-Mstep <- function(dat, read_length, par, formula, change, num_cat = 4, ncores = 2, weights = TRUE) {
+Mstep <- function(dat, read_length, par, formula, num_cat = 4, ncores = 2, weights = TRUE) {
   #give a initial value for optimization
   if (weights) {
     weights <- data.table::rbindlist(foreach(i = 1:ncol(par$wic)) %dopar% {
       data.frame(wic = rep(par$wic[, i], read_length[i]))
     })
     weights <- weights$wic
-    if (change) 
-      start = NULL
-    else
-      start = par$beta %>% as.vector #might exist some problems
+    start = par$beta %>% as.vector
     fit <- modified_mnlogit(formula,
                    data = dat, weights = weights, choiceVar = "nuc", ncores = ncores, start = start)
   }
@@ -43,7 +40,7 @@ Mstep <- function(dat, read_length, par, formula, change, num_cat = 4, ncores = 
 #' @description prepare data and call mnlogit
 #' @return logLik of mnlogit and betas
 
-m_beta <- function(res, d, data, id, formula, change, reads_lengths, ncores) {
+m_beta <- function(res, d, data, id, formula, reads_lengths, ncores) {
   par <- list()
   
   if(length(res$excluded_id) != 0) {
@@ -57,7 +54,7 @@ m_beta <- function(res, d, data, id, formula, change, reads_lengths, ncores) {
   par$beta <- res$param$beta #beta from last step as starting value
   data <- data[, !names(data) %in% c("id")] # (modified_moligit exclude first column: id)
   
-  Mpar <- Mstep(dat = data, read_length = read_length, formula = formula, change = change, par = par, ncores = ncores, weights = TRUE)
+  Mpar <- Mstep(dat = data, read_length = read_length, formula = formula, par = par, ncores = ncores, weights = TRUE)
   par$beta <- Mpar$beta 
   par$wic <- res$param$w_ic ## For the use of update haplotype
   par$eta <- res$param$mixture_prop
