@@ -40,129 +40,74 @@ sourceCpp("../r/m_hap.cpp")
 #' ampliclust_command = "../amplici/run_ampliclust", output = "308TAN_B_P3.txt")
 #' @return assignments and haplotypes, etc
 
-tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaFile, ampliclust_command, deletion_num = 2,
+tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaFile, ampliclust_command, deletion_num = 0,
                     fastq_file = "./res.fastq", datafile = "./res.txt", ac_outfile = "./init", snp = NULL, output = NULL, 
-                    formula = formula(mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc),
+                    formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 1,
                     n_class = 4, num_cat = 4, seed = 0, max = 50, tol = 1e-06, ncores = 2, n_predictor = 10) {
   
   registerDoParallel(cores = ncores)
   
+  ## read the data
   if(is.null(samfile) == FALSE)
     sam <- read_sam(samfile, ref_name, fastq_file, datafile)
   
   d <- read_data(datafile)
-  read_length <- d$length
   hap_length <- d$ref_length_max
   
-  if(is.null(snp) == TRUE)
+  ## read in non-snps sites
+  if(is.null(snp) == TRUE) {
     snp <- rep(1, hap_length)
-  if(typeof(snp) == "character")
+  } else if(typeof(snp) == "character") {
     snp <- read.delim(snp, header = FALSE, sep = " ") %>% as.integer
-  else
+  } else {
     snp <- as.integer(snp)
-  
-  if(init == "ampliclust") {
-    hapinit <- call_ampliclust(ampliclust_command, fastq_file, ac_outfile)
-    hapinit <- hapinit[1:n_class, 1:hap_length]
-  }
-    
-  if(init == "in_file")
-    hapinit <- read_fasta(FastaFile)[1:n_class, 1:hap_length]
-  
-  if(init == "random") {
-    set.seed(seed)
-    samp <- which(d$fake_length == hap_length & d$deletion$del_length_all <= deletion_num)
-    if(length(samp) < n_class)
-      stop("Not enough sample with the same length as the haplotypes to infer, 
-           adjust the deletion_num to be more than 2!")
-    samp_id <- sample(samp, n_class)
-    start <- d$start_id[samp_id] #index is right in R!
-    hap_deletion_len <- d$deletion$del_length_all[samp_id]
-    hap_info <- sample_hap(d, start, samp_id, hap_deletion_len)
-    hapinit <- hap_info$hap
-    # if (any(d$deletion$del_flag[samp_id] == 1))
-    #   N_in = 1
   }
   
+  ## initialize haplotype
+  hapinit <- ini_hap(init, ampliclust_command, fastq_file, ac_outfile, n_class, 
+                     hap_length, FastaFile, seed, deletion_num)
+  
+  ## prepare data
+  read_length <- d$length
   data <- format_data(dat_info = d, haplotype = hapinit)
-  data <- data %>% filter(hap_nuc != 4) # mnlogit only takes data without indels in read or in haplotypes
+  weight_id <- NULL
+  if(sum(hap_deletion_len) != 0) {
+    data_rm <- data %>% filter(mode == 1) 
+    weight_id <- which(data_rm$hap_nuc == 4)
+    data <- data %>% filter(hap_nuc != 4) # mnlogit only takes data without indels in read or in haplotypes
+    #read_length <- len_hapGap(dat_info = d, hap_info = hap_info)
+    #read_length <- collect(data %>% filter(mode == 1) %>% count(id) %>% select(n))[[1]]/4
+  }
   data$nuc <- to_char_r(data$nuc)
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
   data <- data[, !names(data) %in% c("id")]
   
+  ## initialize parameters
   par <- list()
-  par <- ini(dat = data, n_observation = d$n_observation, formula = formula, seed = seed, n_class = n_class, num_cat = num_cat)
+  par <- ini_par(dat = data, n_observation = d$n_observation, formula = formula, seed = seed, 
+             n_class = n_class, num_cat = num_cat, ncores = ncores, weight_id = weight_id)
+  
   hap <- hapinit
-  
-  full_llk <- rep(0, max)
-  CE_llk_iter <- rep(0, max)
-  haps <- list()
-  resu <- list()
-  
+  old_hap <- hap
   data <- cbind(id, data)
-  ### Iteration
-  for (m in 1:max) {
-    cat("iteartion", m, "\n")
-    # if(nrow(par$beta) > n_predictor) {
-    #   N_in = 1
-    # } else 
-    #   N_in = 0
-    
-    #sink(paste0("~/Documents/debug",m,".txt"))
-    res <- em_eta(par = par, dat_info = d, haplotype = hap, hap_info = hap_info, PD_LENGTH = nrow(par$beta))
-    #sink()
-    par$wic <- res$param$w_ic
-    par$rate <- res$param$rate
-    par$excluded_read <- res$param$excluded_read
-    resu[[m]] <- res
-    if(length(res$excluded_id) != 0)
-      cat(res$excluded_id, "don't (doesn't) belong to any of the haplotypes\n")
-    full_llk[m] <- res$full_llk
-    
-    old_hap <- hap
-    #sink(paste0("~/Documents/debug_hap",m,".txt"))
-    hap_info <- m_hap(par = par, dat_info = d, PD_LENGTH = nrow(par$beta), haplotype = old_hap, SNP = snp)
-    hap <- hap_info$hap
-    haps[[m]] <- hap_info
-    #sink()
-    if(any(old_hap != hap)) {
-      data <- format_data(dat_info = d, haplotype = hap)
-      data$nuc <- to_char_r(data$nuc)
-      data$hap_nuc <- to_char_r(data$hap_nuc)
-    } 
-    
-    # if (nrow(res$param$beta) == nrow(par$beta)) {
-    #   change = 1
-    # } else 
-    #   change = 0
-    #   
-    tmp <- m_beta(res = res, d = d, id = id, data = data, formula = formula, reads_lengths = read_length, ncores)
-    par <- tmp$par
-    CE_llk_iter[m] <- tmp$CEllk
-    
-    #if(abs(par$eta - res$param$mixture_prop) < tol && abs(par$beta - res$param$beta) < tol)
-    if(m > 1)
-      if(abs(full_llk[m] - full_llk[m-1]) < tol && 
-         abs(par$eta - res$param$mixture_prop) < tol && 
-         abs(par$beta - res$param$beta) < tol)
-        break;
+  best_llk <- -Inf
+  ## Iteration
+  for (i in 1:n_initialization) {
+    results <- tpphase(dat_info, hap_info, par, hap, old_hap, tol, id, weight_id, data, formula, 
+            read_length, ncores, snp, max)
+    if(best_llk < results$resu$full_llk) {
+      best_llk <- results$resu$full_llk
+      final_res <- dereplicate_res(results$resu, results$haps)
+    }
   }
-  
-  final_res <- list()
-  final_res$full_llk <- resu[[m]]$full_llk
-  final_res$mixture_prop <- resu[[m]]$param$mixture_prop
-  final_res$assignments <- apply(resu[[m]]$param$w_ic, MARGIN = 1, FUN = which.max)
-  final_res$logistic_coeff <- resu[[m]]$param$beta
-  final_res$haplotypes <- matrix(to_char_r(haps[[m-1]]), nrow = n_class)
-  
   if(is.null(output) == FALSE)
     fnlist(final_res, output)
   
   return(final_res)
 }
 
-final <- tpphase(samfile = "../../../data/peanut_consensus/308-TAN-consensus.sam", ref_name = "Adur313:17300_Adur313:17334_P30", init = "random",
+final <- tpphase(samfile = NULL, ref_name = NULL, init = "random", deletion_num = 2,
                  ampliclust_command = "../../amplici/run_ampliclust", fastq_file = "../../../data/tpphase_res_consensus/308TAN/resp30.fastq",
                  datafile = "../../../data/tpphase_res_consensus/308TAN/resp30.txt",
                  ac_outfile = "../../../data/tpphase_res_consensus/initp30", 

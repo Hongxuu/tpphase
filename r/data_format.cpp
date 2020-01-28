@@ -48,6 +48,53 @@ inline xy_t char_to_xy(char c)
 
 unsigned char const xy_to_char[MLOGIT_CLASS] = {'A', 'C', 'T', 'G'};
 
+// [[Rcpp::export]]
+int top_n_map(const IntegerVector & v) 
+{
+  // Initialize a map
+  std::map<double, int> Elt;
+  Elt.clear();
+  
+  // Count each element
+  for (int i = 0; i != v.size(); ++i)
+    Elt[ v[i] ] += 1;
+  
+  // Find out how many unique elements exist... 
+  int n_obs = Elt.size();
+  // If the top number, n, is greater than the number of observations,
+  // then drop it.  
+  int n = n_obs;
+  
+  // Pop the last n elements as they are already sorted. 
+  // Make an iterator to access map info
+  std::map<double,int>::iterator itb = Elt.end();
+  // Advance the end of the iterator up to 5.
+  std::advance(itb, -n);
+  
+  // Recast for R
+  NumericVector result_vals(n);
+  NumericVector result_keys(n);
+  
+  unsigned int count = 0;
+  // Start at the nth element and move to the last element in the map.
+  for( std::map<double,int>::iterator it = itb; it != Elt.end(); ++it ) {
+    // Move them into split vectors
+    result_keys(count) = it->first;
+    result_vals(count) = it->second;
+    count++;
+  }
+  
+  int key = 0;
+  for (unsigned int i = n; i --> 0;)
+    if(result_vals(i) >= NUM_CLASS) {
+      key = result_keys(i);
+      break;
+    }
+    // return Rcpp::List::create(Rcpp::Named("lengths") = result_vals,
+    //                           Rcpp::Named("values") = result_keys);
+    return key;
+}
+
 // FIND UNIQUE UNDER MY CASE
 // List uniq(IntegerVector a, unsigned int len) {
 //   IntegerVector unique(len);
@@ -224,11 +271,13 @@ List read_data(std::string path) {
   for (m = 1; m < n_observation; ++m)
       index[m] = index[m - 1] + length[m - 1];
   
+  /* find the longest reference position && appears more than no. of classes (4) */
   int max_len = 0;
-  for(i = 0; i < total; ++i)
-    if(ref_pos[i] > max_len)
-      max_len = ref_pos[i]; // Actual length need to plus 1
-    
+  max_len = top_n_map(ref_pos);
+  // for(i = 0; i < total; ++i)
+  //   if (ref_pos[i] > max_len) {
+  //     max_len = ref_pos[i]; // Actual length need to plus 1
+  //   }
   max_len = max_len + 1;
   
   IntegerMatrix ref_index(n_observation, max_len);
@@ -245,16 +294,16 @@ List read_data(std::string path) {
           break;
         }
   
-  IntegerVector non_covered_site(max_len);
-  unsigned int num;
-  for (m = 0; m < max_len; ++m) {
-    num = 0;
-      for(i = 0; i < n_observation; ++i)
-        if (ref_index(i, m) == -1)
-          num++;
-      if (num == n_observation)
-        non_covered_site[m] = 1;
-  }
+  // IntegerVector non_covered_site(max_len);
+  // unsigned int num;
+  // for (m = 0; m < max_len; ++m) {
+  //   num = 0;
+  //     for(i = 0; i < n_observation; ++i)
+  //       if (ref_index(i, m) == -1)
+  //         num++;
+  //     if (num == n_observation)
+  //       non_covered_site[m] = 1;
+  // }
         
   List del = List::create(
     Named("del_id") = del_id[Range(0, del_num - 1)],
@@ -290,7 +339,7 @@ List read_data(std::string path) {
     Named("start_id") = index,
     Named("ref_length_max") = max_len, 
     Named("ref_idx") = ref_index, 
-    Named("non_covered_site") = non_covered_site,
+    // Named("non_covered_site") = non_covered_site,
     Named("deletion") = del,
     Named("insertion") = ins);
   
@@ -410,16 +459,58 @@ List sample_hap (List dat_info, IntegerVector start, IntegerVector idx, IntegerV
 CharacterVector to_char(IntegerVector nuc, int length) {
   int i = 0;
   CharacterVector nuc_char(length);
-  
   for(i = 0; i < length; ++i) {
     nuc_char[i] = xy_to_char[nuc[i]];
   }
   return(nuc_char);
 }
 
+// [[Rcpp::export]] 
+IntegerVector find_snp (CharacterMatrix hap) {
+  unsigned int k, j, flag, count = 0;
+  IntegerVector snp_idx(hap.ncol());
+  for(j = 0; j < hap.ncol(); ++j) {
+    flag = 0;
+    for(k = 1; k < hap.nrow(); ++k) {
+      if(hap(k, j) != hap(0, j))
+        flag = 1;
+    }
+    if(flag)
+      snp_idx(count++) = j;
+  }
+  return snp_idx[Range(0, count - 1)];
+}
 
-
-
+// 
+// IntegerMatrix len_hapGap(List dat_info, List hap_info) {
+//   IntegerVector length = dat_info["length"];
+//   IntegerVector ref_index = dat_info["ref_idx"];
+//   int n_observation = dat_info["n_observation"];
+//   
+//   IntegerVector hap_ref_pos = hap_info["deletion_pos"];
+//   IntegerVector hap_deletion_len = hap_info["hap_deletion_len"];
+//   IntegerVector strat_id = hap_info["hap_del_start_id"];
+//   unsigned int i, k, j, loci;
+//   IntegerMatrix new_len(n_observation, NUM_CLASS);
+//   IntegerVector cumsum_del_len(hap_deletion_len.size());
+//   // cumsum_del_len = cumsum(hap_deletion_len);
+//   std::partial_sum(hap_deletion_len.begin(), hap_deletion_len.end(), cumsum_del_len.begin());
+//   
+//   for(i = 0; i < n_observation; ++i)
+//     for (k = 0; k < NUM_CLASS; ++k) {
+//       new_len(i, k) = length(i);
+//       if (strat_id(k) != -1)
+//         for (j = 0; j < hap_deletion_len[k]; ++j) {
+//           if (k != 0) {
+//             loci = hap_ref_pos[j + cumsum_del_len[k - 1]];
+//           } else
+//             loci = hap_ref_pos[j];
+//           if(ref_index(i, loci) != -1)
+//             new_len(i, k)--;
+//         }
+//     }
+//   return new_len;
+// }
 
 
 

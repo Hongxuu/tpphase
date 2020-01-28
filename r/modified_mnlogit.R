@@ -56,7 +56,7 @@ modified_mnlogit <- function (formula, data, choiceVar = NULL, maxiter = 50, fto
   #   choiceVar <- "_Alt_Indx_"
   #   data[[choiceVar]] <- attr(data, "index")$alt
   # }
-  formula <- parseFormula(formula)
+  formula <- parseFormula(f = formula)
   response <- attr(formula, "response")
   interceptOn <- attr(formula, "Intercept")
   # csvChVar <- attr(formula, "csvChCoeff")

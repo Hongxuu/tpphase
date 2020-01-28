@@ -5,7 +5,7 @@ rea_dat <- function(filepath, filter = TRUE) {
   names(dat) <- c("idx", "read_pos", "ref_pos", "qua", "read_nuc")
   #### Remove deletion and insertion:
   if(filter) {
-    dat <- dat %>% filter(!str_detect(qua, "-1"))
+    # dat <- dat %>% filter(!str_detect(qua, "-1"))
     dat <- dat %>% filter(!str_detect(ref_pos, "-1"))
   }
   dat %>% mutate_if(is.factor, as.character)
