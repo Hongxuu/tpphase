@@ -49,7 +49,7 @@ inline xy_t char_to_xy(char c)
 unsigned char const xy_to_char[MLOGIT_CLASS] = {'A', 'C', 'T', 'G'};
 
 // [[Rcpp::export]]
-int top_n_map(const IntegerVector & v) 
+List unique_map(const Rcpp::IntegerVector & v)
 {
   // Initialize a map
   std::map<double, int> Elt;
@@ -77,36 +77,48 @@ int top_n_map(const IntegerVector & v)
   
   unsigned int count = 0;
   // Start at the nth element and move to the last element in the map.
-  for( std::map<double,int>::iterator it = itb; it != Elt.end(); ++it ) {
+  for (std::map<double,int>::iterator it = itb; it != Elt.end(); ++it) {
     // Move them into split vectors
     result_keys(count) = it->first;
     result_vals(count) = it->second;
     count++;
   }
-  
+  return List::create(Named("lengths") = result_vals,
+                      Named("values") = result_keys);
+}
+
+// [[Rcpp::export]] 
+int uni_sum(List unique_map, unsigned int cut_off)
+{
+  NumericVector result_vals = unique_map["lengths"];
+  NumericVector result_keys = unique_map["values"];
+  int n = result_keys.size();
+  int cumsum = 0;
+  int key = 0;
+  for (unsigned int i = 0; i < n; ++i) {
+    cumsum += result_vals(i);
+    if(cumsum >= cut_off) {
+      key = result_keys(i);
+      break;
+    }
+  }
+  return key;
+}
+
+// [[Rcpp::export]]
+int top_n_map(List unique_map) 
+{
+  NumericVector result_vals = unique_map["lengths"];
+  NumericVector result_keys = unique_map["values"];
+  int n = result_keys.size();
   int key = 0;
   for (unsigned int i = n; i --> 0;)
     if(result_vals(i) >= NUM_CLASS) {
       key = result_keys(i);
       break;
     }
-    // return Rcpp::List::create(Rcpp::Named("lengths") = result_vals,
-    //                           Rcpp::Named("values") = result_keys);
     return key;
 }
-
-// FIND UNIQUE UNDER MY CASE
-// List uniq(IntegerVector a, unsigned int len) {
-//   IntegerVector unique(len);
-//   unsigned int uniq_len;
-//   for (unsigned int m = 0; m < len; ++m) 
-//     if (m < len - 1 && a[m] != a[m + 1])
-//       unique[uniq_len++] = a[m];
-//     if(unique[uniq_len] != a[len])
-//       unique[uniq_len++] = a[len];
-//     
-//   return ls; 
-// }
 
 // [[Rcpp::export]]
 List read_data(std::string path) {
@@ -273,7 +285,8 @@ List read_data(std::string path) {
   
   /* find the longest reference position && appears more than no. of classes (4) */
   int max_len = 0;
-  max_len = top_n_map(ref_pos);
+  List uni_map = unique_map(ref_pos);
+  max_len = top_n_map(uni_map);
   // for(i = 0; i < total; ++i)
   //   if (ref_pos[i] > max_len) {
   //     max_len = ref_pos[i]; // Actual length need to plus 1
@@ -480,6 +493,8 @@ IntegerVector find_snp (CharacterMatrix hap) {
   }
   return snp_idx[Range(0, count - 1)];
 }
+
+
 
 // 
 // IntegerMatrix len_hapGap(List dat_info, List hap_info) {

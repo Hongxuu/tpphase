@@ -8,6 +8,7 @@ library(Formula)
 
 source("./read_data.R")
 source("../r/data_process.R")
+source("../r/tpphase.R")
 source("../r/modified_mnlogit.R")
 source("../r/m_beta.R")
 source("../r/initialization.R")
@@ -23,7 +24,7 @@ sourceCpp("../r/m_hap.cpp")
 #' @param samfile Input sam file
 #' @param ref_name Reference name in sam file
 #' @param init Initialization method (Options: "ampliclust", "in_file", "random", Default: "ampliclust")
-#' @param FastaFile Input a fasta file if initialization is "in_file"
+#' @param fasta_file Input a fasta file if initialization is "in_file"
 #' @param ampliclust_command "ampliclust" command (indicate path as well)
 #' @param snp Vector or file to indicate variation sites
 #' @param fastq_file fastq file output from sam file
@@ -40,7 +41,7 @@ sourceCpp("../r/m_hap.cpp")
 #' ampliclust_command = "../amplici/run_ampliclust", output = "308TAN_B_P3.txt")
 #' @return assignments and haplotypes, etc
 
-tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaFile, ampliclust_command, deletion_num = 0,
+tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_file, ampliclust_command, deletion_cut = 0,
                     fastq_file = "./res.fastq", datafile = "./res.txt", ac_outfile = "./init", snp = NULL, output = NULL, 
                     formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 1,
                     n_class = 4, num_cat = 4, seed = 0, max = 50, tol = 1e-06, ncores = 2, n_predictor = 10) {
@@ -64,14 +65,14 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   }
   
   ## initialize haplotype
-  hapinit <- ini_hap(init, ampliclust_command, fastq_file, ac_outfile, n_class, 
-                     hap_length, FastaFile, seed, deletion_num)
-  
+  hap_info <- ini_hap(init, ampliclust_command, fastq_file, ac_outfile, n_class, 
+                     hap_length, fasta_file, seed, deletion_cut)
+  hapinit <- hap_info$hap
   ## prepare data
   read_length <- d$length
   data <- format_data(dat_info = d, haplotype = hapinit)
   weight_id <- NULL
-  if(sum(hap_deletion_len) != 0) {
+  if(sum(hap_info$hap_deletion_len) != 0) {
     data_rm <- data %>% filter(mode == 1) 
     weight_id <- which(data_rm$hap_nuc == 4)
     data <- data %>% filter(hap_nuc != 4) # mnlogit only takes data without indels in read or in haplotypes
@@ -98,7 +99,7 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
             read_length, ncores, snp, max)
     if(best_llk < results$resu$full_llk) {
       best_llk <- results$resu$full_llk
-      final_res <- dereplicate_res(results$resu, results$haps)
+      final_res <- dereplicate_res(resu = results$resu, haps = results$haps)
     }
   }
   if(is.null(output) == FALSE)
@@ -107,7 +108,7 @@ tpphase <- function(samfile = NULL, ref_name = NULL, init = "ampliclust", FastaF
   return(final_res)
 }
 
-final <- tpphase(samfile = NULL, ref_name = NULL, init = "random", deletion_num = 2,
+final <- tpphase(samfile = NULL, ref_name = NULL, init = "random", deletion_cut = 2,
                  ampliclust_command = "../../amplici/run_ampliclust", fastq_file = "../../../data/tpphase_res_consensus/308TAN/resp30.fastq",
                  datafile = "../../../data/tpphase_res_consensus/308TAN/resp30.txt",
                  ac_outfile = "../../../data/tpphase_res_consensus/initp30", 
