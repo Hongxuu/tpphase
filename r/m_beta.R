@@ -42,7 +42,7 @@ Mstep <- function(dat, read_length, par, weight_id, formula, num_cat = 4, ncores
 #' @description prepare data and call mnlogit
 #' @return logLik of mnlogit and betas
 
-m_beta <- function(res, d, weight_id, data, id, formula, reads_lengths, ncores) {
+m_beta <- function(res, weight_id, data, id, formula, reads_lengths, ncores) {
   par <- list()
   
   if(length(res$excluded_id) != 0) {

@@ -4,13 +4,16 @@ fnlist <- function(x, fil){
     if(nams[i] == "haplotypes") {
       cat(nams[i], ":", "\n", file = fil, append = TRUE)
       write.table(x[[i]], file = fil, append = T, quote = FALSE, row.names=FALSE, col.names=FALSE)
+    } else if(nams[i] == "snps") {
+      cat(nams[i], ":", "\n", file = fil, append = TRUE)
+      write.table(x[[i]], file = fil, append = T, quote = FALSE, row.names=FALSE, col.names=TRUE)
     } else {
       cat(nams[i], ":", "\n", x[[i]], "\n", file = fil, append = TRUE) 
     }
   }
 }
 
-dereplicate_res <- function(resu, haps) {
+dereplicate_res <- function(resu, haps, n_class) {
   final_res <- list()
   haplotypes <- matrix(to_char_r(haps$hap), nrow = n_class)
   idx <- duplicated(haplotypes)
@@ -42,8 +45,11 @@ dereplicate_res <- function(resu, haps) {
   }
   cat(nrow(derepliacte_h), " haplotype(s) inferred\n")
   final_res$haplotypes <- derepliacte_h
-  if (nrow(derepliacte_h) != 1)
-    final_res$snps <- final_res$haplotypes[, find_snp(hap = final_res$haplotypes) + 1]
+  if (nrow(derepliacte_h) != 1) {
+    final_res$snps_loci <- find_snp(hap = final_res$haplotypes) + 1
+    final_res$snps <- final_res$haplotypes[, final_res$snps_loci] %>%  
+      `colnames<-`(final_res$snps_loci)
+    }
   final_res$logistic_coeff <- resu$param$beta
   final_res$full_llk <- resu$full_llk
   

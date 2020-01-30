@@ -95,21 +95,28 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
     old_hap <- hap
     data <- cbind(id, data)
     ## Iteration
-    results <- tpphase(dat_info, hap_info, par, hap, old_hap, tol, id, weight_id, data, formula, 
-                       read_length, ncores, snp, max)
-    cat("Log likelihood in the", n_initialization, "th", "initialization:", results$resu$full_llk)
+    results <- tpphase(dat_info = d, hap_info = hap_info, par = par, hap = hap, old_hap = old_hap, tol = tol, 
+                       id = id, weight_id = weight_id, data = data, formula = formula, read_length = read_length, 
+                       ncores = ncores, snp = snp, max = max)
+    cat("Log likelihood in the", n_initialization, "th", "initialization:", results$resu$full_llk, "\n")
     if(best_llk < results$resu$full_llk) {
       best_llk <- results$resu$full_llk
-      final_res <- dereplicate_res(resu = results$resu, haps = results$haps)
+      final_res <- dereplicate_res(resu = results$resu, haps = results$haps, n_class = n_class)
     }
   }
   if(is.null(output) == FALSE)
-    fnlist(final_res, output)
+    fnlist(final, output)
   
   return(final_res)
 }
 
 final <- run_tpphase(samfile = NULL, ref_name = NULL, init = "random", deletion_cut = 15,
+                     datafile = "../../../data/tpphase_res_consensus/308TAN/resp30.txt", snp = NULL,
+                     output = "../../../data/tpphase_res_consensus/308TAN_p30.txt", 
+                     formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 2,
+                     n_class = 4, num_cat = 4, seed = 6, max = 50, tol = 1e-06, ncores = 2)
+  
+
                  ampliclust_command = "../../amplici/run_ampliclust", fastq_file = "../../../data/tpphase_res_consensus/308TAN/resp30.fastq",
                  datafile = "../../../data/tpphase_res_consensus/308TAN/resp30.txt",
                  ac_outfile = "../../../data/tpphase_res_consensus/initp30", 
