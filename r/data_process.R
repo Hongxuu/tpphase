@@ -13,23 +13,37 @@ fnlist <- function(x, fil){
 dereplicate_res <- function(resu, haps) {
   final_res <- list()
   haplotypes <- matrix(to_char_r(haps$hap), nrow = n_class)
-  h <- data.table::data.table(haplotypes, key = paste0("V", 1:ncol(haplotypes)))
-  derepliacte_h <- unique(h[duplicated(h)])
-  
-  if(nrow(derepliacte_h) != nrow(h)) {
-    replicated <- lapply(1:nrow(derepliacte_h),function(i) h[derepliacte_h[i, ], which = T])
-    final_res$mixture_prop <- sapply(1:nrow(derepliacte_h), function(i) sum(resu$param$mixture_prop[replicated[[i]]]))
-    index <- sapply(replicated, "[[", 1)
-    if (nrow(derepliacte_h) != 1)
-      final_res$assignments <- apply(resu$param$w_ic[, index], MARGIN = 1, FUN = which.max)
+  idx <- duplicated(haplotypes)
+  derepliacte_h <- haplotypes[!idx, ]
+  #distinct(haplotypes)
+  if(nrow(derepliacte_h) != nrow(haplotypes) & (nrow(derepliacte_h) != 1)) {
+    flag <- which(idx == TRUE)
+    ##TODO: hash talbe, this is only for the situation with four hap
+    if (length(flag) == 1) {
+      replicated <- c(flag - 1, flag)
+      final_res$mixture_prop <- c(sum(resu$param$mixture_prop[replicated]), resu$param$mixture_prop[-replicated])
+      weights <- cbind(rowSums(resu$param$w_ic[, replicated]), resu$param$w_ic[, -replicated])
+    } else if ((length(flag) == 2)) {
+      if((flag[2] - flag[1]) == 1) {
+        replicated <- c(flag[1] - 1, flag)
+        final_res$mixture_prop <- c(sum(resu$param$mixture_prop[replicated]), resu$param$mixture_prop[-replicated])
+        weights <- cbind(rowSums(resu$param$w_ic[, replicated]), resu$param$w_ic[, -replicated])
+      } else {
+        final_res$mixture_prop <- c(sum(resu$param$mixture_prop[flag[1] - 1, flag[1]]), 
+                                      sum(resu$param$mixture_prop[flag[2] - 1, flag[2]]))
+        weights <- cbind(rowSums(resu$param$w_ic[, c(flag[1] - 1, flag[1])]),
+                           rowSums(resu$param$w_ic[, c(flag[2] - 1, flag[2])]))
+      }
+    }
+    final_res$assignments <- apply(weights, MARGIN = 1, FUN = which.max)
   } else {
     final_res$mixture_prop <- resu$param$mixture_prop
     final_res$assignments <- apply(resu$param$w_ic, MARGIN = 1, FUN = which.max)
   }
-  
-  final_res$haplotypes <- derepliacte_h %>% as.matrix
+  cat(nrow(derepliacte_h), " haplotype(s) inferred\n")
+  final_res$haplotypes <- derepliacte_h
   if (nrow(derepliacte_h) != 1)
-    final_res$snps <- final_res$haplotypes[, find_snp(hap = final_res$haplotypes)]
+    final_res$snps <- final_res$haplotypes[, find_snp(hap = final_res$haplotypes) + 1]
   final_res$logistic_coeff <- resu$param$beta
   final_res$full_llk <- resu$full_llk
   

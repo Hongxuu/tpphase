@@ -436,11 +436,14 @@ List sample_hap (List dat_info, IntegerVector start, IntegerVector idx, IntegerV
     sum += hap_deletion_len[i];
   IntegerVector hap_ref_pos(sum);
   IntegerVector strat_id(NUM_CLASS);
-  
+  //Rcout << start << "\n";
   for (i = 0; i < NUM_CLASS; ++i) {
-    for (j = 0; j < length[idx[i] - 1]; ++j)
+    //Rprintf("\n%d\n", i);
+    for (j = 0; j < length[idx[i] - 1]; ++j)  {
+      //Rprintf("%d\t", obs[start[i] + j]);
       hap_nuc(i, ref_pos[start[i] + j]) = obs[start[i] + j]; //idx start from 1!!!
-    if (del_flag[idx[i] - 1] == 1)
+    }
+    if (del_flag[idx[i] - 1])
       for (m = 0; m < del_total; ++m)
         if (del_id_all[m] == idx[i]) {
           hap_nuc(i, del_ref_pos[m]) = 4;

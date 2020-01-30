@@ -10,7 +10,7 @@
 #' @param seed
 #' @return parameters for EM
 
-ini_par <- function(dat, n_observation, formula, n_class, weight_id, num_cat, seed, ncores) {
+ini_par <- function(dat, n_observation, formula, n_class, weight_id, num_cat, ncores) {
   par <- list()
   #set.seed(seed)
   #par$eta <- runif(n_class, 0, 1)
@@ -26,24 +26,22 @@ ini_par <- function(dat, n_observation, formula, n_class, weight_id, num_cat, se
 }
 
 
-ini_hap <- function(init, ampliclust_command, fastq_file, ac_outfile, n_class, 
-                    hap_length, fasta_file, seed, deletion_cut) {
+ini_hap <- function(d, init, ampliclust_command, fastq_file, ac_outfile, n_class, 
+                    hap_length, fasta_file, deletion_cut) {
+  hap_infom <- list()
   if(init == "ampliclust") {
-    hap_info <- list()
     hapinit <- call_ampliclust(ampliclust_command, fastq_file, ac_outfile)
-    hap_info$hap <- hapinit[1:n_class, 1:hap_length]
-    hap_info$hap_deletion_len <- 0
+    hap_infom$hap <- hapinit[1:n_class, 1:hap_length]
+    hap_infom$hap_deletion_len <- 0
   }
   
   if(init == "in_file") {
-    hap_info <- list()
     hapinit <- read_fasta(fasta_file)[1:n_class, 1:hap_length]
-    hap_info$hap_deletion_len <- 0
-    hap_info$hap <- hapinit
+    hap_infom$hap_deletion_len <- 0
+    hap_infom$hap <- hapinit
   }
   
   if(init == "random") {
-    set.seed(seed)
     uni_map <- unique_map(v = d$deletion$del_length_all)
     deletion_num <- uni_sum(uni_map, cut_off = deletion_cut)
     samp <- which(d$fake_length == hap_length & d$deletion$del_length_all <= deletion_num)
@@ -51,9 +49,12 @@ ini_hap <- function(init, ampliclust_command, fastq_file, ac_outfile, n_class,
       stop("Not enough sample with the same length as the haplotypes to infer, 
            adjust the deletion_cut to be larger!")
     samp_id <- sample(samp, n_class)
+    cat("Selected reads: ", samp_id);
     start <- d$start_id[samp_id] #index is right in R!
     hap_deletion_len <- d$deletion$del_length_all[samp_id]
-    hap_info <- sample_hap(d, start, samp_id, hap_deletion_len)
+    sink("~/Downloads/test.txt")
+    hap_infom <- sample_hap(d, start, samp_id, hap_deletion_len)
+    sink()
   }
-  return(hap_info)
+  return(hap_infom)
 }
