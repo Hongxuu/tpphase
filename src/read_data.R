@@ -25,7 +25,7 @@ read_sam <- function(samfile = NULL, ref_name = NULL,
   if (utils::tail(unlist(strsplit(samfile, "[.]")), 1) != "sam")
     stop("The input datafile has to be sam file!")
   
-  if (!is.loaded("r_read_sam", PACKAGE = "sync_data_r")) {
+  if (!is.loaded("./src/r_read_sam", PACKAGE = "sync_data_r")) {
     dyn.load("sync_data_r.so")
   }
   

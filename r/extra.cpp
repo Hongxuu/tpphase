@@ -121,6 +121,24 @@ IntegerMatrix len_hapGap(List dat_info, List hap_info) {
   return new_len;
 }
 
+// [[Rcpp::export]] 
+List dup_res(IntegerMatrix hap) {
+  unsigned int i, j, i1;
+  IntegerVector index;
+  IntegerVector key(hap.nrow());  
+  int count = 0;
+    for(i = 0; i < hap.nrow(); ++i) {
+      for(i1 = i + 1; i1 < hap.nrow(); ++i1) {
+          for(j = 0; j < hap.ncol(); ++j) {
+            if(hap[i1, j] != hap[i, j]) {
+              key(count++) = i;
+              break;
+            }
+        }
+    }
+  }
+}
+
 
 // /*** R
 // ### Slower
