@@ -105,7 +105,7 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
     }
   }
   if(is.null(output) == FALSE)
-    fnlist(final, output)
+    fnlist(final_res, output)
   
   return(final_res)
 }
