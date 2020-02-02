@@ -26,6 +26,8 @@ tpphase <- function(dat_info, hap_info, par, hap, old_hap, tol, id, weight_id,
     if(any(old_hap != hap)) {
       weight_id <- NULL
       data <- format_data(dat_info = dat_info, haplotype = hap)
+      if(dat_info$over_hapmax)
+        data <- data %>% filter(hap_nuc != -1)
       if(sum(hap_info$hap_deletion_len) != 0) {
         data_rm <- data %>% filter(mode == 1) 
         weight_id <- which(data_rm$hap_nuc == 4)

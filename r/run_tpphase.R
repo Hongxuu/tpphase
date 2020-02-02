@@ -73,6 +73,8 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
     hapinit <- hap_info$hap
     ## prepare data
     data <- format_data(dat_info = d, haplotype = hapinit)
+    if(d$over_hapmax)
+      data <- data %>% filter(hap_nuc != -1)
     weight_id <- NULL
     if(sum(hap_info$hap_deletion_len) != 0) {
       data_rm <- data %>% filter(mode == 1) 
@@ -110,11 +112,11 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
   return(final_res)
 }
 
-final <- run_tpphase(samfile = "../../data/peanut_consensus/308-TAN-consensus.sam", ref_name = "Adur105:427859_Adur105:427873-Aipa71:5269634_P3", 
-                     init = "random", deletion_cut = 15, fastq_file = "../../../data/tpphase_res_consensus/308TAN/resp3.fastq",
-                     datafile = "../../../data/tpphase_res_consensus/308TAN/resp3.txt", snp = NULL,
-                     output = "../../../data/tpphase_res_consensus/308TAN/308TAN_p3.txt", 
-                     formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 2,
+final <- run_tpphase(samfile = NULL, ref_name = NULL, 
+                     init = "random", deletion_cut = 15, fastq_file = "../../../data/tpphase_res_consensus/308TAN/resp5.fastq",
+                     datafile = "../../data/tpphase_res_consensus/308TAN/resp5.txt", snp = NULL,
+                     output = "../../data/tpphase_res_consensus/308TAN/308TAN_p5.txt", 
+                     formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 1,
                      n_class = 4, num_cat = 4, seed = 6, max = 50, tol = 1e-06, ncores = 2)
 
 "../"

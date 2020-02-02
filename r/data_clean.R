@@ -108,7 +108,7 @@ data_clean <- function(dat_path, hap_path, n_class = 4, num_cat = 4, filter = TR
 #lldat <- data_clean(dat_path = "test.txt", hap_path = "test_hap.fa")
 
 write.table(dat_long, file = "long.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
-data_r <- rea_dat(filepath = datafile, filter = FALSE)
+data_r <- rea_dat(filepath = datafile, filter = TRUE)
 data_r %>% filter(idx %in% c(1:10))
 write.table(data_r %>% filter(idx %in% c(1:10)), file = "test_30.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
 ##### add fake information for mnlogit format

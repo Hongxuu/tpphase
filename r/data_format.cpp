@@ -270,27 +270,29 @@ List read_data(std::string path) {
     obs[m] = char_to_xy(obs[m]);
   }
   
-  // true length
+  /* index of read in non-indel loci */
+  IntegerVector index(n_observation);
+  for (m = 1; m < n_observation; ++m)
+    index[m] = index[m - 1] + length[m - 1];
+  
+  // true length (include insertion) and fake length (include deletion also some reads' alignment does not start from 0, count that in)
   IntegerVector true_length(n_observation);
   IntegerVector fake_length(n_observation);
   for (i = 0; i < n_observation; ++i) {
     true_length[i] = length[i] + ins_length_all[i];
-    fake_length[i] = length[i] + del_length_all[i];
+    fake_length[i] = length[i] + del_length_all[i] + ref_pos[index[i]];
   }
-  
-  /* index of read */
-  IntegerVector index(n_observation);
-  for (m = 1; m < n_observation; ++m)
-      index[m] = index[m - 1] + length[m - 1];
   
   /* find the longest reference position && appears more than no. of classes (4) */
   int max_len = 0;
   List uni_map = unique_map(ref_pos);
   max_len = top_n_map(uni_map);
-  // for(i = 0; i < total; ++i)
-  //   if (ref_pos[i] > max_len) {
-  //     max_len = ref_pos[i]; // Actual length need to plus 1
-  //   }
+  int over_hapmax = 0;
+  for(i = 0; i < total; ++i)
+    if (max_len < ref_pos[i]) {
+      over_hapmax = 1;
+      break;
+    }
   max_len = max_len + 1;
   
   IntegerMatrix ref_index(n_observation, max_len);
@@ -352,6 +354,7 @@ List read_data(std::string path) {
     Named("start_id") = index,
     Named("ref_length_max") = max_len, 
     Named("ref_idx") = ref_index, 
+    Named("over_hapmax") = over_hapmax,
     // Named("non_covered_site") = non_covered_site,
     Named("deletion") = del,
     Named("insertion") = ins);
@@ -367,6 +370,7 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype) {
   size_t input_arr_sz = sizeof input_arr / sizeof *input_arr;
   
   int total = dat_info["total"];
+  int hap_length = dat_info["ref_length_max"];
   IntegerVector qua = dat_info["qua"];
   IntegerVector obs = dat_info["nuc"];
   IntegerVector obs_index = dat_info["id"];
@@ -384,9 +388,14 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype) {
   /* pick out the haplotypes accordingg to ref_pos */
   for (i = 0; i < total; ++i)
     for (k = 0; k < NUM_CLASS; ++k)
-      for (l = 0; l < MLOGIT_CLASS; ++l)
-        r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i]);
-  
+      for (l = 0; l < MLOGIT_CLASS; ++l) {
+        // the reference position might be longer than the sampled haplotypes
+        if(ref_pos[i] > hap_length - 1)
+          r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = -1;
+        else
+          r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i]);
+      }
+      
   /* repeat the data for mnlogit */
   for (k = 0; k < total; ++k)
     for (i = 0; i < MLOGIT_CLASS * NUM_CLASS; ++i) {

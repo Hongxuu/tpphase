@@ -15,8 +15,8 @@ ini_par <- function(dat, n_observation, formula, n_class, weight_id, num_cat, nc
   #set.seed(seed)
   #par$eta <- runif(n_class, 0, 1)
   #par$eta <- par$eta/sum(par$eta)
-  par$eta <- rep(0.25, n_class)
-  par$wic <- matrix(0.25, nrow = n_observation, ncol = n_class)
+  par$eta <- rep(1/num_cat, n_class)
+  par$wic <- matrix(1/num_cat, nrow = n_observation, ncol = n_class)
   par$ins_rate <- 1e-5
   par$del_rate <- 1e-5
   par$excluded_read <- rep(0, n_observation)
@@ -43,7 +43,10 @@ ini_hap <- function(d, init, ampliclust_command, fastq_file, ac_outfile, n_class
   
   if(init == "random") {
     uni_map <- unique_map(v = d$deletion$del_length_all)
-    deletion_num <- uni_sum(uni_map, cut_off = deletion_cut)
+    if(uni_map$lengths[1] >= deletion_cut) {
+      deletion_num <- uni_map$values[1]
+    } else 
+      deletion_num <- uni_sum(uni_map, cut_off = deletion_cut)
     samp <- which(d$fake_length == hap_length & d$deletion$del_length_all <= deletion_num)
     if(length(samp) < n_class)
       stop("Not enough sample with the same length as the haplotypes to infer, 

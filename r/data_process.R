@@ -46,9 +46,9 @@ dereplicate_res <- function(resu, haps, n_class) {
   cat(nrow(derepliacte_h), " haplotype(s) inferred\n")
   final_res$haplotypes <- derepliacte_h
   if (nrow(derepliacte_h) != 1) {
-    final_res$snps_loci <- find_snp(hap = final_res$haplotypes) + 1
-    final_res$snps <- final_res$haplotypes[, final_res$snps_loci] %>%  
-      `colnames<-`(final_res$snps_loci)
+    snps_loci <- find_snp(hap = final_res$haplotypes) + 1
+    final_res$snps <- final_res$haplotypes[, snps_loci] %>%  
+      `colnames<-`(snps_loci)
     }
   final_res$logistic_coeff <- resu$param$beta
   final_res$full_llk <- resu$full_llk
