@@ -18,9 +18,9 @@ tpphase <- function(dat_info, hap_info, par, hap, old_hap, tol, id, weight_id,
     
     #if(abs(par$eta - res$param$mixture_prop) < tol && abs(par$beta - res$param$beta) < tol)
     if(m > 1)
-      if(abs(full_llk[m] - full_llk[m-1]) < tol && 
-         abs(par$eta - res$param$mixture_prop) < tol && 
-         abs(par$beta - res$param$beta) < tol)
+      if(abs(full_llk[m] - full_llk[m-1]) < tol | 
+         (abs(par$eta - res$param$mixture_prop) < tol & 
+         abs(par$beta - res$param$beta) < tol))
         break;
     
     if(any(old_hap != hap)) {

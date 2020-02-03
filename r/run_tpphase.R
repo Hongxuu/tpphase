@@ -41,10 +41,10 @@ sourceCpp("./r/m_hap.cpp")
 #' ampliclust_command = "../amplici/run_ampliclust", output = "308TAN_B_P3.txt")
 #' @return assignments and haplotypes, etc
 
-run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_file, ampliclust_command, deletion_cut = 15,
+run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_file, ampliclust_command, deletion_cut = 20,
                     fastq_file = "./res.fastq", datafile = "./res.txt", ac_outfile = "./init", snp = NULL, output = NULL, 
                     formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 1,
-                    n_class = 4, num_cat = 4, seed = 0, max = 50, tol = 1e-06, ncores = 2) {
+                    n_class = 4, num_cat = 4, seed = 0, max = 20, tol = 1e-06, ncores = 2) {
   
   registerDoParallel(cores = ncores)
   
@@ -108,13 +108,13 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
   }
   if(is.null(output) == FALSE)
     fnlist(final_res, output)
-  
+
   return(final_res)
 }
 
 final <- run_tpphase(samfile = NULL, ref_name = NULL, 
-                     init = "random", deletion_cut = 15, fastq_file = "../../../data/tpphase_res_consensus/308TAN/resp5.fastq",
-                     datafile = "../../data/tpphase_res_consensus/308TAN/resp5.txt", snp = NULL,
+                     init = "random", deletion_cut = 15, fastq_file = "../../data/tpphase_res_consensus/308TAN/resp5.fastq",
+                     datafile = "../../data/tpphase_res_consensus/308TAN/resp38.txt", snp = NULL,
                      output = "../../data/tpphase_res_consensus/308TAN/308TAN_p5.txt", 
                      formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 1,
                      n_class = 4, num_cat = 4, seed = 6, max = 50, tol = 1e-06, ncores = 2)

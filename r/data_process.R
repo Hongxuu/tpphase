@@ -32,8 +32,8 @@ dereplicate_res <- function(resu, haps, n_class) {
         final_res$mixture_prop <- c(sum(resu$param$mixture_prop[replicated]), resu$param$mixture_prop[-replicated])
         weights <- cbind(rowSums(resu$param$w_ic[, replicated]), resu$param$w_ic[, -replicated])
       } else {
-        final_res$mixture_prop <- c(sum(resu$param$mixture_prop[flag[1] - 1, flag[1]]), 
-                                      sum(resu$param$mixture_prop[flag[2] - 1, flag[2]]))
+        final_res$mixture_prop <- c(sum(resu$param$mixture_prop[c(flag[1] - 1, flag[1])]), 
+                                      sum(resu$param$mixture_prop[c(flag[2] - 1, flag[2])]))
         weights <- cbind(rowSums(resu$param$w_ic[, c(flag[1] - 1, flag[1])]),
                            rowSums(resu$param$w_ic[, c(flag[2] - 1, flag[2])]))
       }
