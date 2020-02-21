@@ -47,8 +47,10 @@ ini_hap <- function(d, init, ampliclust_command, fastq_file, ac_outfile, n_class
       deletion_num <- uni_map$values[1]
     } else 
       deletion_num <- uni_sum(uni_map, cut_off = deletion_cut)
-    samp <- which(d$fake_length == hap_length & d$deletion$del_length_all <= deletion_num)
-    if(length(samp) < n_class)
+    samp <- which(d$fake_length == hap_length & 
+                    d$length >= (hap_length - median(uni_map$values)) & 
+                    d$deletion$del_length_all <= deletion_num)
+    if(length(samp) < n_class * 3)
       stop("Not enough sample with the same length as the haplotypes to infer, 
            adjust the deletion_cut to be larger!\n")
     samp_id <- sample(samp, n_class)

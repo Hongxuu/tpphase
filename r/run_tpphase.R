@@ -52,9 +52,9 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
   if(is.null(samfile) == FALSE)
     sam <- read_sam(samfile, ref_name, fastq_file, datafile)
   
-  d <- read_data(datafile)
-  hap_length <- d$ref_length_max
-  read_length <- d$length
+  dat_info <- read_data(datafile)
+  hap_length <- dat_info$ref_length_max
+  read_length <- dat_info$length
   ## read in non-snps sites
   if(is.null(snp) == TRUE) {
     snp <- rep(1, hap_length)
@@ -68,19 +68,19 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
   best_llk <- -Inf
   for (i in 1:n_initialization) {
     ## initialize haplotype
-    hap_info <- ini_hap(d, init, ampliclust_command, fastq_file, ac_outfile, n_class, 
+    hap_info <- ini_hap(dat_info, init, ampliclust_command, fastq_file, ac_outfile, n_class, 
                         hap_length, fasta_file, deletion_cut)
     hapinit <- hap_info$hap
     ## prepare data
-    data <- format_data(dat_info = d, haplotype = hapinit)
-    if(d$over_hapmax)
+    data <- format_data(dat_info = dat_info, haplotype = hapinit)
+    if(dat_info$over_hapmax)
       data <- data %>% filter(hap_nuc != -1)
     weight_id <- NULL
     if(sum(hap_info$hap_deletion_len) != 0) {
       data_rm <- data %>% filter(mode == 1) 
       weight_id <- which(data_rm$hap_nuc == 4)
       data <- data %>% filter(hap_nuc != 4) # mnlogit only takes data without indels in read or in haplotypes
-      #read_length <- len_hapGap(dat_info = d, hap_info = hap_info)
+      #read_length <- len_hapGap(dat_info = dat_info, hap_info = hap_info)
       #read_length <- collect(data %>% filter(mode == 1) %>% count(id) %>% select(n))[[1]]/4
     }
     data$nuc <- to_char_r(data$nuc)
@@ -90,14 +90,14 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
     
     ## initialize parameters
     par <- list()
-    par <- ini_par(dat = data, n_observation = d$n_observation, formula = formula, 
+    par <- ini_par(dat = data, n_observation = dat_info$n_observation, formula = formula, 
                    n_class = n_class, num_cat = num_cat, ncores = ncores, weight_id = weight_id)
     
     hap <- hapinit
     old_hap <- hap
     data <- cbind(id, data)
     ## Iteration
-    results <- tpphase(dat_info = d, hap_info = hap_info, par = par, hap = hap, old_hap = old_hap, tol = tol, 
+    results <- tpphase(dat_info = dat_info, hap_info = hap_info, par = par, hap = hap, old_hap = old_hap, tol = tol, 
                        id = id, weight_id = weight_id, data = data, formula = formula, read_length = read_length, 
                        ncores = ncores, snp = snp, max = max)
     cat("Log likelihood in the", n_initialization, "th", "initialization:", results$resu$full_llk, "\n")
@@ -114,8 +114,8 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
 
 final <- run_tpphase(samfile = NULL, ref_name = NULL, 
                      init = "random", deletion_cut = 15, fastq_file = "../../data/tpphase_res_consensus/308TAN/resp5.fastq",
-                     datafile = "../../data/tpphase_res_consensus/308TAN/resp38.txt", snp = NULL,
-                     output = "../../data/tpphase_res_consensus/308TAN/308TAN_p5.txt", 
+                     datafile = "../../data/tpphase_res_consensus/308TAN/resp28.txt", snp = NULL,
+                     output = "../../data/tpphase_res_consensus/308TAN/308TAN_p38.txt", 
                      formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 1,
                      n_class = 4, num_cat = 4, seed = 6, max = 50, tol = 1e-06, ncores = 2)
 

@@ -103,7 +103,8 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned
         likelihood += log(w_ic(i, K)) + xb + tail;
       else
         likelihood += w_ic(i, K) * exp(xb + tail);
-      //Rcout << "normal add " << w_ic(i, K) * exp(xb + tail) << "\t";
+      // if(i == 0)
+      //   Rcout << "normal add " << w_ic(i, K) * exp(xb + tail) << "\t";
     }
     
       if(ref_index(i, j) == -1) {
@@ -114,7 +115,8 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned
             likelihood += w_ic(i, K) * R::dpois(1, del_lambda, false);
         }
       }
-      //Rcout << "del add " << w_ic(i, K) * R::dpois(1, lambda, false) << "\t";
+      // if(i == 0)
+      //   Rcout << "del add " << w_ic(i, K) * R::dpois(1, del_lambda, false) << "\t";
     // if(l == 4 && ref_index(i, j) != -1) {
     //   if (viterbi)
     //     likelihood += log(w_ic(i, K)) + R::dpois(1, ins_lambda, true);
@@ -126,7 +128,7 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned
     //   Rcout << "predictor : " << predictor.t() << "\n";
     //   Rcout << "nuc" << obs[index[i] + ref_index(i, j)] << "\t";
     // }
-    //Rcout << likelihood << "\t";
+    // Rcout << likelihood << "\t";
   }
   return likelihood;
 }/* m_haplotype_llk */
@@ -164,9 +166,9 @@ IntegerMatrix m_hap (List par, List dat_info, IntegerMatrix haplotype, unsigned 
   
   /* pick out the updated sites for each haplotype */
   for (k = 0; k < NUM_CLASS; ++k) {
-    //Rprintf("k: %d\n", k);
+     //Rprintf("k: %d\n", k);
     for (j = 0; j < hap_length; ++j) {
-      //Rprintf("j: %d\n", j);
+       //Rprintf("j: %d\n", j);
       if(SNP[j] == 0) {
         m_haplotype(k, j) = haplotype(k, j);
         continue;
@@ -181,7 +183,7 @@ IntegerMatrix m_hap (List par, List dat_info, IntegerMatrix haplotype, unsigned 
         for (l = 0; l < NONINDEL_STATE; ++l) {
           llk = m_haplotype_llk(j, l, k, PD_LENGTH, beta, dat_info, w_ic, excluded_read, 
                                 ins_lambda, del_lambda, 0);
-          //Rprintf("\n neu likelihood %d %f\n", l, log(llk));
+          // Rprintf("\n neu likelihood %d %f\n", l, log(llk));
           if (llk > max) {
             max = llk;
             max_id = l;
@@ -198,7 +200,7 @@ IntegerMatrix m_hap (List par, List dat_info, IntegerMatrix haplotype, unsigned 
 // [[Rcpp::export]]
 /*
  * Viterbi Algorithm:
- * transition probablities: MN
+ * hidden: MN
  */
 List viterbi_MN(List par, List dat_info) {
   NumericMatrix w_ic = par["wic"];
@@ -226,14 +228,15 @@ List viterbi_MN(List par, List dat_info) {
   IntegerMatrix hidden_state(NUM_CLASS, hap_length);
   IntegerVector hap_deletion_len(NUM_CLASS);
   
-  double del_lambda = del_rate* hap_length;
-  double ins_lambda = ins_rate* hap_length;
+  double del_lambda = del_rate * hap_length;
+  double ins_lambda = ins_rate * hap_length;
   double max;
   int total = del_total + nondel_total;
   unsigned int i, j, j1, k, l, l1, max_id;
   /*
    * log transition prob, 0: state M [NOTICE: some reads may be aligned to the middle of a genome, when update haplotypes, 
    * remember to count that out from deletion]
+   * [TODO: no need to compute mton ntom everytime]
    */
   for (k = 0; k < NUM_CLASS; ++k) {
     //Rprintf("%d\n", k);
@@ -261,8 +264,8 @@ List viterbi_MN(List par, List dat_info) {
     transition_prob(1, 0, k) = log(1 - transition_prob(1, 1, k));
     transition_prob(1, 1, k) = log(transition_prob(1, 1, k));
   }
-  // Rprintf("transition prob:\n");
-  // Rcout << transition_prob << "\n";
+   // Rprintf("transition prob:\n");
+   // Rcout << transition_prob << "\n";
   //log emission prob for the entire datasets(treat them independently)
   NumericMatrix emmis_prob(hap_length, HIDDEN_STATE);
   NumericMatrix sin_emmis(HIDDEN_STATE, HIDDEN_STATE);
@@ -273,6 +276,7 @@ List viterbi_MN(List par, List dat_info) {
 
   for (j = 0; j < hap_length; ++j)
     for(i = 0; i < n_observation; ++i) {
+      // if indel position
         if (ref_index(i, j) == -1) {
           if((j >= ref_pos[index[i]]) && (j <= ref_pos[index[i] + length[i] - 1])) {
           emmis_prob(j, 0) += sin_emmis(0, 1);
@@ -284,8 +288,8 @@ List viterbi_MN(List par, List dat_info) {
           emmis_prob(j, 1) += sin_emmis(1, 0);
         }
     }
-    // Rprintf("emmission prob:\n");
-    // Rcout << emmis_prob << "\n";
+     // Rprintf("emmission prob:\n");
+     // Rcout << emmis_prob << "\n";
   /*
    * compute log probability table to trace back the hidden state: l = 0, state M
    */
@@ -305,8 +309,8 @@ List viterbi_MN(List par, List dat_info) {
           path_jnk(j, l, k) = emmis_prob(j, l) + max;
         }
       }
-  // Rprintf("path_jnk prob:\n");
-  // Rcout << path_jnk << "\n";  
+   // Rprintf("path_jnk prob:\n");
+   // Rcout << path_jnk << "\n";  
   /*
    * find the path (backtrace)
    */
@@ -321,7 +325,7 @@ List viterbi_MN(List par, List dat_info) {
         }
       hidden_state(k, j) = max_id;
       if(hidden_state(k, j) == 1) {
-        Rprintf("%d %d deletion state\n", k, j);
+        // Rprintf("%d %d deletion state\n", k, j);
         hap_deletion_len[k]++;
       }
     }

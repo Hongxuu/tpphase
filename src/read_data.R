@@ -8,15 +8,18 @@ read_fasta <- function(datafile = NULL)
     stop("The input datafile has to be fasta file!")
   
   if (!is.loaded("r_read_fasta", PACKAGE = "sync_data_r")) {
-    dyn.load("sync_data_r.so")
+    dyn.load("./src/sync_data_r.so")
   }
   
   res <- .Call("r_read_fasta", datafile)
   
   names(res) <- c("reads", "dim")
-  reads <- matrix(res$reads, ncol = res$dim[2], byrow = TRUE)
-  
-  return(reads)
+  if (length(res$dim[2]) == res$dim[1]) {
+    reads <- matrix(res$reads, ncol = res$dim[2], byrow = TRUE)
+    return(reads)
+  } else {
+    return(res)
+  }
 } #read_fasta(datafile = FastaFile)
 
 read_sam <- function(samfile = NULL, ref_name = NULL, 
@@ -26,7 +29,7 @@ read_sam <- function(samfile = NULL, ref_name = NULL,
     stop("The input datafile has to be sam file!")
   
   if (!is.loaded("./src/r_read_sam", PACKAGE = "sync_data_r")) {
-    dyn.load("sync_data_r.so")
+    dyn.load("./src/sync_data_r.so")
   }
   
   if(is.null(datafile) == TRUE | is.null(samfile) == TRUE | is.null(fastq_file) == TRUE | is.null(ref_name) == TRUE)
@@ -44,7 +47,7 @@ read_fastq <- function(datafile = NULL)
     stop("The input datafile has to be fastq file!")
   
   if (!is.loaded("r_read_fastq", PACKAGE = "sync_data_r")) {
-    dyn.load("sync_data_r.so")
+    dyn.load("./src/sync_data_r.so")
   }
   
   res <- .Call("r_read_fastq", datafile)
@@ -68,7 +71,7 @@ call_ampliclust <- function(ampliclust_command = NULL, fastq_file = NULL, ac_out
     stop("ac_outfile path does not exist!")
   
   if (!is.loaded("r_ampliclust_init", PACKAGE = "sync_data_r")) {
-    dyn.load("sync_data_r.so")
+    dyn.load("./src/sync_data_r.so")
   }
   
   res <- .Call("r_ampliclust_init", ampliclust_command, fastq_file, ac_outfile)

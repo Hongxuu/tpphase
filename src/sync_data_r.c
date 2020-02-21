@@ -177,33 +177,54 @@ SEXP r_ampliclust_init(SEXP ampliclust_command_r, SEXP fastq_file_r, SEXP ac_out
 SEXP r_read_fasta(SEXP datafile_r)
 {
 	int err = NO_ERROR;
+	unsigned int i;
 	fastq_options *fqo = NULL;
 	fastq_data *fdata = NULL;
 	char const *datafile = NULL;
 	SEXP r_list;
-	
+	PROTECT(r_list = allocVector(VECSXP, 3));
 	datafile = CHAR(STRING_ELT(datafile_r, 0));
 	
 	if ((err = make_fastq_options(&fqo)))
 		return R_NilValue;
-	fqo->read_encoding = XY_ENCODING;
+	fqo->read_encoding = IUPAC_ENCODING;
+	fqo->read_names = 1;
 	read_fastq(datafile, &fdata, fqo);
+	SEXP r_names = PROTECT(allocVector(CHARSXP, fdata->n_reads));
+	for (i = 0; i < fdata->n_reads; ++i)
+	  CHAR(r_names)[i] = fdata->names[i];
 	
-	SEXP r_data_dim = PROTECT(allocVector(INTSXP, 2));
-	INTEGER(r_data_dim)[0] = fdata->n_reads;
-	INTEGER(r_data_dim)[1] = fdata->n_max_length;
-	
-	SEXP r_reads = PROTECT(allocVector(INTSXP, fdata->n_reads * fdata->n_max_length));
-	
-	for (unsigned int i = 0; i < fdata->n_reads * fdata->n_max_length; ++i) {
-		INTEGER(r_reads)[i] = fdata->reads[i];
+	if (fdata->n_max_length == fdata->n_min_length)
+	{
+		SEXP r_data_dim = PROTECT(allocVector(INTSXP, 2));
+		INTEGER(r_data_dim)[0] = fdata->n_reads;
+		INTEGER(r_data_dim)[1] = fdata->n_max_length;
+		
+		SEXP r_reads = PROTECT(allocVector(INTSXP, fdata->n_reads * fdata->n_max_length));
+		
+		for (i = 0; i < fdata->n_reads * fdata->n_max_length; ++i)
+			INTEGER(r_reads)[i] = fdata->reads[i];
+		
+		SET_VECTOR_ELT(r_list, 0, r_reads);
+		SET_VECTOR_ELT(r_list, 1, r_data_dim);
+	} else {
+		unsigned int total_length = 0;
+		SEXP r_data_lengths = PROTECT(allocVector(INTSXP, fdata->n_reads));
+		for (i = 0; i < fdata->n_reads; ++i) {
+			total_length += fdata->n_lengths[i];
+			INTEGER(r_data_lengths)[i] = fdata->n_lengths[i];
+		}
+		
+		SEXP r_reads = PROTECT(allocVector(INTSXP, total_length));
+		
+		for (i = 0; i < total_length; ++i)
+			INTEGER(r_reads)[i] = fdata->reads[i];
+		
+		SET_VECTOR_ELT(r_list, 0, r_reads);
+		SET_VECTOR_ELT(r_list, 1, r_data_lengths);
 	}
-	
-	PROTECT(r_list = allocVector(VECSXP, 2));
-	SET_VECTOR_ELT(r_list, 0, r_reads);
-	SET_VECTOR_ELT(r_list, 1, r_data_dim);
-	UNPROTECT(3);
-	
+	SET_VECTOR_ELT(r_list, 2, r_names);
+	UNPROTECT(4);
 	if (fdata)
 		free_fastq(fdata);
 	

@@ -92,19 +92,18 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
     } else if(obs[index[i] + j] == 0) {
       xb = 0;
     }
-    //Rcout << "xb + tail: " << xb + tail << "\t";
     read_llk += xb + tail; /* Notice here use log likelihood, not likelihood */
   }
-  
+  //Rcout << "read_llk: " << read_llk << "\t";
   /* relative deletion penalty */
   int hap_length = dat_info["ref_length_max"];
   if(del_count != 0)
     read_llk += R::dpois(del_count, hap_length * del_rate, true);
-  //Rcout << "deletion llk" << R::dpois(del_count, hap_length * rate, true) << "\t";
+  //Rcout << "deletion llk" << R::dpois(del_count, hap_length * del_rate, true) << "\t";
   /* relative insertion penalty */
   if(ins_count != 0)
     read_llk += R::dpois(ins_count, hap_length * ins_rate, true);
-  
+  //Rcout << "ins llk" << R::dpois(ins_count, hap_length * ins_rate, true) << "\n";
   return read_llk;
 } /* site_likelihood */
   
@@ -179,7 +178,6 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
         }
         read_class_llk(i, k) = site_likelihood(i, k, beta, PD_LENGTH, ins_rate, del_rate, dat_info, haplotype, del_count(i, k), ins_count(i, k));
         weight_llk[k] = eta[k] * exp(read_class_llk(i, k));
-        //Rprintf("\n read %d class %d llk %f; log wei_lk %.10lf; del count %d\n", i, k, read_class_llk(i, k), log(weight_llk[k]), del_count(i, k));
         sum_weight[i] += weight_llk[k];
       }
       //Rprintf("sum_weight %.30lf\n", sum_weight[i]);
@@ -218,23 +216,25 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
     for (k = 0; k < NUM_CLASS; ++k)
       mixture_prop_updated[k] = mixture_prop_updated[k]/(n_observation - count);
     
-    /* update rate */
-    if(indel_both(0, 0) != 0) {
-      double wic_di = 0, wic_pc = 0, wic_ii = 0;
-      for (i = 0; i < n_observation; ++i) {
-        if (excluded_read[i] == 1)
-          continue;
-        for (k = 0; k < NUM_CLASS; ++k) {
-          if(del_count(i, k) != 0)
-            wic_di += w_ic(i, k) * del_count(i, k);
-          if(ins_count(i, k) != 0)
-            wic_ii += w_ic(i, k) * ins_count(i, k);
-          wic_pc += w_ic(i, k) * hap_length;
-        }
-      }
-      del_rate = wic_di/wic_pc;
-      ins_rate = wic_ii/wic_pc;
-    }
+    /* update indel rate */
+    // if(indel_both(0, 0) != 0) {
+    //   double wic_di = 0, wic_pc = 0, wic_ii = 0;
+    //   for (i = 0; i < n_observation; ++i) {
+    //     if (excluded_read[i] == 1)
+    //       continue;
+    //     for (k = 0; k < NUM_CLASS; ++k) {
+    //       if(del_count(i, k) != 0)
+    //         wic_di += w_ic(i, k) * del_count(i, k);
+    //       if(ins_count(i, k) != 0)
+    //         wic_ii += w_ic(i, k) * ins_count(i, k);
+    //       wic_pc += w_ic(i, k) * hap_length;
+    //     }
+    //   }
+    //   del_rate = wic_di/wic_pc;
+    //   ins_rate = wic_ii/wic_pc;
+    // }
+    // Rcout << del_count << "\n";
+    // Rcout << ins_count << "\n";
     
     k = 0;
     IntegerVector excluded_id(count);

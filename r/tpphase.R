@@ -7,10 +7,14 @@ tpphase <- function(dat_info, hap_info, par, hap, old_hap, tol, id, weight_id,
   for (m in 1:max) {
     cat("Iteartion", m, "\n")
     cat("Infer hidden states\n")
+    #sink(paste0("~/Downloads/hap_hidden", m, ".txt"))
     hap_info <- viterbi_MN(par = par, dat_info = dat_info)
+    #sink()
     hidden_state <- hap_info$hidden
     
+    #sink(paste0("~/Documents/par2", m, ".txt"))
     res <- em_eta(par = par, dat_info = dat_info, hap_info = hap_info, haplotype = hap, PD_LENGTH = nrow(par$beta))
+    #sink()
     resu[[m]] <- res
     if(length(res$excluded_id) != 0)
       cat(res$excluded_id, "don't (doesn't) belong to any of the haplotypes\n")
@@ -18,8 +22,8 @@ tpphase <- function(dat_info, hap_info, par, hap, old_hap, tol, id, weight_id,
     
     #if(abs(par$eta - res$param$mixture_prop) < tol && abs(par$beta - res$param$beta) < tol)
     if(m > 1)
-      if(abs(full_llk[m] - full_llk[m-1]) < tol | 
-         (abs(par$eta - res$param$mixture_prop) < tol & 
+      if(abs(full_llk[m] - full_llk[m-1]) < tol || 
+         (abs(par$eta - res$param$mixture_prop) < tol &&
          abs(par$beta - res$param$beta) < tol))
         break;
     
@@ -44,8 +48,10 @@ tpphase <- function(dat_info, hap_info, par, hap, old_hap, tol, id, weight_id,
     
     old_hap <- hap
     cat("Update non-indel positions\n")
+    #sink(paste0("~/Documents/hap2rd", m, ".txt"))
     hap <- m_hap(par = par, dat_info = dat_info, PD_LENGTH = nrow(par$beta),
                  haplotype = hap, hidden_state = hidden_state, SNP = snp)
+    #sink()
     hap_info$hap <- hap
     haps[[m]] <- hap_info
   }
