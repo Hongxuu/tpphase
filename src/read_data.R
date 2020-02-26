@@ -10,7 +10,6 @@ read_fasta <- function(datafile = NULL)
   if (!is.loaded("r_read_fasta", PACKAGE = "sync_data_r")) {
     dyn.load("./src/sync_data_r.so")
   }
-  
   res <- .Call("r_read_fasta", datafile)
   
   names(res) <- c("reads", "dim")

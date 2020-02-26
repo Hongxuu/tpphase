@@ -182,7 +182,7 @@ SEXP r_read_fasta(SEXP datafile_r)
 	fastq_data *fdata = NULL;
 	char const *datafile = NULL;
 	SEXP r_list;
-	PROTECT(r_list = allocVector(VECSXP, 3));
+	PROTECT(r_list = allocVector(VECSXP, 2));
 	datafile = CHAR(STRING_ELT(datafile_r, 0));
 	
 	if ((err = make_fastq_options(&fqo)))
@@ -190,9 +190,9 @@ SEXP r_read_fasta(SEXP datafile_r)
 	fqo->read_encoding = IUPAC_ENCODING;
 	fqo->read_names = 1;
 	read_fastq(datafile, &fdata, fqo);
-	SEXP r_names = PROTECT(allocVector(CHARSXP, fdata->n_reads));
-	for (i = 0; i < fdata->n_reads; ++i)
-	  CHAR(r_names)[i] = fdata->names[i];
+	//SEXP r_name_lengths = PROTECT(allocVector(STRSXP, fdata->n_reads));
+	//for (i = 0; i < fdata->n_reads; ++i)
+	  //SET_STRING_ELT(r_names, i, mkChar(&fdata->names[i]));
 	
 	if (fdata->n_max_length == fdata->n_min_length)
 	{
@@ -216,15 +216,14 @@ SEXP r_read_fasta(SEXP datafile_r)
 		}
 		
 		SEXP r_reads = PROTECT(allocVector(INTSXP, total_length));
-		
 		for (i = 0; i < total_length; ++i)
 			INTEGER(r_reads)[i] = fdata->reads[i];
 		
 		SET_VECTOR_ELT(r_list, 0, r_reads);
 		SET_VECTOR_ELT(r_list, 1, r_data_lengths);
 	}
-	SET_VECTOR_ELT(r_list, 2, r_names);
-	UNPROTECT(4);
+	//SET_VECTOR_ELT(r_list, 2, r_names);
+	UNPROTECT(3);
 	if (fdata)
 		free_fastq(fdata);
 	

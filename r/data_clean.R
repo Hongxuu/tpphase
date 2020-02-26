@@ -1,6 +1,6 @@
 ######## Insertion: RefPos is -1; Deletion: Qua Nuc are -1 -
 
-rea_dat <- function(filepath, filter = TRUE) {
+rea_d4at <- function(filepath, filter = TRUE) {
   dat <- read.csv(filepath, sep = " ", header = F)
   names(dat) <- c("idx", "read_pos", "ref_pos", "qua", "read_nuc")
   #### Remove deletion and insertion:

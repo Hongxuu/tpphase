@@ -121,7 +121,7 @@ int top_n_map(List unique_map)
 }
 
 // [[Rcpp::export]]
-List read_data(std::string path) {
+List read_data(std::string path, unsigned int old_v) {
   int j, k, l;
   unsigned int i, m, count = 0, count_del = 0, count_ins = 0;
   char c;
@@ -275,24 +275,31 @@ List read_data(std::string path) {
   for (m = 1; m < n_observation; ++m)
     index[m] = index[m - 1] + length[m - 1];
   
-  // true length (include insertion) and fake length (include deletion also some reads' alignment does not start from 0, count that in)
+  // true length (include insertion) and fake length (include deletion) (some reads' alignment does not start from 0, other one also count that in)
   IntegerVector true_length(n_observation);
   IntegerVector fake_length(n_observation);
   for (i = 0; i < n_observation; ++i) {
     true_length[i] = length[i] + ins_length_all[i];
-    fake_length[i] = length[i] + del_length_all[i] + ref_pos[index[i]];
+    fake_length[i] = length[i] + del_length_all[i];
+    //fake_length[i] = length[i] + del_length_all[i] + ref_pos[index[i]];
   }
   
-  /* find the longest reference position && appears more than no. of classes (4) */
   int max_len = 0;
-  List uni_map = unique_map(ref_pos);
-  max_len = top_n_map(uni_map);
-  int over_hapmax = 0;
-  for(i = 0; i < total; ++i)
-    if (max_len < ref_pos[i]) {
-      over_hapmax = 1;
-      break;
-    }
+  int over_hapmax = 0; // indicate if the length of reads is more than the hap_max
+  if(old_v == 1) {
+    /* find the longest reference position && appears more than no. of classes (4) */
+    List uni_map = unique_map(ref_pos);
+    max_len = top_n_map(uni_map);
+    for(i = 0; i < total; ++i)
+      if (max_len < ref_pos[i]) {
+        over_hapmax = 1;
+        break;
+      }
+  } else {
+    for(i = 0; i < total; ++i)
+      if (max_len < ref_pos[i])
+        max_len = ref_pos[i];
+  }
   max_len = max_len + 1;
   
   IntegerMatrix ref_index(n_observation, max_len);
@@ -506,6 +513,67 @@ IntegerVector find_snp (CharacterMatrix hap) {
   return snp_idx[Range(0, count - 1)];
 }
 
+// [[Rcpp::export]] 
+List hmm_info(List dat_info) {
+  unsigned int i, j, t;
+  int n_observation = dat_info["n_observation"];
+  unsigned int hap_length = dat_info["ref_length_max"];
+  IntegerMatrix ref_index = dat_info["ref_idx"];
+  IntegerVector ref_pos = dat_info["ref_pos"];
+  IntegerVector index = dat_info["start_id"];
+  IntegerVector fake_length = dat_info["fake_length"];
+  IntegerVector length = dat_info["length"];
+  IntegerVector obs = dat_info["nuc"];
+  /* Find the number of reads with alignment start from each t (hash) */
+  IntegerVector read_start(n_observation);
+  for(i = 0; i < n_observation; ++i)
+    read_start(i) = ref_pos[index[i]];
+  List start_t = unique_map(read_start);
+  IntegerVector n_t = start_t["lengths"];
+  IntegerVector time_pos = start_t["values"];
+  
+  /* Find the max p in each t*/
+  unsigned int t_max = time_pos.length();
+  IntegerVector p_tmax(t_max);
+  unsigned int max;
+  for(t = 0; t < t_max; ++t) {
+    max = 0;
+    for(i = 0; i < n_observation; ++i)
+      if(ref_pos[index[i]] == time_pos[t])
+        if(max < fake_length[i])
+          max = fake_length[i];
+    p_tmax[t] = max;
+  }
+  
+  unsigned int count;
+  IntegerVector nuc_j(n_observation);
+  List nuc_unique(hap_length);
+  List nuc_count(hap_length);
+  List nuc(2);
+  for (j = 0; j < hap_length; ++j) {
+    count = 0;
+    for (i = 0; i < n_observation; ++i)
+      if((j >= ref_pos[index[i]]) && (j <= ref_pos[index[i] + length[i] - 1])) {
+        if(ref_index(i, j) == -1) {
+          nuc_j(count++) = -1;
+        } else {
+          nuc_j(count++) = obs[index[i] + ref_index(i, j)];
+        }
+      }
+    nuc = unique_map(nuc_j[Range(0, count - 1)]);
+    nuc_unique[j] = nuc["values"];
+    nuc_count[j] = nuc["lengths"];
+  }
+  
+  List ls = List::create(
+    Named("nuc_unique") = nuc_unique,
+    Named("nuc_count") = nuc_count,
+    Named("p_tmax") = p_tmax,
+    Named("n_t") = n_t,
+    Named("time_pos") = time_pos);
+  
+  return ls;
+}
 
 
 // 

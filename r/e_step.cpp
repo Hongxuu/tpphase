@@ -122,7 +122,7 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
     NumericVector mixture_prop_updated(NUM_CLASS);
     IntegerVector excluded_read = par["excluded_read"];
     NumericMatrix read_class_llk(n_observation, NUM_CLASS);
-    NumericMatrix sum_weight(n_observation);
+    NumericMatrix read_likelihood(n_observation);
     NumericMatrix beta = par["beta"];
     double del_rate = par["del_rate"];
     double ins_rate = par["ins_rate"];
@@ -158,7 +158,7 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
       /* reset eta %*% llk at each class for each read */
       NumericVector weight_llk(NUM_CLASS);
       /* compute the likelihood for each read under each haplotype */
-      //sum_weight = 0.;
+      //read_likelihood = 0.;
       for (k = 0; k < NUM_CLASS; ++k) {
         // find how many deletion positions are the NOT same between read and haplotype 
         // (both read and haplotype need to contain deletion)
@@ -178,11 +178,11 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
         }
         read_class_llk(i, k) = site_likelihood(i, k, beta, PD_LENGTH, ins_rate, del_rate, dat_info, haplotype, del_count(i, k), ins_count(i, k));
         weight_llk[k] = eta[k] * exp(read_class_llk(i, k));
-        sum_weight[i] += weight_llk[k];
+        read_likelihood[i] += weight_llk[k];
       }
-      //Rprintf("sum_weight %.30lf\n", sum_weight[i]);
+      //Rprintf("read_likelihood %.30lf\n", read_likelihood[i]);
       for (k = 0; k < NUM_CLASS; ++k)
-        w_ic(i, k) = weight_llk[k]/sum_weight[i];
+        w_ic(i, k) = weight_llk[k]/read_likelihood[i];
       
       /* some reads may not be explained by either of the haplotype */
       if (exp(read_class_llk(i, 0)) == 0 || isnan(w_ic(i, 0)))
@@ -202,7 +202,7 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
         count++;
         continue;
       }
-      full_llk += log(sum_weight[i]);
+      full_llk += log(read_likelihood[i]);
     }
     
     /* update eta, still exclude nan */
