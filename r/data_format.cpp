@@ -1,13 +1,16 @@
-#include <Rcpp.h>
+#include <RcppArmadillo.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 using namespace Rcpp;
+using namespace std;
 
 #define MLOGIT_CLASS 4
 #define NUM_CLASS 4
+
+// [[Rcpp::depends(RcppArmadillo)]]
 
 //https://stackoverflow.com/questions/51110244/in-rcpp-how-to-get-a-user-defined-structure-from-c-into-r
 // namespace Rcpp {
@@ -24,6 +27,19 @@ using namespace Rcpp;
 //     return Rcpp::wrap(Rcpp::Named("beta") = Rcpp::wrap(x.beta));
 //   };
 // }
+
+class Permutation {
+public:
+  vector<vector<int> > permuteUnique(vector<int>& nums) {
+    vector<vector<int> > res;
+    sort(nums.begin(), nums.end());
+    res.push_back(nums);
+    while (next_permutation(nums.begin(), nums.end())) {
+      res.push_back(nums);
+    }
+    return res;
+  }
+};
 
 typedef unsigned char xy_t;
 /**
@@ -513,10 +529,42 @@ IntegerVector find_snp (CharacterMatrix hap) {
   return snp_idx[Range(0, count - 1)];
 }
 
+IntegerMatrix call_permute(vector<int> a) {
+  Permutation per;
+  vector<vector<int> > res =  per.permuteUnique(a);
+  IntegerMatrix permutation(res.size(), res[0].size());
+  for (int i = 0; i < res.size(); i++)
+    for (int j = 0; j < res[i].size(); j++) 
+      permutation(i, j) = res[i][j];
+  
+  return(permutation);
+}
+
+IntegerMatrix call_permute_N(vector<int> a, unsigned int genome_A) {
+  Permutation per;
+  vector<vector<int> > res =  per.permuteUnique(a);
+  IntegerMatrix permutation(res.size(), res[0].size());
+  for (int i = 0; i < res.size(); i++)
+    for (int j = 0; j < res[i].size(); j++) 
+      permutation(i, j) = res[i][j];
+  IntegerVector del(res.size() * 2, -1);
+  del.attr("dim") = Dimension(res.size(), 2);
+  arma::mat m1 = as<arma::mat>(permutation);
+  arma::mat m2 = as<arma::mat>(del);
+  arma::mat out;
+  if(genome_A)
+    out = join_rows(m2, m1);
+  else
+    out = join_rows(m1, m2);
+  
+  return(wrap(out));
+}
+
 // [[Rcpp::export]] 
-List hmm_info(List dat_info) {
-  unsigned int i, j, t;
+List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
+  unsigned int i, j, t, l, m;
   int n_observation = dat_info["n_observation"];
+  unsigned int total = dat_info["total"];
   unsigned int hap_length = dat_info["ref_length_max"];
   IntegerMatrix ref_index = dat_info["ref_idx"];
   IntegerVector ref_pos = dat_info["ref_pos"];
@@ -532,6 +580,22 @@ List hmm_info(List dat_info) {
   IntegerVector n_t = start_t["lengths"];
   IntegerVector time_pos = start_t["values"];
   
+  // get the coverage of each site (including -)
+  List deletion = dat_info["deletion"];
+  IntegerVector del_ref_pos = deletion["del_ref_pos"];
+  unsigned int del_total = deletion["del_total"];
+  unsigned int enuma = total + del_total;
+  IntegerVector pos(enuma);
+  for(i = 0; i < total; ++i)
+    pos(i) = ref_pos(i);
+  for(i = 0; i < del_total; ++i)
+    pos(i + total) = del_ref_pos(i);
+  List coverage_stat = unique_map(pos);
+  IntegerVector coverage = coverage_stat["lengths"];
+  NumericVector prop(hap_length);
+  for(i = 0; i < hap_length; ++i)
+    prop[i] = coverage[i] * cut_off;
+  
   /* Find the max p in each t*/
   unsigned int t_max = time_pos.length();
   IntegerVector p_tmax(t_max);
@@ -545,11 +609,15 @@ List hmm_info(List dat_info) {
     p_tmax[t] = max;
   }
   
-  unsigned int count;
+  unsigned int count, num;
   IntegerVector nuc_j(n_observation);
   List nuc_unique(hap_length);
   List nuc_count(hap_length);
   List nuc(2);
+  NumericVector keys(MLOGIT_CLASS + 1);
+  NumericVector vals(MLOGIT_CLASS + 1);
+  List haplotype(hap_length);
+  
   for (j = 0; j < hap_length; ++j) {
     count = 0;
     for (i = 0; i < n_observation; ++i)
@@ -560,21 +628,118 @@ List hmm_info(List dat_info) {
           nuc_j(count++) = obs[index[i] + ref_index(i, j)];
         }
       }
+    /* get the nuc table at each site */  
     nuc = unique_map(nuc_j[Range(0, count - 1)]);
-    nuc_unique[j] = nuc["values"];
-    nuc_count[j] = nuc["lengths"];
+    IntegerVector key = nuc["values"];
+    IntegerVector val = nuc["lengths"];
+    num = 0;
+    /* remove some unlikely occurred nuc */
+    for(t = 0; t < val.length(); ++t) {
+      if(val[t] >= prop(j)) {
+        keys(num) = key(t);
+        vals(num++) = val(t);
+      }
+    }
+    nuc_unique[j] = keys[Range(0, num - 1)];
+    nuc_count[j] = vals[Range(0, num - 1)];
+    IntegerVector hap_site = nuc_unique[j];
+    IntegerVector sum_site = nuc_count[j];
+    unsigned int sum;
+    //record possible hidden states[only suitable for ployploids]
+    if (num == 1) {
+      IntegerVector temp = {hap_site[0], hap_site[0], hap_site[0], hap_site[0]};
+      haplotype(j) = temp;
+    } 
+    else if (num == 2) {
+      if(hap_site[0] == -1) { // if N appears, 2 possibilities
+        IntegerVector temp(NUM_CLASS);
+        if(uni_alignment[j] == "J") 
+          temp = {-1, -1, hap_site[1], hap_site[1]};
+        if(uni_alignment[j] == "I")
+          temp = {hap_site[1], hap_site[1], -1, -1};
+        haplotype(j) = temp;
+      } else { // if N not appears
+        sum = sum_site[1] + sum_site[0];
+        if(sum_site[0]/sum <= 0.35) { //1st one appears 3 times
+          IntegerMatrix temp = call_permute({hap_site[0], hap_site[1], hap_site[1], hap_site[1]});
+          haplotype(j) = temp;
+        } if(sum_site[0]/sum >= 0.65) {//2nd one appears 3 times
+          IntegerMatrix temp = call_permute({hap_site[0], hap_site[0], hap_site[0], hap_site[1]});
+          haplotype(j) = temp;
+        } else {
+          IntegerMatrix temp = call_permute({hap_site[0], hap_site[0], hap_site[1], hap_site[1]});
+          haplotype(j) = temp;
+        }
+      }
+    } 
+    else if (num == 3) {
+      if(hap_site[0] == -1) { // if N appears, 4 possibilities
+        IntegerVector temp(2 * NUM_CLASS);
+        if(uni_alignment[j] == "I")
+          temp = {-1, -1, hap_site[1], hap_site[2], //J in universal alignment
+                  -1, -1, hap_site[2], hap_site[1]};
+        if(uni_alignment[j] == "I")
+          temp = {hap_site[1], hap_site[2], -1, -1,  //I in universal alignment                                       
+                  hap_site[2], hap_site[1], -1, -1};
+        temp.attr("dim") = Dimension(2, 4);
+        haplotype(j) = temp;
+      } else {
+        sum = sum_site[2] + sum_site[1] + sum_site[0];
+        if(sum_site[0]/sum >= 0.45) {
+          IntegerMatrix temp = call_permute({hap_site[0], hap_site[0], hap_site[1], hap_site[2]});
+          haplotype(j) = temp;
+        } if(sum_site[1]/sum >= 0.45) {
+          IntegerMatrix temp = call_permute({hap_site[0], hap_site[1], hap_site[1], hap_site[2]});
+          haplotype(j) = temp;
+        } else {
+          IntegerMatrix temp = call_permute({hap_site[0], hap_site[1], hap_site[2], hap_site[2]});
+          haplotype(j) = temp;
+        }
+      }
+    }
+    else if(num == 4) {
+      if(hap_site[0] == -1) {
+        arma::mat temp;
+        IntegerMatrix inner_tmp(2, NUM_CLASS);
+        for(l = 0; l < num; ++l)
+          for(m = l + 1; m < num; ++m) {
+            if(uni_alignment[j] == "I") //deletion in B genome
+              inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 0);
+            if(uni_alignment[j] == "J")
+              inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 1);
+            temp = join_cols(temp, as<arma::mat>(inner_tmp));
+          }
+          haplotype(j) = wrap(temp);
+      } else {
+        IntegerMatrix temp = call_permute({hap_site[0], hap_site[1], hap_site[2], hap_site[3]});
+        haplotype(j) = temp;
+      }
+    }
+    else if(num == 5) {//which is not likely
+      arma::mat temp;
+      IntegerMatrix inner_tmp(2, NUM_CLASS);
+      for(l = 0; l < num; ++l)
+        for(m = l + 1; m < num; ++m) {
+          if(uni_alignment[j] == "I") //deletion in B genome
+            inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 0);
+          if(uni_alignment[j] == "J")
+            inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 1);
+          temp = join_cols(temp, as<arma::mat>(inner_tmp));
+        }
+      haplotype(j) = wrap(temp);
+    }
   }
-  
+ // compute the number of hidden states
   List ls = List::create(
-    Named("nuc_unique") = nuc_unique,
+    Named("hidden_states") = haplotype,
+    Named("nuc_unique") = nuc_unique, // unique 
     Named("nuc_count") = nuc_count,
-    Named("p_tmax") = p_tmax,
-    Named("n_t") = n_t,
-    Named("time_pos") = time_pos);
+    Named("p_tmax") = p_tmax, // max length at each t
+    Named("n_t") = n_t,// no emission reads at each time t
+    Named("time_pos") = time_pos); // emission start position
   
   return ls;
 }
-
 
 // 
 // IntegerMatrix len_hapGap(List dat_info, List hap_info) {

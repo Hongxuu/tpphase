@@ -22,9 +22,9 @@ ini_par <- function(dat, n_observation, formula, n_class, weight_id, num_cat, nc
   par$excluded_read <- rep(0, n_observation)
   Mpar <- Mstep(dat, read_length = NULL, par, weight_id = weight_id, formula, num_cat, ncores, weights = FALSE)
   par$beta <- Mpar$beta
+  
   return(par)
 }
-
 
 ini_hap <- function(d, init, ampliclust_command, fastq_file, ac_outfile, n_class, 
                     hap_length, fasta_file, deletion_cut) {

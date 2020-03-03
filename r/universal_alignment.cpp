@@ -1,33 +1,6 @@
 #include <Rcpp.h>
 using namespace Rcpp;
-// 
-// List make_universal(List A_genome, List B_genome) {
-//   IntegerVector A_aligned = A_genome["reads"];
-//   IntegerVector B_aligned = B_genome["reads"];
-//   IntegerVector B_lengths = B_genome["dim"];
-//   
-//   unsigned int i, j;
-//   IntegerVector start_id(B_lengths.length());
-//   CharacterVector universal(B_aligned.length());
-//   
-//   for(i = 1; i < B_lengths.length(); ++i)
-//     start_id[i] = start_id[i - 1] + B_lengths[i - 1];
-//   
-//   for(j = 0; j < B_aligned.length(); ++j) {
-//     if(B_aligned[j] == 15 & A_aligned[j] != 15) {
-//       universal[j] = "J";
-//     } else if(B_aligned[j] != 15 & A_aligned[j] == 15) {
-//       universal[j] = "I";
-//     } else
-//       universal[j] = "M";
-//   }
-//   
-//   List ls = List::create(
-//     Named("universal_alignment") = universal,
-//     Named("start_id") = start_id);
-//   return ls;
-// }
-#define NUM_IUPAC_SYMBOLS	16
+
 #define N_GENOME 2
 CharacterVector iupac_to_char = {"-", "A", "C", "M", "G", "R", "S", "V", 
                                  "T", "W", "Y", "H", "K", "D", "B", "N"};
@@ -56,9 +29,9 @@ List make_universal(List alignment, unsigned int for_hmm) {
    for(j = 0; j < dim[i * N_GENOME]; ++j) {
      idx = j + start_id[i];
      if(for_hmm) {
-       if(reads[idx] == 15 & reads[idx + dim[i * N_GENOME]] != 15) {
+       if(reads[idx] == 15 && reads[idx + dim[i * N_GENOME]] != 15) {
          uni_alignment[j] = "J";
-       } else if(reads[idx] != 15 & reads[idx + dim[i * N_GENOME]] == 15) {
+       } else if(reads[idx] != 15 && reads[idx + dim[i * N_GENOME]] == 15) {
          uni_alignment[j] = "I";
        } else
          uni_alignment[j] = "M";
