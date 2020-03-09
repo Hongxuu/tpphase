@@ -9,7 +9,6 @@ CharacterVector iupac_to_char = {"-", "A", "C", "M", "G", "R", "S", "V",
 List make_universal(List alignment, unsigned int for_hmm) { 
   IntegerVector reads = alignment["reads"];
   IntegerVector dim = alignment["dim"];
-  
   unsigned int i, j, m;
   unsigned int n_alignment = dim.length()/N_GENOME;
   List universal(n_alignment);

@@ -43,7 +43,7 @@ sourceCpp("./r/m_hap.cpp")
 
 run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_file, ampliclust_command, deletion_cut = 20,
                     fastq_file = "./res.fastq", datafile = "./res.txt", ac_outfile = "./init", snp = NULL, output = NULL, 
-                    formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 1, old_version = 1,
+                    formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 1,
                     n_class = 4, num_cat = 4, seed = 0, max = 20, tol = 1e-06, ncores = 2) {
   
   registerDoParallel(cores = ncores)
@@ -52,7 +52,7 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
   if(is.null(samfile) == FALSE)
     sam <- read_sam(samfile, ref_name, fastq_file, datafile)
   
-  dat_info <- read_data(datafile, old_v = old_version)
+  dat_info <- read_data(datafile)
   hap_length <- dat_info$ref_length_max
   read_length <- dat_info$length
   ## read in non-snps sites
@@ -119,7 +119,14 @@ final <- run_tpphase(samfile = NULL, ref_name = NULL,
                      formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 1,
                      n_class = 4, num_cat = 4, seed = 6, max = 50, tol = 1e-06, ncores = 2)
 
-"../"
+A <- read_fasta("../../data/peanut_consensus/A_aligned_target.fasta")
+B <- read_fasta("../../data/peanut_consensus/B_aligned_target.fasta")
+sourceCpp("./r/extra.cpp")
+uNI <- make_universal_old(A, B)
+U28 <- uNI$universal_alignment[(uNI$start_id[8]+1):uNI$start_id[9]]
+old_version = 0
+dat_info <- read_data(datafile, old_v = old_version)
+HMM <- hmm_info(dat_info = dat_info, cut_off = 0.47, uni_alignment = U28)
 # hapinit <- readFastq(fastq_file)
 # samp <- sample(which(hapinit@sread@ranges@width == hap_length), n_class) # id starts from 1 in data
 # a <- sread(hapinit)[samp] %>% as.data.frame()

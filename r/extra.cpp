@@ -1,9 +1,11 @@
 #include <RcppArmadillo.h>
-
+#include <iostream>
+#include <vector>
+#include <algorithm>
 using namespace Rcpp;
 using namespace std;
 // [[Rcpp::depends(RcppArmadillo)]]
-
+#define NUM_CLASS 4
 // [[Rcpp::export]]
 List make_universal_old(List A_genome, List B_genome) {
   IntegerVector A_aligned = A_genome["reads"];
@@ -31,6 +33,7 @@ List make_universal_old(List A_genome, List B_genome) {
     Named("start_id") = start_id);
   return ls;
 }
+
 
 // /*** R
 // ### Slower
@@ -183,3 +186,13 @@ List make_universal_old(List A_genome, List B_genome) {
 //   }
 // }
 // */
+
+
+
+
+
+
+
+
+
+
