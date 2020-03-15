@@ -387,7 +387,7 @@ List read_data(std::string path, unsigned int old_v) {
 
 //prepare data for mnlogit, mnlogit only takes data without indels in read or in haplotypes
 // [[Rcpp::export]]
-DataFrame format_data(List dat_info, IntegerMatrix haplotype) {
+DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1) {
   unsigned int i, k, l;
   int input_arr[] = {0, 1, 2, 3};
   size_t input_arr_sz = sizeof input_arr / sizeof *input_arr;
@@ -400,23 +400,29 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype) {
   IntegerVector ref_pos = dat_info["ref_pos"];
   IntegerVector read_pos = dat_info["read_pos"];
 
-  IntegerVector r_ref_pos(total * MLOGIT_CLASS * NUM_CLASS);
-  IntegerVector r_read_pos(total * MLOGIT_CLASS * NUM_CLASS);
-  IntegerVector r_qua(total * MLOGIT_CLASS * NUM_CLASS);
-  IntegerVector r_obs(total * MLOGIT_CLASS * NUM_CLASS);
-  IntegerVector r_hap_nuc(total * MLOGIT_CLASS * NUM_CLASS);
-  IntegerVector mode(total * MLOGIT_CLASS * NUM_CLASS);
-  IntegerVector id(total * MLOGIT_CLASS * NUM_CLASS);
+  unsigned int len = total * MLOGIT_CLASS * NUM_CLASS;
+  IntegerVector r_ref_pos(len);
+  IntegerVector r_read_pos(len);
+  IntegerVector r_qua(len);
+  IntegerVector r_obs(len);
+  IntegerVector r_hap_nuc(len);
+  IntegerVector mode(len);
+  IntegerVector id(len);
 
   /* pick out the haplotypes accordingg to ref_pos */
   for (i = 0; i < total; ++i)
     for (k = 0; k < NUM_CLASS; ++k)
       for (l = 0; l < MLOGIT_CLASS; ++l) {
-        // the reference position might be longer than the sampled haplotypes
-        if(ref_pos[i] > hap_length - 1)
-          r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = -1;
-        else
-          r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i]);
+        if(time_pos != -1) {
+          //Rcout << haplotype(k, ref_pos[i] - time_pos) << "\t";
+          r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i] - time_pos); 
+        } else {
+          // the reference position might be longer than the sampled haplotypes
+          if(ref_pos[i] > hap_length - 1)
+            r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = -1;
+          else
+            r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i]); 
+        }
       }
       
   /* repeat the data for mnlogit */
@@ -446,59 +452,6 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype) {
     Named("hap_nuc") = r_hap_nuc);
 
   return(df_new);
-}
-
-// [[Rcpp::export]]
-List sample_hap (List dat_info, IntegerVector start, IntegerVector idx, IntegerVector hap_deletion_len) {
-  List deletion = dat_info["deletion"];
-  IntegerVector del_flag = deletion["del_flag"];
-  IntegerVector del_id_all = deletion["del_id_all"];
-  IntegerVector del_ref_pos = deletion["del_ref_pos"];
-  IntegerVector ref_pos = dat_info["ref_pos"];
-  IntegerVector obs = dat_info["nuc"];
-  IntegerVector length = dat_info["length"];
-  int del_total = deletion["del_total"];
-  int hap_length = dat_info["ref_length_max"];
-  unsigned int i, j, m;
-  unsigned int sum = 0;
-  unsigned int count = 0;
-  IntegerMatrix hap_nuc(NUM_CLASS, hap_length);
-  
-  for(i = 0; i < NUM_CLASS; ++i)
-    sum += hap_deletion_len[i];
-  IntegerVector hap_ref_pos(sum);
-  IntegerVector strat_id(NUM_CLASS);
-  //Rcout << start << "\n";
-  for (i = 0; i < NUM_CLASS; ++i) {
-    //Rprintf("\n%d\n", i);
-    for (j = 0; j < length[idx[i] - 1]; ++j)  {
-      //Rprintf("%d\t", obs[start[i] + j]);
-      hap_nuc(i, ref_pos[start[i] + j]) = obs[start[i] + j]; //idx start from 1!!!
-    }
-    if (del_flag[idx[i] - 1])
-      for (m = 0; m < del_total; ++m)
-        if (del_id_all[m] == idx[i]) {
-          hap_nuc(i, del_ref_pos[m]) = 4;
-          hap_ref_pos[count++] = del_ref_pos[m];
-        }
-  }
-  
-  for (i = 0; i < NUM_CLASS; ++i) {
-    if (hap_deletion_len[i] != 0) {
-      if(i != 0)
-        for (j = 0; j < i; ++j)
-          strat_id[i] += hap_deletion_len[j];
-    }
-    else
-      strat_id[i] = -1; //record the deletion starting id in vector hap_ref_pos for each hap
-  }
-  
-  List ls = List::create(
-    Named("hap") = hap_nuc,
-    Named("deletion_pos") = hap_ref_pos,
-    Named("hap_deletion_len") = hap_deletion_len,
-    Named("hap_del_start_id") = strat_id);
-  return ls;
 }
 
 // [[Rcpp::export]] 
@@ -562,7 +515,8 @@ IntegerMatrix call_permute_N(vector<int> a, unsigned int genome_A) {
 
 List aux_noN(IntegerVector sum_site, IntegerVector hap_site, unsigned int which_stage) {
   List out(2);
-  int n_row, sum;
+  int n_row;
+  double sum;
   IntegerMatrix temp;
   if (which_stage == 2) {
     sum = sum_site[1] + sum_site[0];
@@ -632,19 +586,23 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
     prop[i] = coverage[i] * cut_off;
   
   /* Find the max p in each t and record the observations in each set t*/
-  IntegerVector which_t(n_observation);
+  
   unsigned int t_max = time_pos.length();
+  List n_in_t(t_max);
   IntegerVector p_tmax(t_max);
-  unsigned int max;
+  unsigned int max, count_nt;
   for(t = 0; t < t_max; ++t) {
+    count_nt = 0;
+    IntegerVector nt(n_observation);
     max = 0;
     for(i = 0; i < n_observation; ++i)
       if(ref_pos[index[i]] == time_pos[t]) {
-        which_t[i] = t;
+        nt[count_nt++] = i;
         if(max < fake_length[i])
           max = fake_length[i];
       }
     p_tmax[t] = max;
+    n_in_t(t) = nt[Range(0, count_nt - 1)];
   }
   
   unsigned int count, num, more_than1 = 0;
@@ -673,26 +631,34 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
     IntegerVector key = nuc["values"];
     IntegerVector val = nuc["lengths"];
     num = 0;
-    /* remove some unlikely occurred nuc */
-    for(t = 0; t < val.length(); ++t) {
+    /* remove some unlikely occurred nuc (notice the situation that only - appears) */
+    for(t = 0; t < val.length(); ++t)
       if(val[t] >= prop(j)) {
         keys(num) = key(t);
         vals(num++) = val(t);
       }
+      
+    if(num == 1 && keys[0] == -1) {
+      nuc_unique[j] = key[Range(0, 1)];
+      nuc_count[j] = val[Range(0, 1)];
+      num++;
+    } else {
+      nuc_unique[j] = keys[Range(0, num - 1)];
+      nuc_count[j] = vals[Range(0, num - 1)];
     }
-    nuc_unique[j] = keys[Range(0, num - 1)];
-    nuc_count[j] = vals[Range(0, num - 1)];
+    
     IntegerVector hap_site = nuc_unique[j];
     IntegerVector sum_site = nuc_count[j];
-    unsigned int sum;
+    double sum;
+    
     //record possible hidden states[only suitable for ployploids]
-    if (num == 1) { //TODO: there is a potential problem that at one site, most of the nuc are -1, but the haplotype cannot have 4 gaps
+    if (num == 1) {
       IntegerVector temp = {hap_site[0], hap_site[0], hap_site[0], hap_site[0]};
       haplotype(j) = temp;
       n_row[j] = 1;
     } 
     else if (num == 2) {
-      if(hap_site[0] == -1) { // if N appears, 2 possibilities, but based on universal, 1 possible
+      if(hap_site[0] == -1) {
         IntegerVector temp(NUM_CLASS);
         if(uni_alignment[j] == "I") 
           temp = {-1, -1, hap_site[1], hap_site[1]};
@@ -804,7 +770,7 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
     Named("p_tmax") = p_tmax, // max length at each t
     Named("n_t") = n_t,// no. emission reads at each time t
     Named("time_pos") = time_pos, // emission start position
-    Named("which_t") = which_t, // indicate reads in which t 
+    Named("n_in_t") = n_in_t, // reads index in each t 
     Named("t_max") = t_max); //biggest t
   
   return ls;

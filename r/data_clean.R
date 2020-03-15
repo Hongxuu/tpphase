@@ -1,6 +1,6 @@
 ######## Insertion: RefPos is -1; Deletion: Qua Nuc are -1 -
 
-rea_d4at <- function(filepath, filter = TRUE) {
+rea_dat <- function(filepath, filter = TRUE) {
   dat <- read.csv(filepath, sep = " ", header = F)
   names(dat) <- c("idx", "read_pos", "ref_pos", "qua", "read_nuc")
   #### Remove deletion and insertion:
@@ -108,10 +108,13 @@ data_clean <- function(dat_path, hap_path, n_class = 4, num_cat = 4, filter = TR
 #lldat <- data_clean(dat_path = "test.txt", hap_path = "test_hap.fa")
 
 write.table(dat_long, file = "long.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
-data_r <- rea_dat(filepath = datafile, filter = TRUE)
-data_r %>% filter(idx %in% c(1:10))
+data_r <- rea_dat(filepath = datafile, filter = FALSE)
+dd <- data_r %>% group_by(idx) %>% mutate_at("read_pos", function(x) x - x[1])
+data_r <- data_r %>% filter(idx <= 125)
 write.table(data_r %>% filter(idx %in% c(1:10)), file = "test_30.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
 ##### add fake information for mnlogit format
+data_rR <- data_r %>% filter(!(idx %in% c(1298, 1647, 1170, 1617, 1261, 1371, 220)))
+write.table(dd, file = "test_28.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
 ######### DATA:
 
 ######   idx   nuc   hap_nuc hap_name read_pos ref_pos qua mode

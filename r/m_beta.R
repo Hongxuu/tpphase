@@ -5,15 +5,22 @@
 #' @param ncores number of ncores to run mnlogit
 #' @return betas and CE_llk
 
-Mstep <- function(dat, read_length, par, weight_id, formula, num_cat = 4, ncores, weights = TRUE) {
+Mstep <- function(dat, read_length, par, weight_id, formula, num_cat = 4, ncores, weights = TRUE, given_weights = NULL) {
   #give a initial value for optimization
   if (weights) {
-    weights <- data.table::rbindlist(foreach(i = 1:ncol(par$wic)) %dopar% {
-      data.frame(wic = rep.int(par$wic[, i], read_length[i]))
-    })
-    if(!is.null(weight_id))
-      weights <- weights[-c(weight_id), ]
-    weights <- weights$wic
+    if(is.null(given_weights)) { ## for old_tpphase
+      weights <- data.table::rbindlist(foreach(i = 1:ncol(par$wic)) %dopar% {
+        data.frame(wic = rep.int(par$wic[, i], read_length[i]))
+      })
+      if(!is.null(weight_id))
+        weights <- weights[-c(weight_id), ]
+      weights <- weights$wic
+    } else {
+      weights <- given_weights
+      if(!is.null(weight_id))
+        weights <- weights[-c(weight_id)]
+    }
+    
     start <- par$beta %>% as.vector
     fit <- modified_mnlogit(formula = formula,
                    data = dat, weights = weights, choiceVar = "nuc", ncores = ncores, start = start)
@@ -42,7 +49,7 @@ Mstep <- function(dat, read_length, par, weight_id, formula, num_cat = 4, ncores
 #' @description prepare data and call mnlogit
 #' @return logLik of mnlogit and betas
 
-m_beta <- function(res, weight_id, data, id, formula, reads_lengths, ncores) {
+m_beta <- function(res, weight_id, data, id, formula, reads_lengths, ncores, old_version, weight) {
   par <- list()
   
   if(length(res$excluded_id) != 0) {
@@ -56,13 +63,15 @@ m_beta <- function(res, weight_id, data, id, formula, reads_lengths, ncores) {
   data <- data[, !names(data) %in% c("id")] # (modified_moligit exclude first column: id)
   
   Mpar <- Mstep(dat = data, read_length = reads_lengths, weight_id= weight_id, formula = formula, par = par, 
-                ncores = ncores, weights = TRUE)
+                ncores = ncores, weights = TRUE, given_weights = weight)
   par$beta <- Mpar$beta 
   par$wic <- res$param$w_ic ## For the use of update haplotype
   par$eta <- res$param$mixture_prop
-  par$del_rate <- res$param$del_rate
-  par$ins_rate <- res$param$ins_rate
-  par$excluded_read <- res$param$excluded_read
+  if(old_version) {
+    par$del_rate <- res$param$del_rate
+    par$ins_rate <- res$param$ins_rate
+    par$excluded_read <- res$param$excluded_read
+  }
   
   results <- list()
   results$par <- par

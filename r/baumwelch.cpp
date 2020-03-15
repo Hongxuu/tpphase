@@ -11,39 +11,15 @@
 #include <algorithm>
 
 #include "data_format.h"
+#include "baumwelch.h"
 using namespace Rcpp;
 using namespace std;
-// [[Rcpp::depends(RcppArmadillo)]]
-#define NUM_CLASS 4
+
 #define MLOGIT_CLASS 4
+#define NUM_CLASS 4
 
-// [[Rcpp::export]]
-List make_universal_old(List A_genome, List B_genome) {
-  IntegerVector A_aligned = A_genome["reads"];
-  IntegerVector B_aligned = B_genome["reads"];
-  IntegerVector B_lengths = B_genome["dim"];
+// [[Rcpp::depends(RcppArmadillo)]]
 
-  unsigned int i, j;
-  IntegerVector start_id(B_lengths.length());
-  CharacterVector universal(B_aligned.length());
-
-  for(i = 1; i < B_lengths.length(); ++i)
-    start_id[i] = start_id[i - 1] + B_lengths[i - 1];
-
-  for(j = 0; j < B_aligned.length(); ++j) {
-    if(B_aligned[j] == 15 & A_aligned[j] != 15) {
-      universal[j] = "J";
-    } else if(B_aligned[j] != 15 & A_aligned[j] == 15) {
-      universal[j] = "I";
-    } else
-      universal[j] = "M";
-  }
-
-  List ls = List::create(
-    Named("universal_alignment") = universal,
-    Named("start_id") = start_id);
-  return ls;
-}
 
 List ini_hmm (unsigned int t_max,  IntegerVector num_states) {
   NumericVector phi(num_states[0]);
@@ -68,9 +44,10 @@ List ini_hmm (unsigned int t_max,  IntegerVector num_states) {
   //     emission(w) = 1/double(num_states[t]);
   //   emit(t) = emission;
   // }
-  
+  // 
   List par_hmm = List::create(
     Named("phi") = phi,
+    // Named("emit") = emit
     Named("trans") = trans);
   return(par_hmm);
 }
@@ -154,9 +131,9 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
         x(w, m) = exp(x(w, m));
         sum += x(w, m);
       }
-    for (w = 0; w < num_states[t]; ++w)
-      for (m = 0; m < num_states[t + 1]; ++m)
-        x(w, m) /= sum;
+      for (w = 0; w < num_states[t]; ++w)
+        for (m = 0; m < num_states[t + 1]; ++m)
+          x(w, m) /= sum;
     xi(t) = x;
   }
   List par_hmm_out = List::create(
@@ -192,25 +169,103 @@ List update_trans(List par_hmm, unsigned int t_max, IntegerVector num_states) {
     for (w = 0; w < num_states[t]; ++w)
       for (m = 0; m < num_states[t + 1]; ++m)
         transition(w, m) = x(w, m)/gam(w);
-      trans[t] = transition;
+    trans[t] = transition;
   }
   return(trans);
 }
 
-vector<vector<int> > cart_product (const vector<vector<int> > &v) {
-  vector<vector<int> > s = {{}};
-  for (const auto& u : v) {
-    vector<vector<int> > r;
-    for (const auto& x : s) {
-      for (const auto y : u) {
-        r.push_back(x);
-        r.back().push_back(y);
-      }
+double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsigned int PD_LENGTH, 
+                        List dat_info, IntegerMatrix haplotype, unsigned int time_pos) {
+  unsigned int j, l;
+  double qua_in, read_pos_in, ref_pos_in;
+  double tail, sum;
+  double xb = 0;
+  
+  IntegerVector qua = dat_info["qua"];
+  IntegerVector obs = dat_info["nuc"];
+  IntegerVector ref_pos = dat_info["ref_pos"];
+  IntegerVector read_pos = dat_info["read_pos"];
+  IntegerVector length = dat_info["length"];
+  IntegerVector index = dat_info["start_id"];
+  IntegerMatrix ref_index = dat_info["ref_idx"];
+  
+  NumericVector hap_nuc(MLOGIT_CLASS);
+  NumericVector hnuc_qua(MLOGIT_CLASS);
+  NumericVector pred_beta(MLOGIT_CLASS - 1);
+  double read_llk = 0.;
+  arma::vec predictor(PD_LENGTH);
+  //NumericVector site_llk(length[i]);
+  
+  /* non-indel positions for both reads and haplotypes */
+  for(j = 0; j < length[i]; ++j) {
+    
+    //Rprintf("j %d, position %d\n", j, index[i] + j);
+    read_pos_in = read_pos[index[i] + j];
+    qua_in = qua[index[i] + j];
+    ref_pos_in = ref_pos[index[i] + j] - time_pos; // this is different since the sub-hap are counted 0 from the time t
+    
+    for (l = 0; l < MLOGIT_CLASS; ++l) {
+      hap_nuc[l] = 0;
+      hnuc_qua[l] = 0;
     }
-    s = move(r);
+    //Rcout << "haplotype " << haplotype(K, ref_pos_in) << "\t";
+    
+    if(haplotype(K, ref_pos_in) == 1) {
+      hap_nuc[0] = 1;
+      hnuc_qua[0] = qua_in;
+    } else if(haplotype(K, ref_pos_in) == 3) {
+      hap_nuc[1] = 1;
+      hnuc_qua[1] = qua_in;
+    } else if(haplotype(K, ref_pos_in) == 2) {
+      hap_nuc[3] = 1;
+      hnuc_qua[3] = qua_in;
+    }
+    
+    predictor = {1, read_pos_in, ref_pos_in, qua_in, hap_nuc[0], hap_nuc[1],
+                 hap_nuc[3], hnuc_qua[0], hnuc_qua[1], hnuc_qua[3]};
+    
+    arma::mat beta_ar = as<arma::mat>(beta);
+    arma::vec pb = beta_ar.t() * predictor;
+    pred_beta = as<NumericVector>(wrap(pb));
+    
+    //Rcout << "predictor : " << predictor.t() << "\n";
+    //Rcout << "beta_ar : " << beta_ar << "\n";
+    //Rcout << "pred_beta : " << pred_beta << "\n";
+    
+    sum = 0.0;
+    for (l = 0; l < MLOGIT_CLASS - 1; ++l)
+      sum += exp(pred_beta[l]);
+    tail = log(1/(1 + sum));
+    
+    if(obs[index[i] + j] == 1) {
+      xb = pred_beta[0];
+    } else if(obs[index[i] + j] == 3) {
+      xb = pred_beta[1];
+    } else if(obs[index[i] + j] == 2) {
+      xb = pred_beta[2];
+    } else if(obs[index[i] + j] == 0) {
+      xb = 0;
+    }
+    read_llk += xb + tail; /* Notice here use log likelihood, not likelihood */
   }
-  return s;
-}
+  //Rcout << "read_llk: " << read_llk << "\t";
+  return read_llk;
+} /* site_likelihood */
+  
+  vector<vector<int> > cart_product (const vector<vector<int> > &v) {
+    vector<vector<int> > s = {{}};
+    for (const auto& u : v) {
+      vector<vector<int> > r;
+      for (const auto& x : s) {
+        for (const auto y : u) {
+          r.push_back(x);
+          r.back().push_back(y);
+        }
+      }
+      s = move(r);
+    }
+    return s;
+  }
 
 IntegerMatrix call_cart_product(IntegerVector len) {
   unsigned int row = len.size();
@@ -231,6 +286,7 @@ IntegerMatrix call_cart_product(IntegerVector len) {
   
   return(out);
 }
+
 /*
  * Fill the positions without variation
  */
@@ -246,6 +302,7 @@ IntegerMatrix fill_all_hap(List hidden_states, unsigned int hap_length, IntegerV
     }
     return haplotype;
 }
+
 /*
  * Return the combination of sites with variation within one time t
  */
@@ -260,8 +317,8 @@ List find_combination(IntegerVector undecided_pos, IntegerVector pos_possibility
       location(num) = undecided_pos[i];
       location_len(num++) = pos_possibility[i];
     }
-  IntegerMatrix combination = call_cart_product(location_len[Range(0, num - 1)]);
-  List ls = List::create(
+    IntegerMatrix combination = call_cart_product(location_len[Range(0, num - 1)]);
+    List ls = List::create(
       Named("combination") = combination,
       Named("num") = num,
       Named("location") = location[Range(0, num - 1)]);
@@ -283,6 +340,7 @@ IntegerMatrix make_hap(List hidden_states, IntegerMatrix haplotype, IntegerVecto
   }
   return(haplotype(_, Range(time_pos, time_pos + p_tmax - 1)));
 }
+
 // [[Rcpp::export]]
 List full_hap(List hmm_info, unsigned int hap_length) {
   List hidden_states = hmm_info["hidden_states"];
@@ -317,84 +375,6 @@ List full_hap(List hmm_info, unsigned int hap_length) {
   return(full_hap);
 }
 
-double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsigned int PD_LENGTH, 
-                        List dat_info, IntegerMatrix haplotype, unsigned int time_pos) {
-  unsigned int j, l;
-  double qua_in, read_pos_in, ref_pos_in;
-  double tail, sum;
-  double xb = 0;
-
-  IntegerVector qua = dat_info["qua"];
-  IntegerVector obs = dat_info["nuc"];
-  IntegerVector ref_pos = dat_info["ref_pos"];
-  IntegerVector read_pos = dat_info["read_pos"];
-  IntegerVector length = dat_info["length"];
-  IntegerVector index = dat_info["start_id"];
-  IntegerMatrix ref_index = dat_info["ref_idx"];
-
-  NumericVector hap_nuc(MLOGIT_CLASS);
-  NumericVector hnuc_qua(MLOGIT_CLASS);
-  NumericVector pred_beta(MLOGIT_CLASS - 1);
-  double read_llk = 0.;
-  arma::vec predictor(PD_LENGTH);
-  //NumericVector site_llk(length[i]);
-
-  /* non-indel positions for both reads and haplotypes */
-  for(j = 0; j < length[i]; ++j) {
-
-    //Rprintf("j %d, position %d\n", j, index[i] + j);
-    read_pos_in = read_pos[index[i] + j];
-    qua_in = qua[index[i] + j];
-    ref_pos_in = ref_pos[index[i] + j] - time_pos; // this is different since the sub-hap are counted 0 from the time t
-    
-    for (l = 0; l < MLOGIT_CLASS; ++l) {
-      hap_nuc[l] = 0;
-      hnuc_qua[l] = 0;
-    }
-    //Rcout << "haplotype " << haplotype(K, ref_pos_in) << "\t";
-
-    if(haplotype(K, ref_pos_in) == 1) {
-      hap_nuc[0] = 1;
-      hnuc_qua[0] = qua_in;
-    } else if(haplotype(K, ref_pos_in) == 3) {
-      hap_nuc[1] = 1;
-      hnuc_qua[1] = qua_in;
-    } else if(haplotype(K, ref_pos_in) == 2) {
-      hap_nuc[3] = 1;
-      hnuc_qua[3] = qua_in;
-    }
-
-    predictor = {1, read_pos_in, ref_pos_in, qua_in, hap_nuc[0], hap_nuc[1],
-                 hap_nuc[3], hnuc_qua[0], hnuc_qua[1], hnuc_qua[3]};
-
-    arma::mat beta_ar = as<arma::mat>(beta);
-    arma::vec pb = beta_ar.t() * predictor;
-    pred_beta = as<NumericVector>(wrap(pb));
-
-    //Rcout << "predictor : " << predictor.t() << "\n";
-    //Rcout << "beta_ar : " << beta_ar << "\n";
-    //Rcout << "pred_beta : " << pred_beta << "\n";
-
-    sum = 0.0;
-    for (l = 0; l < MLOGIT_CLASS - 1; ++l)
-      sum += exp(pred_beta[l]);
-    tail = log(1/(1 + sum));
-
-    if(obs[index[i] + j] == 1) {
-      xb = pred_beta[0];
-    } else if(obs[index[i] + j] == 3) {
-      xb = pred_beta[1];
-    } else if(obs[index[i] + j] == 2) {
-      xb = pred_beta[2];
-    } else if(obs[index[i] + j] == 0) {
-      xb = 0;
-    }
-    read_llk += xb + tail; /* Notice here use log likelihood, not likelihood */
-  }
-  //Rcout << "read_llk: " << read_llk << "\t";
-  return read_llk;
-} /* site_likelihood */
-
 List compute_emit(List hmm_info, List dat_info, List hap_info, NumericMatrix beta, NumericVector eta, int PD_LENGTH) 
 {
   List hidden_states = hmm_info["hidden_states"];
@@ -424,14 +404,14 @@ List compute_emit(List hmm_info, List dat_info, List hap_info, NumericMatrix bet
       IntegerMatrix haplotype = full_hap_t(m);
       NumericMatrix w_tic(n_t[t], NUM_CLASS);
       for (i = 0; i < n_t[t]; ++i) { // todo: maybe better to make a read set for each t
-          unsigned int id = idx[i];
-          for (k = 0; k < NUM_CLASS; ++k) {
-            read_class_llk(i, k) = site_likelihood(id, k, beta, PD_LENGTH, dat_info, haplotype, time_pos[t]);
-            weight_llk[k] = eta[k] * exp(read_class_llk(i, k));
-            read_likelihood[i] += weight_llk[k];
-          }
-          for (k = 0; k < NUM_CLASS; ++k)
-            w_tic(i, k) = weight_llk[k]/read_likelihood[i];
+        unsigned int id = idx[i];
+        for (k = 0; k < NUM_CLASS; ++k) {
+          read_class_llk(i, k) = site_likelihood(id, k, beta, PD_LENGTH, dat_info, haplotype, time_pos[t]);
+          weight_llk[k] = eta[k] * exp(read_class_llk(i, k));
+          read_likelihood[i] += weight_llk[k];
+        }
+        for (k = 0; k < NUM_CLASS; ++k)
+          w_tic(i, k) = weight_llk[k]/read_likelihood[i];
         emission[m] += log(read_likelihood[i]);
       }
       emission[m] = exp(emission[m]);
@@ -478,42 +458,6 @@ NumericVector update_eta(List w_ic, List gamma, IntegerVector num_states, Intege
     eta_new[k] = eta_new[k]/n_observation;
   
   return(eta_new);
-}
-
-// [[Rcpp::export]]
-/*
- * Initialize based on the variant site and ramdomly sample 4 haplotypes
- */
-List sample_hap2(List hmm_info, unsigned int hap_length) 
-{
-  List hidden_states = hmm_info["hidden_states"];
-  IntegerVector num_states = hmm_info["num_states"];
-  IntegerVector time_pos = hmm_info["time_pos"];
-  IntegerVector p_tmax = hmm_info["p_tmax"];
-  IntegerVector n_row = hmm_info["n_row"];
-  IntegerVector pos_possibility = hmm_info["pos_possibility"];
-  IntegerVector undecided_pos = hmm_info["undecided_pos"];
-  unsigned int m, k, j;
-  
-  IntegerMatrix haplotype = fill_all_hap(hidden_states, hap_length, n_row);
-  List comb_info = find_combination(undecided_pos, pos_possibility, hap_length, time_pos[0]);
-  IntegerVector location = comb_info["location"];
-  IntegerMatrix combination = comb_info["combination"];
-  unsigned int num = comb_info["num"];
-  unsigned int total = combination.nrow();
-  m = R::runif(0, total - 1);
-  IntegerMatrix haplotype_out = make_hap(hidden_states, haplotype, location, hap_length, combination(m, _), time_pos[0], num);
-  
-  int gap_in = 0;
-  for(k = 0; k < NUM_CLASS; ++k) 
-    for(j = 0; j < hap_length; ++j)
-      if(haplotype_out(k, j) == -1)
-        gap_in = 1;
-      
-  List ls = List::create(
-    Named("haplotype") = haplotype_out,
-    Named("gap_in") = gap_in);
-  return(ls);
 }
 
 List sub_sample(List hmm_info, List dat_info) {
@@ -565,9 +509,12 @@ List sub_sample(List hmm_info, List dat_info) {
     dat_info_t["read_pos"] = read_pos_out;
     dat_out(t) = dat_info_t;
   }
-  
   return(dat_out);
 }
+
+/*
+ * format the data for mnlogit, note here ref_pos should be shifted according the strating t
+ */
 // [[Rcpp::export]]
 DataFrame format_data2(List hmm_info, List d_info, List hap_info) {
   IntegerVector num_states = hmm_info["num_states"];
@@ -576,7 +523,7 @@ DataFrame format_data2(List hmm_info, List d_info, List hap_info) {
   unsigned int t, m, i;
   
   List subsample = sub_sample(hmm_info, d_info);
-    
+  
   unsigned int total = 0;
   for(t = 0; t < t_max; ++t) {
     List data_info = subsample(t);

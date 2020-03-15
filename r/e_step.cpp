@@ -46,10 +46,11 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
     
     //Rprintf("j %d, position %d\n", j, index[i] + j);
     read_pos_in = read_pos[index[i] + j];
-    if(haplotype(K, ref_pos_in) == 4)
-      continue;
     qua_in = qua[index[i] + j];
     ref_pos_in = ref_pos[index[i] + j];
+    
+    if(haplotype(K, ref_pos_in) == 4)
+      continue;
     for (l = 0; l < MLOGIT_CLASS; ++l) {
       hap_nuc[l] = 0;
       hnuc_qua[l] = 0;
