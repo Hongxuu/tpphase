@@ -160,9 +160,6 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
     xi(t) = x;
   }
   List par_hmm_out = List::create(
-    Named("phi") = phi,
-    Named("trans") = trans,
-    Named("emit") = emit,
     Named("alpha") = alpha,
     Named("beta_wt") = beta_wt,
     Named("gamma") = gamma,
@@ -183,7 +180,7 @@ NumericVector update_phi(List par_hmm, unsigned int num_states) {
 List update_trans(List par_hmm, unsigned int t_max, IntegerVector num_states) {
   List gamma = par_hmm["gamma"];
   List xi = par_hmm["xi"];
-  List trans(t_max);
+  List trans(t_max - 1);
   unsigned int t, m, w;
   for (t = 0; t < t_max - 1; ++t) {
     NumericMatrix transition(num_states[t], num_states[t + 1]);
@@ -672,14 +669,13 @@ NumericVector make_weight(List wic, List gamma, List hmm_info, List dat_info) {
 }
 
 // [[Rcpp::export]]
-List baum_welch(List hmm_info, List data_info, List hap_info, List par, int PD_LENGTH)
+List baum_welch_init(List hmm_info, List data_info, List hap_info, List par, int PD_LENGTH)
 {
   IntegerVector num_states = hmm_info["num_states"];
   IntegerVector n_t = hmm_info["n_t"];
   NumericMatrix beta = par["beta"];
   NumericVector eta = par["eta"];
   unsigned int t_max = hmm_info["t_max"];
-  unsigned int n_observation = data_info["n_observation"];
   
   List par_hmm;
   
@@ -690,38 +686,66 @@ List baum_welch(List hmm_info, List data_info, List hap_info, List par, int PD_L
   List for_emit = compute_emit(hmm_info, data_info, hap_info, beta, eta, PD_LENGTH);
   par_hmm["emit"] = for_emit["emit"];
   List w_ic = for_emit["w_ic"];
+  List par_hmm_bf = forward_backward(par_hmm, t_max, num_states);
+  List gamma = par_hmm_bf["gamma"];
+  /* prepare weight for beta */
+  NumericVector weight = make_weight(w_ic, gamma, hmm_info, data_info);
   
-  /* update hmm par (except for emit) */
-  List par_hmm_new = forward_backward(par_hmm, t_max, num_states);
-  NumericVector phi_new = update_phi(par_hmm_new, num_states[0]);
-  List trans_new = update_trans(par_hmm_new, t_max, num_states);
-  List gamma = par_hmm_new["gamma"];
+  //store the parmaeters for calling mnlogit
+  List par_aux = List::create(
+    Named("beta") = beta,
+    Named("w_ic") = w_ic,
+    Named("weight") = weight);
   
+  List ls = List::create(
+    Named("par_hmm_bf") = par_hmm_bf,
+    Named("par_aux") = par_aux,
+    Named("par_hmm") = par_hmm);
+  
+  return(ls);
+}
+// [[Rcpp::export]]
+List baum_welch_iter(List hmm_info, List par_hmm, List data_info, List hap_info, NumericMatrix beta, int PD_LENGTH)
+{
+  List par_aux = par_hmm["par_aux"];
+  List par_hmm_bf = par_hmm["par_hmm_bf"];
+  IntegerVector num_states = hmm_info["num_states"];
+  IntegerVector n_t = hmm_info["n_t"];
+  List w_ic = par_aux["w_ic"];
+  List gamma = par_hmm_bf["gamma"];
+  unsigned int t_max = hmm_info["t_max"];
+  unsigned int n_observation = data_info["n_observation"];
+  List par_hmm_new;
   /* update eta */
   NumericVector eta_new = update_eta(w_ic, gamma, num_states, n_t, t_max, n_observation);
   
   /* update emit */
   List for_emit_new = compute_emit(hmm_info, data_info, hap_info, beta, eta_new, PD_LENGTH);
-  List emit_new = for_emit_new["emit"];
+  par_hmm_new["emit"] = for_emit_new["emit"];
+  List wic_new = for_emit_new["w_ic"];
+  
+  /* update hmm par (except for emit) */
+  NumericVector phi_new = update_phi(par_hmm_bf, num_states[0]);
+  List trans_new = update_trans(par_hmm_bf, t_max, num_states);
+  par_hmm_new["phi"] = phi_new;
+  par_hmm_new["trans"] = trans_new;
+  
+  List par_hmm_bf_new = forward_backward(par_hmm_new, t_max, num_states);
+  List gamma_new = par_hmm_bf_new["gamma"];
   
   /* prepare weight for beta */
-  NumericVector weight = make_weight(w_ic, gamma, hmm_info, data_info);
+  NumericVector weight = make_weight(wic_new, gamma_new, hmm_info, data_info);
   
-  //store the parmaeters for calling mnlogit
-  List par_out = List::create(
-    Named("eta") = eta_new,
-    Named("w_ic") = w_ic,
+  List par_aux_out = List::create(
     Named("beta") = beta,
+    Named("eta") = eta_new,
+    Named("w_ic") = wic_new,
     Named("weight") = weight);
-  List par_hmm_out = List::create(
-    Named("phi") = phi_new,
-    Named("trans") = trans_new,
-    Named("emit") = emit_new,
-    Named("gamma") = gamma);
-  
+ 
   List ls = List::create(
-    Named("param") = par_out,
-    Named("par_hmm") = par_hmm_out);
-  
+    Named("par_aux") = par_aux_out,
+    Named("par_hmm") = par_hmm_new,
+    Named("par_hmm_bf") = par_hmm_bf_new);
+
   return(ls);
 }

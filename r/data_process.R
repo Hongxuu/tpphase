@@ -63,3 +63,9 @@ to_char_r <- function(x) {
 to_xy_r <- function(x) {
   as.numeric(c("A" = "0", "T" = "2", "C" = "1", "G" = "3")[t(x)])
 }
+
+compare_par <- function(new, old, name) {
+  mapply(FUN = function(A, B) {
+    abs(A - B) < tol
+  }, A = new[[name]], B = old[[name]]) %>% flatten_lgl()
+} 

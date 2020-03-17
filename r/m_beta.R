@@ -58,16 +58,18 @@ m_beta <- function(res, weight_id, data, id, formula, reads_lengths, ncores, old
     data <- data %>% filter(!(id %in% res$excluded_id))
   }
   
-  par$wic <- t(res$param$w_ic)
+  if(old_version) 
+    par$wic <- t(res$param$w_ic)
   par$beta <- res$param$beta #beta from last step as starting value
   data <- data[, !names(data) %in% c("id")] # (modified_moligit exclude first column: id)
   
   Mpar <- Mstep(dat = data, read_length = reads_lengths, weight_id= weight_id, formula = formula, par = par, 
                 ncores = ncores, weights = TRUE, given_weights = weight)
   par$beta <- Mpar$beta 
-  par$wic <- res$param$w_ic ## For the use of update haplotype
-  par$eta <- res$param$mixture_prop
+  
   if(old_version) {
+    par$wic <- res$param$w_ic ## For the use of update haplotype
+    par$eta <- res$param$mixture_prop
     par$del_rate <- res$param$del_rate
     par$ins_rate <- res$param$ins_rate
     par$excluded_read <- res$param$excluded_read
