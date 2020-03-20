@@ -18,7 +18,7 @@ source("./r/likelihood.R")
 sourceCpp("./r/data_format.cpp")
 sourceCpp("./r/mnlogit.cpp")
 sourceCpp("./r/baumwelch.cpp")
-#sourceCpp("./r/extra.cpp")
+sourceCpp("./r/extra.cpp")
 sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
@@ -30,11 +30,19 @@ universial <- make_universal_old(A, B)
 U28 <- universial$universal_alignment[(universial$start_id[8]+1):universial$start_id[9]]
 old_version = 0
 dat_info <- read_data(datafile, old_v = old_version)
-HMM <- hmm_info(dat_info = dat_info, cut_off = 0.45, uni_alignment = U28) ## cut-off too high TODO: dataset
+HMM <- hmm_info(dat_info = dat_info, cut_off = 0.15, uni_alignment = U28) ## cut-off too high TODO: dataset
 
+formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc
+n_class = 4
+num_cat = 4
+seed = 0
+max = 20
+tol = 1e-06
+ncores = 2
+old_version = 0
 altragenotype <- function(samfile = NULL, ref_name = NULL, 
                           fastq_file = "./res.fastq", datafile = "./res.txt", output = NULL, 
-                          formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, n_initialization = 1,
+                          formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 1,
                           n_class = 4, num_cat = 4, seed = 0, max = 20, tol = 1e-06, ncores = 2, old_version = 0)  {
   registerDoParallel(cores = ncores)  
   
@@ -64,8 +72,8 @@ altragenotype <- function(samfile = NULL, ref_name = NULL,
                         par = par, PD_LENGTH = nrow(par$beta))
   
   ###### estimate beta
-  for(m in (0:n_initialization)) {
-    bw$par_hmm_old <- bw$par_hmm
+  for(m in (1)) {
+    par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
     
     weight_id <- NULL
@@ -86,14 +94,16 @@ altragenotype <- function(samfile = NULL, ref_name = NULL,
                           beta = tmp$par$beta, PD_LENGTH = nrow(par$beta))
     
     if(abs(bw$par_hmm$phi - phi_old) < tol & 
-       compare_par(new = bw$par_hmm, old = bw$par_hmm_old, name = "emit") &
-       compare_par(new = bw$par_hmm, old = bw$par_hmm_old, name = "trans"))
+       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit") &
+       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans"))
       break;
   }
   
   ### viterbi decoding
-  h <- viterbi(hmm_info = HMM, dat_info = dat_info, hap_info = hap_full, par_hmm = bw$par_hmm)
-  
+  hap <- viterbi(hmm_info = HMM, dat_info = dat_info, hap_info = hap_full, par_hmm = bw$par_hmm)
+  haplotypes <- matrix(to_char_r(hap), nrow = n_class)
+  idx <- duplicated(haplotypes)
+  derepliacte_h <- haplotypes[!idx, ]
 }
 
 

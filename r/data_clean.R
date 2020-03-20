@@ -109,14 +109,15 @@ data_clean <- function(dat_path, hap_path, n_class = 4, num_cat = 4, filter = TR
 
 write.table(dat_long, file = "long.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
 data_r <- rea_dat(filepath = datafile, filter = FALSE)
-dd <- data_r %>% group_by(idx) %>% mutate_at("read_pos", function(x) x - x[1])
+data_r %>% filter(!(idx %in% c(1:40) & ref_pos %in% c(150:200))) -> d
+d <- d %>% group_by(idx) %>% mutate_at("read_pos", function(x) x - x[1])
 data_r <- data_r %>% filter(idx <= 125)
 write.table(data_r %>% filter(idx %in% c(1:10)), file = "test_30.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
 ##### add fake information for mnlogit format
 data_rR <- data_r %>% filter(!(idx %in% c(1298, 1647, 1170, 1617, 1261, 1371, 220)))
-write.table(dd, file = "test_28.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
+write.table(d, file = "test_28.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
 ######### DATA:
-
+data_
 ######   idx   nuc   hap_nuc hap_name read_pos ref_pos qua mode
 ######    1     C       C       1        0       0     33   1
 #####     1     C       C       2        0       0     33   1

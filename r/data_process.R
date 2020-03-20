@@ -57,7 +57,7 @@ dereplicate_res <- function(resu, haps, n_class) {
 }
 
 to_char_r <- function(x) {
-  as.character(c("0" = "A", "2" = "T", "1" = "C", "3" = "G", "4" = "N")[as.character(x)])
+  as.character(c("0" = "A", "2" = "T", "1" = "C", "3" = "G", "4" = "N", "-1" = "N")[as.character(x)])
 }
 
 to_xy_r <- function(x) {

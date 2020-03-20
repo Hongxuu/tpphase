@@ -62,7 +62,7 @@ inline xy_t char_to_xy(char c)
     return 1 << 7;	/* non-nuc */
 } /* char_to_xy */
 
-unsigned char const xy_to_char[MLOGIT_CLASS] = {'A', 'C', 'T', 'G'};
+CharacterVector xy_to_char[MLOGIT_CLASS] = {"A", "C", "T", "G"};
 
 // [[Rcpp::export]]
 List unique_map(const Rcpp::IntegerVector & v)
@@ -455,12 +455,10 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1)
 }
 
 // [[Rcpp::export]] 
-
-/* NOT WORKING??? */
-CharacterVector to_char(IntegerVector nuc, int length) {
-  int i = 0;
-  CharacterVector nuc_char(length);
-  for(i = 0; i < length; ++i) {
+CharacterVector to_char(IntegerVector nuc) {
+  unsigned int i;
+  CharacterVector nuc_char(nuc.size());
+  for(i = 0; i < nuc.size(); ++i) {
     nuc_char[i] = xy_to_char[nuc[i]];
   }
   return(nuc_char);
@@ -493,6 +491,12 @@ IntegerMatrix call_permute(vector<int> a) {
   return(permutation);
 }
 
+IntegerMatrix Twopossible(IntegerVector a) {
+  IntegerVector temp = {a[0], a[1], a[0], a[1], a[1], a[0], a[1], a[0]};
+  temp.attr("dim") = Dimension(2, 4);
+  return(as<IntegerMatrix>(temp));
+}
+
 IntegerMatrix call_permute_N(vector<int> a, unsigned int genome_A) {
   Permutation per;
   vector<vector<int> > res =  per.permuteUnique(a);
@@ -520,22 +524,22 @@ List aux_noN(IntegerVector sum_site, IntegerVector hap_site, unsigned int which_
   IntegerMatrix temp;
   if (which_stage == 2) {
     sum = sum_site[1] + sum_site[0];
-    if(sum_site[0]/sum <= 0.35) { //1st one appears 3 times
+    if (sum_site[0]/sum <= 0.38) { //1st one appears 3 times
       temp = call_permute({hap_site[0], hap_site[1], hap_site[1], hap_site[1]});
       n_row = 4;
-    } if(sum_site[0]/sum >= 0.65) {//2nd one appears 3 times
+    } else if (sum_site[0]/sum >= 0.62) {//2nd one appears 3 times
       temp = call_permute({hap_site[0], hap_site[0], hap_site[0], hap_site[1]});
       n_row = 4;
-    } else {
-      temp = call_permute({hap_site[0], hap_site[0], hap_site[1], hap_site[1]});
-      n_row = 6;
+    } else { // the possibility of occuring ACAC is small? so elimiate this possibility???
+      temp = Twopossible(hap_site);
+      n_row = 2;
     }
   }
   if(which_stage == 3) {
     sum = sum_site[2] + sum_site[1] + sum_site[0];
-    if(sum_site[0]/sum >= 0.45) {
+    if (sum_site[0]/sum >= 0.45) {
       temp = call_permute({hap_site[0], hap_site[0], hap_site[1], hap_site[2]});
-    } if(sum_site[1]/sum >= 0.45) {
+    } else if(sum_site[1]/sum >= 0.45) {
       temp = call_permute({hap_site[0], hap_site[1], hap_site[1], hap_site[2]});
     } else {
       temp = call_permute({hap_site[0], hap_site[1], hap_site[2], hap_site[2]});
@@ -662,7 +666,7 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
         IntegerVector temp(NUM_CLASS);
         if(uni_alignment[j] == "I") 
           temp = {-1, -1, hap_site[1], hap_site[1]};
-        if(uni_alignment[j] == "J")
+        else if(uni_alignment[j] == "J")
           temp = {hap_site[1], hap_site[1], -1, -1};
         else
           temp = {hap_site[1], hap_site[1], hap_site[1], hap_site[1]};
@@ -682,13 +686,13 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
         // if N appears, 4 possibilities
         if(sum_site[0]/sum >= 0.45) {
           IntegerVector temp(2 * NUM_CLASS);
-          if(uni_alignment[j] == "I")
-            temp = {-1, -1, hap_site[1], hap_site[2], //J in universal alignment
-                    -1, -1, hap_site[2], hap_site[1]};
-          if(uni_alignment[j] == "J")
-            temp = {hap_site[1], hap_site[2], -1, -1,  //I in universal alignment                                       
-                    hap_site[2], hap_site[1], -1, -1};
-          temp.attr("dim") = Dimension(2, 4);
+          if (uni_alignment[j] == "I")
+            temp = {-1, -1,  -1, -1, hap_site[1], hap_site[2], //J in universal alignment
+                   hap_site[2], hap_site[1]};
+          else if(uni_alignment[j] == "J")
+            temp = {hap_site[1], hap_site[2], hap_site[2],hap_site[1],  //I in universal alignment                                       
+                    -1,  -1,  -1, -1};
+          temp.attr("dim") = Dimension(2, 4); // by column
           haplotype(j) = temp;
           n_row[j] = 2;
         } else {
@@ -716,7 +720,7 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
             for(m = l + 1; m < num; ++m) {
               if(uni_alignment[j] == "I") //deletion in B genome
                 inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 0);
-              if(uni_alignment[j] == "J")
+              else if(uni_alignment[j] == "J")
                 inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 1);
               temp = join_cols(temp, as<arma::mat>(inner_tmp));
             }
