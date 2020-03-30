@@ -202,7 +202,7 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
     //Rprintf("j %d, position %d\n", j, index[i] + j);
     read_pos_in = read_pos[index[i] + j];
     qua_in = qua[index[i] + j];
-    ref_pos_in = ref_pos[index[i] + j] - time_pos; // this is different since the sub-hap are counted 0 from the time t
+    ref_pos_in = ref_pos[index[i] + j]; // this is different since the sub-hap is counted 0 from the time t
     
     for (l = 0; l < MLOGIT_CLASS; ++l) {
       hap_nuc[l] = 0;
@@ -210,13 +210,13 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
     }
     //Rcout << "haplotype " << haplotype(K, ref_pos_in) << "\t";
     
-    if(haplotype(K, ref_pos_in) == 1) {
+    if(haplotype(K, ref_pos_in - time_pos) == 1) {
       hap_nuc[0] = 1;
       hnuc_qua[0] = qua_in;
-    } else if(haplotype(K, ref_pos_in) == 3) {
+    } else if(haplotype(K, ref_pos_in - time_pos) == 3) {
       hap_nuc[1] = 1;
       hnuc_qua[1] = qua_in;
-    } else if(haplotype(K, ref_pos_in) == 2) {
+    } else if(haplotype(K, ref_pos_in - time_pos) == 2) {
       hap_nuc[3] = 1;
       hnuc_qua[3] = qua_in;
     }
@@ -304,30 +304,30 @@ IntegerMatrix fill_all_hap(List hidden_states, unsigned int hap_length, IntegerV
 }
 
 /*
- * Return the combination of sites with variation within one time t
+ * Return the combination of sites with variation within one time t[NOTE:time_pos might not start from 0, but undecided_pos starts from 0]
  */
 List find_combination(IntegerVector undecided_pos, IntegerVector pos_possibility, 
-                      unsigned int p_tmax, unsigned int time_pos) {
+                      unsigned int p_tmax, unsigned int time_pos, int hap_min_pos) {
   //possible combination of the rest non-unique loci
   IntegerVector location(pos_possibility.size());
   IntegerVector location_len(pos_possibility.size());
   unsigned int num = 0;
   for(unsigned int i = 0; i < pos_possibility.size(); ++i)
-    if(time_pos <= undecided_pos[i] && undecided_pos[i] < time_pos + p_tmax) {
+    if(time_pos - hap_min_pos <= undecided_pos[i] && undecided_pos[i] < time_pos + p_tmax - hap_min_pos) {
       location(num) = undecided_pos[i];
       location_len(num++) = pos_possibility[i];
     }
     IntegerMatrix combination = call_cart_product(location_len[Range(0, num - 1)]);
     List ls = List::create(
-      Named("combination") = combination,
-      Named("num") = num,
-      Named("location") = location[Range(0, num - 1)]);
+      Named("combination") = combination, // possible comb
+      Named("num") = num, // number of comb at time t
+      Named("location") = location[Range(0, num - 1)]); // undecided site at time t [here assume alignment starts from 0]
     return(ls);
 }
 
-//fill haplotype at the rest sites (with variation)
+//fill haplotype at the rest sites (with variation) at time t
 IntegerMatrix make_hap(List hidden_states, IntegerMatrix haplotype, IntegerVector location, unsigned int p_tmax,
-                       IntegerVector combination, unsigned int time_pos, unsigned int num) {
+                       IntegerVector combination, unsigned int time_pos, unsigned int num, int hap_min_pos) {
   unsigned int j, k, idx;
   
   for(j = 0; j < num; ++j) {
@@ -338,11 +338,11 @@ IntegerMatrix make_hap(List hidden_states, IntegerMatrix haplotype, IntegerVecto
     for(k = 0; k < NUM_CLASS; ++k)
       haplotype(k, location[j]) = hidden(idx, k);
   }
-  return(haplotype(_, Range(time_pos, time_pos + p_tmax - 1)));
+  return(haplotype(_, Range(time_pos - hap_min_pos, time_pos + p_tmax - hap_min_pos - 1)));
 }
 
 // [[Rcpp::export]]
-List full_hap(List hmm_info, unsigned int hap_length) {
+List full_hap(List hmm_info, unsigned int hap_length, int hap_min_pos) {
   List hidden_states = hmm_info["hidden_states"];
   IntegerVector num_states = hmm_info["num_states"];
   IntegerVector time_pos = hmm_info["time_pos"];
@@ -358,17 +358,17 @@ List full_hap(List hmm_info, unsigned int hap_length) {
     List full_hap_t(num_states(t));
     // give h_t, each t has many possible combinations
     if(num_states[t] != 1) {
-      List comb_info = find_combination(undecided_pos, pos_possibility, p_tmax[t], time_pos[t]);
+      List comb_info = find_combination(undecided_pos, pos_possibility, p_tmax[t], time_pos[t], hap_min_pos);
       IntegerVector location = comb_info["location"];
       //Rcout << location << "\n";
       IntegerMatrix combination = comb_info["combination"];
       unsigned int num = comb_info["num"];
       for(m = 0; m < num_states[t]; ++m) {
-        IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[t], combination(m, _), time_pos[t], num);
+        IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[t], combination(m, _), time_pos[t], num, hap_min_pos);
         full_hap_t(m) = haplotype;
       }
     } else {
-      full_hap_t[0] = hap(_, Range(time_pos[t], time_pos[t] + p_tmax[t] - 1));
+      full_hap_t[0] = hap(_, Range(time_pos[t] - hap_min_pos, time_pos[t] + p_tmax[t] - hap_min_pos - 1));
     }
     full_hap(t) = full_hap_t;
   }
@@ -403,7 +403,7 @@ List compute_emit(List hmm_info, List dat_info, List hap_info, NumericMatrix bet
       NumericMatrix read_class_llk(n_t[t], NUM_CLASS);
       IntegerMatrix haplotype = full_hap_t(m);
       NumericMatrix w_tic(n_t[t], NUM_CLASS);
-      for (i = 0; i < n_t[t]; ++i) { // todo: maybe better to make a read set for each t
+      for (i = 0; i < n_t[t]; ++i) {
         unsigned int id = idx[i];
         for (k = 0; k < NUM_CLASS; ++k) {
           read_class_llk(i, k) = site_likelihood(id, k, beta, PD_LENGTH, dat_info, haplotype, time_pos[t]);

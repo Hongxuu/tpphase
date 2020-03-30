@@ -108,7 +108,9 @@ double m_haplotype_llk (unsigned int j, unsigned int l, unsigned int K, unsigned
     }
     
       if(ref_index(i, j) == -1) {
-        if((j >= ref_pos[index[i]]) && (j <= ref_pos[index[i] + length[i] - 1])) {
+        int hap_min_pos = dat_info["ref_start"];
+        unsigned int ref_j = j + hap_min_pos;
+        if((ref_j >= ref_pos[index[i]]) && (ref_j <= ref_pos[index[i] + length[i] - 1])) {
           if (viterbi)
             likelihood += log(w_ic(i, K)) + R::dpois(1, del_lambda, true);
           else
@@ -146,7 +148,9 @@ IntegerMatrix m_hap (List par, List dat_info, IntegerMatrix haplotype, unsigned 
   IntegerVector excluded_read = par["excluded_read"];
   IntegerVector ref = dat_info["ref_pos"];
   NumericVector beta = par["beta"];
-  int hap_length = dat_info["ref_length_max"];
+  int hap_max_pos = dat_info["ref_length_max"];
+  int hap_min_pos = dat_info["ref_start"];
+  int hap_length = hap_max_pos - hap_min_pos;
   double del_rate = par["del_rate"]; 
   double del_lambda = del_rate* hap_length;
   double ins_rate = par["ins_rate"]; 
@@ -218,7 +222,9 @@ List viterbi_MN(List par, List dat_info) {
   int nondel_total = dat_info["total"];
   double del_rate = par["del_rate"]; 
   double ins_rate = par["ins_rate"]; 
-  unsigned int hap_length = dat_info["ref_length_max"];
+  int hap_max_pos = dat_info["ref_length_max"];
+  int hap_min_pos = dat_info["ref_start"];
+  int hap_length = hap_max_pos - hap_min_pos;
   unsigned int n_observation = dat_info["n_observation"];
   
   arma::Cube<double> path_jnk(hap_length, HIDDEN_STATE, NUM_CLASS);
@@ -274,20 +280,22 @@ List viterbi_MN(List par, List dat_info) {
   sin_emmis(1, 1) = log(1 - R::dpois(1, ins_lambda, false)); //n to deletion
   sin_emmis(1, 0) = R::dpois(1, ins_lambda, true);
 
-  for (j = 0; j < hap_length; ++j)
+  for (j = 0; j < hap_length; ++j) {
+    unsigned int ref_j = j + hap_min_pos;
     for(i = 0; i < n_observation; ++i) {
       // if indel position
-        if (ref_index(i, j) == -1) {
-          if((j >= ref_pos[index[i]]) && (j <= ref_pos[index[i] + length[i] - 1])) {
+      if (ref_index(i, j) == -1) {
+        if((ref_j >= ref_pos[index[i]]) && (ref_j <= ref_pos[index[i] + length[i] - 1])) {
           emmis_prob(j, 0) += sin_emmis(0, 1);
           emmis_prob(j, 1) += sin_emmis(1, 1);
-          }
         }
-        else {
-          emmis_prob(j, 0) += sin_emmis(0, 0);
-          emmis_prob(j, 1) += sin_emmis(1, 0);
-        }
+      }
+      else {
+        emmis_prob(j, 0) += sin_emmis(0, 0);
+        emmis_prob(j, 1) += sin_emmis(1, 0);
+      }
     }
+  }
      // Rprintf("emmission prob:\n");
      // Rcout << emmis_prob << "\n";
   /*

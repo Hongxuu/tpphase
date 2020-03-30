@@ -63,7 +63,8 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   HMM <- hmm_info(dat_info = dat_info, cut_off = 0.16, uni_alignment = universial)
   
   ## initialize hap
-  hap_info <- sample_hap2(HMM, dat_info$ref_length_max)
+  hap_length <- dat_info$ref_length_max - dat_info$ref_start
+  hap_info <- sample_hap2(hmm_info = HMM, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
   hapinit <- hap_info$haplotype
   data <- format_data(dat_info = dat_info, haplotype = hapinit)
   weight_id <- NULL
@@ -83,12 +84,12 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   ## baum-welch (iterate until converge)
   
   ## initial
-  hap_full <- full_hap(hmm_info = HMM, hap_length = dat_info$ref_length_max)
+  hap_full <- full_hap(hmm_info = HMM, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
   bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, 
                         par = par, PD_LENGTH = nrow(par$beta))
   
   ###### estimate beta
-  for(m in (1:5)) {
+  for(m in (1:max_iter)) {
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
     

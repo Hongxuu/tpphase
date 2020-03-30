@@ -396,6 +396,8 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1)
   
   int total = dat_info["total"];
   int hap_max_pos = dat_info["ref_length_max"];
+  int hap_min_pos = dat_info["ref_start"];
+  // int hap_length = hap_max_pos - hap_min_pos;
   IntegerVector qua = dat_info["qua"];
   IntegerVector obs = dat_info["nuc"];
   IntegerVector obs_index = dat_info["id"];
@@ -416,14 +418,14 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1)
     for (k = 0; k < NUM_CLASS; ++k)
       for (l = 0; l < MLOGIT_CLASS; ++l) {
         if(time_pos != -1) {
-          //Rcout << haplotype(k, ref_pos[i] - time_pos) << "\t";
+          //Rcout << haplotype(k, ref_pos[i] - time_pos) << "\t"; Both ref_pos[i] and time_pos has the starting aligned location
           r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i] - time_pos); 
         } else {
           // the reference position might be longer than the sampled haplotypes
           if(ref_pos[i] > hap_max_pos - 1)
             r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = -1;
           else
-            r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i]); 
+            r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i] - hap_min_pos); 
         }
       }
       

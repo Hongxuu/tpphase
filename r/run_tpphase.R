@@ -54,7 +54,7 @@ run_tpphase <- function(samfile = NULL, ref_name = NULL, init = "random", fasta_
     sam <- read_sam(samfile, ref_name, fastq_file, datafile)
   
   dat_info <- read_data(datafile, old_v = old_version)
-  hap_length <- dat_info$ref_length_max
+  hap_length <- dat_info$ref_length_max - dat_info$ref_start
   read_length <- dat_info$length
   ## read in non-snps sites
   if(is.null(snp) == TRUE) {

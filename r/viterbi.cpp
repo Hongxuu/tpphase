@@ -26,7 +26,9 @@ IntegerMatrix viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm)
   IntegerVector p_tmax = hmm_info["p_tmax"];
   IntegerVector time_pos = hmm_info["time_pos"];
   unsigned int t_max = hmm_info["t_max"];
-  unsigned int hap_length = dat_info["ref_length_max"];
+  int hap_max_pos = dat_info["ref_length_max"];
+  int hap_min_pos = dat_info["ref_start"];
+  int hap_length = hap_max_pos - hap_min_pos;
   unsigned int t, m, w, k, j, max_id;
   IntegerMatrix hap_final(NUM_CLASS, hap_length);
   /*
@@ -75,14 +77,14 @@ IntegerMatrix viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm)
     hidden_value(t) = path_t(max_id);
   }
   /*
-   * make the haplotype (for the overlap region: take the hidden state which hidden value is bigger)
+   * make the haplotype (for the overlap region: take the hidden state which hidden value is bigger) or simply choose the later one?
    */
   for(t = 0; t < t_max; ++t) {
     List full_hap_t = hap_info(t);
     IntegerMatrix hap_t = full_hap_t[hidden_state(t)];
-    for(j = time_pos[t]; j < time_pos[t] + p_tmax[t]; ++j)
+    for(j = time_pos[t] - hap_min_pos; j < time_pos[t] + p_tmax[t] - hap_min_pos; ++j)
       for(k = 0; k < NUM_CLASS; ++k)
-        hap_final(k, j) = hap_t(k, j - time_pos[t]);
+        hap_final(k, j) = hap_t(k, j - time_pos[t] + hap_min_pos);
   }
   
   return(hap_final);

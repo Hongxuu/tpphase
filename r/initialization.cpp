@@ -77,7 +77,7 @@ List sample_hap (List dat_info, IntegerVector start, IntegerVector idx, IntegerV
  * Initialize based on the variant site and ramdomly sample 4 haplotypes
  */
 // [[Rcpp::export]]
-List sample_hap2(List hmm_info, unsigned int hap_length) 
+List sample_hap2(List hmm_info, unsigned int hap_length, int hap_min_pos) 
 {
   List hidden_states = hmm_info["hidden_states"];
   IntegerVector num_states = hmm_info["num_states"];
@@ -89,13 +89,13 @@ List sample_hap2(List hmm_info, unsigned int hap_length)
   unsigned int m, k, j;
   
   IntegerMatrix haplotype = fill_all_hap(hidden_states, hap_length, n_row);
-  List comb_info = find_combination(undecided_pos, pos_possibility, hap_length, time_pos[0]);
+  List comb_info = find_combination(undecided_pos, pos_possibility, hap_length, time_pos[0], hap_min_pos);
   IntegerVector location = comb_info["location"];
   IntegerMatrix combination = comb_info["combination"];
   unsigned int num = comb_info["num"];
   unsigned int total = combination.nrow();
   m = R::runif(0, total - 1);
-  IntegerMatrix haplotype_out = make_hap(hidden_states, haplotype, location, hap_length, combination(m, _), time_pos[0], num);
+  IntegerMatrix haplotype_out = make_hap(hidden_states, haplotype, location, hap_length, combination(m, _), time_pos[0], num, hap_min_pos);
   
   int gap_in = 0;
   for(k = 0; k < NUM_CLASS; ++k) 
