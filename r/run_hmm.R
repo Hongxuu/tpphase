@@ -18,20 +18,19 @@ source("./r/likelihood.R")
 sourceCpp("./r/data_format.cpp")
 sourceCpp("./r/mnlogit.cpp")
 sourceCpp("./r/baumwelch.cpp")
-sourceCpp("./r/extra.cpp")
+sourceCpp("./r/universal_alignment.cpp")
 sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
-## prepare data
-datafile = "./test_28.txt"
-A <- read_fasta("../../data/peanut_consensus/A_aligned_target.fasta")
-B <- read_fasta("../../data/peanut_consensus/B_aligned_target.fasta")
-universial <- make_universal_old(A, B)
-U28 <- universial$universal_alignment[(universial$start_id[8]+1):universial$start_id[9]]
-old_version = 0
-dat_info <- read_data(datafile, old_v = old_version)
-HMM <- hmm_info(dat_info = dat_info, cut_off = 0.15, uni_alignment = U28) ## cut-off too high TODO: dataset
+##### targeted data
+## read the data
+samfile = "../../data/tpphase_res_consensus/GWS/ch8.1.sam"
+ref_name = "ch81"
+fastq_file = "./res.fastq"
+datafile = "./res.txt"
+alignment = "../../data/tpphase_res_consensus/GWS/ch8.fasta"
 
+#######
 formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc
 n_class = 4
 num_cat = 4
@@ -39,12 +38,29 @@ seed = 0
 max = 20
 tol = 1e-06
 ncores = 2
+ref_delim = "."
 old_version = 0
-altragenotype <- function(samfile = NULL, ref_name = NULL, 
+altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref_delim = ".",
                           fastq_file = "./res.fastq", datafile = "./res.txt", output = NULL, 
                           formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 1,
                           n_class = 4, num_cat = 4, seed = 0, max = 20, tol = 1e-06, ncores = 2, old_version = 0)  {
   registerDoParallel(cores = ncores)  
+  ## read the data
+  if(is.null(samfile) == FALSE)
+    sam <- read_sam(samfile, ref_name, fastq_file, datafile)
+  
+  ## make universial reference
+  align <- read_fasta(alignment)
+  ref_name = "ch8.1"
+  ref_in <- strsplit(ref_name, ref_delim, fixed = TRUE) %>% unlist()
+  ref_index <- ref_in[2] %>% as.integer() - 1 ## index in C
+  universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = ref_index)
+  universial <- Filter(Negate(is.null), universial) %>% unlist()
+  rm(align)
+  
+  ## prepare data
+  dat_info <- read_data(datafile, old_v = old_version)
+  HMM <- hmm_info(dat_info = dat_info, cut_off = 0.16, uni_alignment = universial)
   
   ## initialize hap
   hap_info <- sample_hap2(HMM, dat_info$ref_length_max)
@@ -72,7 +88,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL,
                         par = par, PD_LENGTH = nrow(par$beta))
   
   ###### estimate beta
-  for(m in (1)) {
+  for(m in (1:5)) {
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
     
@@ -100,10 +116,20 @@ altragenotype <- function(samfile = NULL, ref_name = NULL,
   }
   
   ### viterbi decoding
+  res <- list()
   hap <- viterbi(hmm_info = HMM, dat_info = dat_info, hap_info = hap_full, par_hmm = bw$par_hmm)
   haplotypes <- matrix(to_char_r(hap), nrow = n_class)
   idx <- duplicated(haplotypes)
   derepliacte_h <- haplotypes[!idx, ]
+  snp_location <- HMM$undecided_pos + 1
+  snps <- derepliacte_h[, snp_location]
+  
+  res$no_reads_t <- HMM$n_t
+  res$time_pos <- HMM$time_pos
+  res$haplotypes <- derepliacte_h
+  res$snps <- snps
+  res$snp_location <- snp_location
+  fnlist(res, fil = "./test.res")
 }
 
 

@@ -5,7 +5,7 @@ rea_dat <- function(filepath, filter = TRUE) {
   names(dat) <- c("idx", "read_pos", "ref_pos", "qua", "read_nuc")
   #### Remove deletion and insertion:
   if(filter) {
-    # dat <- dat %>% filter(!str_detect(qua, "-1"))
+    #dat <- dat %>% filter(!str_detect(qua, "-1"))
     dat <- dat %>% filter(!str_detect(ref_pos, "-1"))
   }
   dat %>% mutate_if(is.factor, as.character)
@@ -108,7 +108,7 @@ data_clean <- function(dat_path, hap_path, n_class = 4, num_cat = 4, filter = TR
 #lldat <- data_clean(dat_path = "test.txt", hap_path = "test_hap.fa")
 
 write.table(dat_long, file = "long.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
-data_r <- rea_dat(filepath = datafile, filter = FALSE)
+data_r <- rea_dat(filepath = datafile)
 data_r %>% filter(!(idx %in% c(1:40) & ref_pos %in% c(150:200))) -> d
 d <- d %>% group_by(idx) %>% mutate_at("read_pos", function(x) x - x[1])
 data_r <- data_r %>% filter(idx <= 125)
@@ -116,8 +116,20 @@ write.table(data_r %>% filter(idx %in% c(1:10)), file = "test_30.txt", quote = F
 ##### add fake information for mnlogit format
 data_rR <- data_r %>% filter(!(idx %in% c(1298, 1647, 1170, 1617, 1261, 1371, 220)))
 write.table(d, file = "test_28.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
-######### DATA:
-data_
+######### make fastq:
+a <- vector()
+for(i in 1:length(data_r$qua)) {
+  a[i] <- intToUtf8(data_r$qua[i] + 33)
+}
+data_r$quality <- a
+fil = "./test.fastq"
+for(i in 1:length(unique(data_r$idx))) {
+  subset <- data_r %>% filter(idx == i)
+  cat(paste0("@", i), "\n", file = fil, append = TRUE)
+  cat(subset$read_nuc, "\n", sep = "", file = fil, append = TRUE)
+  cat("+", "\n", file = fil, append = TRUE)
+  cat(subset$quality, "\n", sep = "", file = fil, append = TRUE)
+}
 ######   idx   nuc   hap_nuc hap_name read_pos ref_pos qua mode
 ######    1     C       C       1        0       0     33   1
 #####     1     C       C       2        0       0     33   1

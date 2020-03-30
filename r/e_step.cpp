@@ -33,6 +33,7 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
   IntegerVector length = dat_info["length"];
   IntegerVector index = dat_info["start_id"];
   IntegerMatrix ref_index = dat_info["ref_idx"];
+  int hap_min_pos = dat_info["ref_start"];
   
   NumericVector hap_nuc(MLOGIT_CLASS);
   NumericVector hnuc_qua(MLOGIT_CLASS);
@@ -47,7 +48,7 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
     //Rprintf("j %d, position %d\n", j, index[i] + j);
     read_pos_in = read_pos[index[i] + j];
     qua_in = qua[index[i] + j];
-    ref_pos_in = ref_pos[index[i] + j];
+    ref_pos_in = ref_pos[index[i] + j]; 
     
     if(haplotype(K, ref_pos_in) == 4)
       continue;
@@ -56,14 +57,14 @@ double site_likelihood (unsigned int i, unsigned int K, NumericMatrix beta, unsi
       hnuc_qua[l] = 0;
     }
     //Rcout << "haplotype " << haplotype(K, ref_pos_in) << "\t";
-    
-    if(haplotype(K, ref_pos_in) == 1) {
+    //IF THE ALIGNMENT DOES NOT START FROM 0: - hap_min_pos
+    if(haplotype(K, ref_pos_in - hap_min_pos) == 1) {
       hap_nuc[0] = 1;
       hnuc_qua[0] = qua_in;
-    } else if(haplotype(K, ref_pos_in) == 3) {
+    } else if(haplotype(K, ref_pos_in - hap_min_pos) == 3) {
       hap_nuc[1] = 1;
       hnuc_qua[1] = qua_in;
-    } else if(haplotype(K, ref_pos_in) == 2) {
+    } else if(haplotype(K, ref_pos_in - hap_min_pos) == 2) {
       hap_nuc[3] = 1;
       hnuc_qua[3] = qua_in;
     }

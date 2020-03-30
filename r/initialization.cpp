@@ -28,7 +28,9 @@ List sample_hap (List dat_info, IntegerVector start, IntegerVector idx, IntegerV
   IntegerVector obs = dat_info["nuc"];
   IntegerVector length = dat_info["length"];
   int del_total = deletion["del_total"];
-  int hap_length = dat_info["ref_length_max"];
+  int hap_max_pos = dat_info["ref_length_max"];
+  int hap_min_pos = dat_info["ref_start"];
+  int hap_length = hap_max_pos - hap_min_pos;
   unsigned int i, j, m;
   unsigned int sum = 0;
   unsigned int count = 0;
@@ -65,7 +67,7 @@ List sample_hap (List dat_info, IntegerVector start, IntegerVector idx, IntegerV
   
   List ls = List::create(
     Named("hap") = hap_nuc,
-    Named("deletion_pos") = hap_ref_pos,
+    Named("deletion_pos") = hap_ref_pos, // this position is relative to the alignment start position
     Named("hap_deletion_len") = hap_deletion_len,
     Named("hap_del_start_id") = strat_id);
   return ls;

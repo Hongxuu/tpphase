@@ -300,9 +300,11 @@ List read_data(std::string path, unsigned int old_v) {
     //fake_length[i] = length[i] + del_length_all[i] + ref_pos[index[i]];
   }
   
-  int max_len = 0;
+  int max_len = 0; // largest position of reference
+  int min_len = 0; // smallest position of reference
+  min_len = min(ref_pos);
   int over_hapmax = 0; // indicate if the length of reads is more than the hap_max
-  if(old_v == 1) {
+  if(old_v == 1) { // use the old version for genotyping targeted region not WGS [the starting aligned position has to be 0]
     /* find the longest reference position && appears more than no. of classes (4) */
     List uni_map = unique_map(ref_pos);
     max_len = top_n_map(uni_map);
@@ -311,23 +313,21 @@ List read_data(std::string path, unsigned int old_v) {
         over_hapmax = 1;
         break;
       }
-  } else {
-    for(i = 0; i < total; ++i)
-      if (max_len < ref_pos[i])
-        max_len = ref_pos[i];
+  } else { // for WGS
+    max_len = max(ref_pos);
   }
   max_len = max_len + 1;
   
-  IntegerMatrix ref_index(n_observation, max_len);
+  IntegerMatrix ref_index(n_observation, max_len - min_len);
   for(i = 0; i < n_observation; ++i)
-     for(m = 0; m < max_len; ++m)
+     for(m = 0; m < max_len - min_len; ++m)
       ref_index(i, m) = -1;
     
   /* Find the index of ref position under different read of every j */
   for(i = 0; i < n_observation; ++i)
-    for(m = 0; m < max_len; ++m)
+    for(m = 0; m < max_len - min_len; ++m)
       for(j = 0; j < length[i]; ++j)
-        if(ref_pos[index[i] + j] == m) {
+        if(ref_pos[index[i] + j] == m + min_len) {
           ref_index(i, m) = j;
           break;
         }
@@ -336,9 +336,9 @@ List read_data(std::string path, unsigned int old_v) {
   // unsigned int num;
   // for (m = 0; m < max_len; ++m) {
   //   num = 0;
-  //     for(i = 0; i < n_observation; ++i)
-  //       if (ref_index(i, m) == -1)
-  //         num++;
+  //   for(i = 0; i < n_observation; ++i)
+  //     if (ref_index(i, m) == -1)
+  //       num++;
   //     if (num == n_observation)
   //       non_covered_site[m] = 1;
   // }
@@ -375,17 +375,19 @@ List read_data(std::string path, unsigned int old_v) {
     Named("fake_length") = fake_length, 
     Named("total") = total,
     Named("start_id") = index,
+    Named("ref_start") = min_len,
     Named("ref_length_max") = max_len, 
     Named("ref_idx") = ref_index, 
     Named("over_hapmax") = over_hapmax,
     // Named("non_covered_site") = non_covered_site,
-    Named("deletion") = del,
-    Named("insertion") = ins);
+    Named("deletion") = del);
+    // Named("insertion") = ins); no insertion for now
   
   return ls;
 }
 
 //prepare data for mnlogit, mnlogit only takes data without indels in read or in haplotypes
+//time_pos is used when calling hmm method
 // [[Rcpp::export]]
 DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1) {
   unsigned int i, k, l;
@@ -393,7 +395,7 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1)
   size_t input_arr_sz = sizeof input_arr / sizeof *input_arr;
   
   int total = dat_info["total"];
-  int hap_length = dat_info["ref_length_max"];
+  int hap_max_pos = dat_info["ref_length_max"];
   IntegerVector qua = dat_info["qua"];
   IntegerVector obs = dat_info["nuc"];
   IntegerVector obs_index = dat_info["id"];
@@ -418,7 +420,7 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1)
           r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i] - time_pos); 
         } else {
           // the reference position might be longer than the sampled haplotypes
-          if(ref_pos[i] > hap_length - 1)
+          if(ref_pos[i] > hap_max_pos - 1)
             r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = -1;
           else
             r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i]); 
@@ -497,6 +499,13 @@ IntegerMatrix Twopossible(IntegerVector a) {
   return(as<IntegerMatrix>(temp));
 }
 
+IntegerMatrix Fourpossible(IntegerVector small, int big) {
+  IntegerVector temp = {small[0], small[1], big, big, small[1], small[0], big, big,
+                        big, big, small[0], small[1], big, big, small[1], small[0]};
+  temp.attr("dim") = Dimension(4, 4);
+  return(as<IntegerMatrix>(temp));
+}
+
 IntegerMatrix call_permute_N(vector<int> a, unsigned int genome_A) {
   Permutation per;
   vector<vector<int> > res =  per.permuteUnique(a);
@@ -517,33 +526,91 @@ IntegerMatrix call_permute_N(vector<int> a, unsigned int genome_A) {
   return(wrap(out));
 }
 
-List aux_noN(IntegerVector sum_site, IntegerVector hap_site, unsigned int which_stage) {
-  List out(2);
+List aux_noN_S2(IntegerVector sum_site, IntegerVector hap_site) {
+  
   int n_row;
   double sum;
   IntegerMatrix temp;
-  if (which_stage == 2) {
-    sum = sum_site[1] + sum_site[0];
-    if (sum_site[0]/sum <= 0.38) { //1st one appears 3 times
-      temp = call_permute({hap_site[0], hap_site[1], hap_site[1], hap_site[1]});
-      n_row = 4;
-    } else if (sum_site[0]/sum >= 0.62) {//2nd one appears 3 times
-      temp = call_permute({hap_site[0], hap_site[0], hap_site[0], hap_site[1]});
-      n_row = 4;
-    } else { // the possibility of occuring ACAC is small? so elimiate this possibility???
-      temp = Twopossible(hap_site);
-      n_row = 2;
-    }
+  
+  sum = sum_site[1] + sum_site[0];
+  if (sum_site[0]/sum <= 0.38) { //1st one appears 3 times
+    temp = call_permute({hap_site[0], hap_site[1], hap_site[1], hap_site[1]});
+    n_row = 4;
+  } else if (sum_site[0]/sum >= 0.62) {//2nd one appears 3 times
+    temp = call_permute({hap_site[0], hap_site[0], hap_site[0], hap_site[1]});
+    n_row = 4;
+  } else { // the possibility of occuring ACAC is small? so elimiate this possibility???
+    temp = Twopossible(hap_site);
+    n_row = 2;
   }
-  if(which_stage == 3) {
-    sum = sum_site[2] + sum_site[1] + sum_site[0];
-    if (sum_site[0]/sum >= 0.45) {
-      temp = call_permute({hap_site[0], hap_site[0], hap_site[1], hap_site[2]});
-    } else if(sum_site[1]/sum >= 0.45) {
-      temp = call_permute({hap_site[0], hap_site[1], hap_site[1], hap_site[2]});
-    } else {
-      temp = call_permute({hap_site[0], hap_site[1], hap_site[2], hap_site[2]});
-    }
+  
+  List ls = List::create(
+    Named("n_row") = n_row,
+    Named("temp") = temp);
+  return ls; 
+}
+
+List aux_noN_S3(IntegerVector sum_site, IntegerVector hap_site) {
+  int n_row;
+  double sum;
+  IntegerMatrix temp;
+  List from_2(2);
+
+  sum = sum_site[2] + sum_site[1] + sum_site[0];
+  double p0 = sum_site[0]/sum;
+  double p1 = sum_site[1]/sum;
+  double p2 = sum_site[2]/sum;
+  IntegerVector small(2);
+  IntegerVector small_count(2);
+  // different ceriterion to reduce the possibilities, basically rule out things like ATAG
+  if (((sum_site[2] + sum_site[1])/sum_site[0] <= 1.2 && (sum_site[2] + sum_site[1])/sum_site[0] >= 0.8) ||
+      (sum_site[0]/sum >= 0.45)) {
+    small = {hap_site[1], hap_site[2]};
+    temp = Fourpossible(small, hap_site[0]);
+    n_row = 4;
+  } else if (((sum_site[1] + sum_site[0])/sum_site[2] <= 1.2 && (sum_site[0] + sum_site[1])/sum_site[2] >= 0.8) ||
+    (sum_site[2]/sum >= 0.45)) {
+    small = {hap_site[1], hap_site[0]};
+    temp = Fourpossible(small, hap_site[2]);
+    n_row = 4;
+  } else if (((sum_site[2] + sum_site[0])/sum_site[1] <= 1.2 && (sum_site[0] + sum_site[2])/sum_site[1] >= 0.8) ||
+    (sum_site[1]/sum >= 0.45)) {
+    small = {hap_site[2], hap_site[0]};
+    temp = Fourpossible(small, hap_site[1]);
+    n_row = 4;
+  } else if (p0 <= 0.25) {
+    small = {hap_site[1], hap_site[2]};
+    small_count = {sum_site[1], sum_site[2]};
+    List from_2 = aux_noN_S2(small_count, small);
+    IntegerMatrix ttemp = from_2["temp"];
+    temp = ttemp;
+    n_row = from_2["n_row"];
+  } else if (p1 <= 0.25) {
+    small = {hap_site[0], hap_site[2]};
+    small_count = {sum_site[0], sum_site[2]};
+    List from_2 = aux_noN_S2(small_count, small);
+    IntegerMatrix ttemp = from_2["temp"];
+    temp = ttemp;
+    n_row = from_2["n_row"];
+  } else if (p2 <= 0.25) {
+    small = {hap_site[0], hap_site[1]};
+    small_count = {sum_site[0], sum_site[1]};
+    List from_2 = aux_noN_S2(small_count, small);
+    IntegerMatrix ttemp = from_2["temp"];
+    temp = ttemp;
+    n_row = from_2["n_row"];
+  } else { //hopefully this won't happen, when three roughly equal happens
+    small = {hap_site[1], hap_site[2]};
+    temp = Fourpossible(small, hap_site[0]);
+    arma::mat m1 = as<arma::mat>(temp);
+    small = {hap_site[1], hap_site[0]};
+    temp = Fourpossible(small, hap_site[2]);
+    arma::mat m2 = as<arma::mat>(temp);
+    small = {hap_site[2], hap_site[0]};
+    temp = Fourpossible(small, hap_site[1]);
+    arma::mat m3 = as<arma::mat>(temp);
+    arma::mat out = join_cols(m1, m2, m3);
+    temp = wrap(out);
     n_row = 12;
   }
   List ls = List::create(
@@ -552,24 +619,27 @@ List aux_noN(IntegerVector sum_site, IntegerVector hap_site, unsigned int which_
   return ls; 
 }
 
-
 // [[Rcpp::export]] 
 List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
   unsigned int i, j, t, l, m;
-  int n_observation = dat_info["n_observation"];
   unsigned int total = dat_info["total"];
-  unsigned int hap_length = dat_info["ref_length_max"];
+  int n_observation = dat_info["n_observation"];
+  int hap_max_pos = dat_info["ref_length_max"];
+  int hap_min_pos = dat_info["ref_start"];
+  int hap_length = hap_max_pos - hap_min_pos;
   IntegerMatrix ref_index = dat_info["ref_idx"];
   IntegerVector ref_pos = dat_info["ref_pos"];
   IntegerVector index = dat_info["start_id"];
   IntegerVector fake_length = dat_info["fake_length"];
   IntegerVector length = dat_info["length"];
   IntegerVector obs = dat_info["nuc"];
+  
   /* Find the number of reads with alignment start from each t (hash) */
   IntegerVector read_start(n_observation);
   for(i = 0; i < n_observation; ++i)
     read_start(i) = ref_pos[index[i]];
-  List start_t = unique_map(read_start);
+  
+  List start_t = unique_map(read_start); // start might not from 0 (e.g. ailgnment starts from 2)
   IntegerVector n_t = start_t["lengths"];
   IntegerVector time_pos = start_t["values"];
   
@@ -621,27 +691,36 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
   IntegerVector pos_possibility(hap_length);
   IntegerVector undecided_pos(hap_length);
   for (j = 0; j < hap_length; ++j) {
+    unsigned int ref_j = j + hap_min_pos;
+    
     count = 0;
     for (i = 0; i < n_observation; ++i)
-      if((j >= ref_pos[index[i]]) && (j <= ref_pos[index[i] + length[i] - 1])) {
+      if((ref_j >= ref_pos[index[i]]) && (ref_j <= ref_pos[index[i] + length[i] - 1])) {
         if(ref_index(i, j) == -1) {
           nuc_j(count++) = -1;
         } else {
           nuc_j(count++) = obs[index[i] + ref_index(i, j)];
         }
       }
-    /* get the nuc table at each site */  
-    nuc = unique_map(nuc_j[Range(0, count - 1)]);
+
+    /* skip the noncovered site */
+    if(count == 0)
+      continue;
+    IntegerVector tmp_nuc = nuc_j[Range(0, count - 1)];
+
+    /* get the nuc table at each site */
+    nuc = unique_map(tmp_nuc);
     IntegerVector key = nuc["values"];
     IntegerVector val = nuc["lengths"];
     num = 0;
+    
     /* remove some unlikely occurred nuc (notice the situation that only - appears) */
     for(t = 0; t < val.length(); ++t)
       if(val[t] >= prop(j)) {
         keys(num) = key(t);
         vals(num++) = val(t);
       }
-      
+    // if only deletion appears
     if(num == 1 && keys[0] == -1) {
       nuc_unique[j] = key[Range(0, 1)];
       nuc_count[j] = val[Range(0, 1)];
@@ -650,47 +729,47 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
       nuc_unique[j] = keys[Range(0, num - 1)];
       nuc_count[j] = vals[Range(0, num - 1)];
     }
-    
+
     IntegerVector hap_site = nuc_unique[j];
     IntegerVector sum_site = nuc_count[j];
     double sum;
-    
+
     //record possible hidden states[only suitable for ployploids]
     if (num == 1) {
       IntegerVector temp = {hap_site[0], hap_site[0], hap_site[0], hap_site[0]};
       haplotype(j) = temp;
       n_row[j] = 1;
-    } 
+    }
     else if (num == 2) {
       if(hap_site[0] == -1) {
         IntegerVector temp(NUM_CLASS);
-        if(uni_alignment[j] == "I") 
+        if(uni_alignment[ref_j] == "I")
           temp = {-1, -1, hap_site[1], hap_site[1]};
-        else if(uni_alignment[j] == "J")
+        else if(uni_alignment[ref_j] == "J")
           temp = {hap_site[1], hap_site[1], -1, -1};
         else
           temp = {hap_site[1], hap_site[1], hap_site[1], hap_site[1]};
         haplotype(j) = temp;
         n_row[j] = 1;
       } else { // if N not appears
-        List out = aux_noN(sum_site, hap_site, 2);
+        List out = aux_noN_S2(sum_site, hap_site);
         haplotype(j) = out["temp"];
         n_row[j] = out["n_row"];
-        undecided_pos(more_than1) = j;
+        undecided_pos(more_than1) = j; // relative to the haplotype currently try to infer (alignment start from 0)
         pos_possibility(more_than1++) = n_row[j];
       }
-    } 
+    }
     else if (num == 3) {
       sum = sum_site[2] + sum_site[1] + sum_site[0];
       if (hap_site[0] == -1) {
         // if N appears, 4 possibilities
         if(sum_site[0]/sum >= 0.45) {
           IntegerVector temp(2 * NUM_CLASS);
-          if (uni_alignment[j] == "I")
+          if (uni_alignment[ref_j] == "I")
             temp = {-1, -1,  -1, -1, hap_site[1], hap_site[2], //J in universal alignment
                    hap_site[2], hap_site[1]};
-          else if(uni_alignment[j] == "J")
-            temp = {hap_site[1], hap_site[2], hap_site[2],hap_site[1],  //I in universal alignment                                       
+          else if(uni_alignment[ref_j] == "J")
+            temp = {hap_site[1], hap_site[2], hap_site[2],hap_site[1],  //I in universal alignment
                     -1,  -1,  -1, -1};
           temp.attr("dim") = Dimension(2, 4); // by column
           haplotype(j) = temp;
@@ -698,12 +777,12 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
         } else {
           IntegerVector sum_site_cleaned = {sum_site[1], sum_site[2]};
           IntegerVector hap_site_cleaned = {hap_site[1], hap_site[2]};
-          List out = aux_noN(sum_site_cleaned, hap_site_cleaned, 2);
+          List out = aux_noN_S2(sum_site_cleaned, hap_site_cleaned);
           haplotype(j) = out["temp"];
           n_row[j] = out["n_row"];
         }
       } else {
-        List out = aux_noN(sum_site, hap_site, 3);
+        List out = aux_noN_S3(sum_site, hap_site);
         haplotype(j) = out["temp"];
         n_row[j] = out["n_row"];
       }
@@ -718,9 +797,9 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
           IntegerMatrix inner_tmp(2, NUM_CLASS);
           for(l = 0; l < num; ++l)
             for(m = l + 1; m < num; ++m) {
-              if(uni_alignment[j] == "I") //deletion in B genome
+              if(uni_alignment[ref_j] == "I") //deletion in B genome
                 inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 0);
-              else if(uni_alignment[j] == "J")
+              else if(uni_alignment[ref_j] == "J")
                 inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 1);
               temp = join_cols(temp, as<arma::mat>(inner_tmp));
             }
@@ -729,7 +808,7 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
         } else {
           IntegerVector sum_site_cleaned = {sum_site[1], sum_site[2], sum_site[3]};
           IntegerVector hap_site_cleaned = {hap_site[1], hap_site[2], hap_site[3]};
-          List out = aux_noN(sum_site_cleaned, hap_site_cleaned, 3);
+          List out = aux_noN_S3(sum_site_cleaned, hap_site_cleaned);
           haplotype(j) = out["temp"];
           n_row[j] = out["n_row"];
         }
@@ -741,25 +820,11 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
       undecided_pos(more_than1) = j;
       pos_possibility(more_than1++) = n_row[j];
     }
-    // else if(num == 5) {//which is not likely
-    //   arma::mat temp;
-    //   IntegerMatrix inner_tmp(2, NUM_CLASS);
-    //   for(l = 0; l < num; ++l)
-    //     for(m = l + 1; m < num; ++m) {
-    //       if(uni_alignment[j] == "I") //deletion in B genome
-    //         inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 0);
-    //       if(uni_alignment[j] == "J")
-    //         inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 1);
-    //       temp = join_cols(temp, as<arma::mat>(inner_tmp));
-    //     }
-    //   haplotype(j) = wrap(temp);
-    //   n_row[j] = 2;
-    // }
   }
   // find the number of hidden states at each t
   IntegerVector num_states(t_max, 1);
   for(t = 0; t < t_max; ++t)
-    for(j = time_pos[t]; j < time_pos[t] + p_tmax[t]; ++j)
+    for(j = time_pos[t] - hap_min_pos; j < time_pos[t] + p_tmax[t] - hap_min_pos; ++j)
       num_states[t] *= n_row[j];
   
  // compute the number of hidden states
