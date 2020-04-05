@@ -9,6 +9,9 @@ CharacterVector iupac_to_char = {"-", "A", "C", "M", "G", "R", "S", "V",
 List make_universal(List alignment, unsigned int for_hmm, int ref_idx = -1) { 
   IntegerVector reads = alignment["reads"];
   IntegerVector dim = alignment["dim"];
+  
+  if(dim.length() == 2) // if only give one alignment
+    dim[0] = dim[1];
   unsigned int i, j, m;
   unsigned int n_alignment = dim.length()/N_GENOME;
   List universal(n_alignment);
@@ -38,7 +41,7 @@ List make_universal(List alignment, unsigned int for_hmm, int ref_idx = -1) {
         } else
           uni_alignment[j] = "M";
       } else {
-        //Rcout << idx << "\t" << idx + dim[i * N_GENOME] << "\n";
+        // Rcout << idx << "\t" << idx + dim[i * N_GENOME] << "\n";
         if(reads[idx] == reads[idx + dim[i * N_GENOME]]) {
           uni_alignment[j] = seq[idx];
         } else {

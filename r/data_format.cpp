@@ -704,7 +704,7 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
           nuc_j(count++) = obs[index[i] + ref_index(i, j)];
         }
       }
-
+    
     /* skip the noncovered site */
     if(count == 0)
       continue;
@@ -722,20 +722,21 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment) {
         keys(num) = key(t);
         vals(num++) = val(t);
       }
+    
     // if only deletion appears
     if(num == 1 && keys[0] == -1) {
       nuc_unique[j] = key[Range(0, 1)];
       nuc_count[j] = val[Range(0, 1)];
-      num++;
+      num++; //for using the codition num == 2
     } else {
       nuc_unique[j] = keys[Range(0, num - 1)];
       nuc_count[j] = vals[Range(0, num - 1)];
     }
-
+    
     IntegerVector hap_site = nuc_unique[j];
     IntegerVector sum_site = nuc_count[j];
     double sum;
-
+    
     //record possible hidden states[only suitable for ployploids]
     if (num == 1) {
       IntegerVector temp = {hap_site[0], hap_site[0], hap_site[0], hap_site[0]};
