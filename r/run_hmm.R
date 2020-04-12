@@ -23,12 +23,13 @@ sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
 ##### targeted data
+
 ## read the data
-samfile = "../../data/tpphase_res_consensus/WGS/ch8.1_sub.sam"
-ref_name = "ch81"
+samfile = "../../data/tpphase_res_consensus/WGS/test.sam"
+ref_name = "target.1"
 fastq_file = "./res.fastq"
 datafile = "./res.txt"
-alignment = "../../data/tpphase_res_consensus/WGS/ch8.fasta"
+alignment = "../../data/tpphase_res_consensus/WGS/test.fasta"
 
 #######
 formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc
@@ -51,16 +52,20 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   
   ## make universial reference
   align <- read_fasta(alignment)
-  ref_name = "ch8.1"
   ref_in <- strsplit(ref_name, ref_delim, fixed = TRUE) %>% unlist()
-  ref_index <- ref_in[2] %>% as.integer() - 1 ## index in C
-  universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = ref_index)
+  if(length(align$dim) == 2) #only read in one reference
+    universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = 0)
+  else { ## read in many reference, take the one we want
+    ref_index <- ref_in[2] %>% as.integer() - 1 ## index in C
+    universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = ref_index)
+  }
   universial <- Filter(Negate(is.null), universial) %>% unlist()
   rm(align)
   
   ## prepare data
   dat_info <- read_data(datafile, old_v = old_version)
   HMM <- hmm_info(dat_info = dat_info, cut_off = 0.16, uni_alignment = universial)
+  
   ## initialize hap
   hap_length <- dat_info$ref_length_max - dat_info$ref_start
   hap_info <- sample_hap2(hmm_info = HMM, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
@@ -131,8 +136,3 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   res$snp_location <- snp_location
   fnlist(res, fil = "./test.res")
 }
-
-uni <- read_fasta("../../data/peanut_consensus/picked.fasta")
-make_universal(alignment = uni, for_hmm = 0) -> test
-write_fasta(test, names = "target.1")
-

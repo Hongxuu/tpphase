@@ -290,6 +290,7 @@ IntegerMatrix call_cart_product(IntegerVector len) {
 /*
  * Fill the positions without variation
  */
+// [[Rcpp::export]]
 IntegerMatrix fill_all_hap(List hidden_states, unsigned int hap_length, IntegerVector n_row) {
   unsigned int j, k;
   IntegerMatrix haplotype(NUM_CLASS, hap_length);
@@ -478,7 +479,7 @@ List sub_sample(List hmm_info, List dat_info) {
   unsigned int id, len, total;
   for(t = 0; t < t_max; ++t) {
     len = 0;
-    List dat_info_t;
+    List dat_info_t(7);
     IntegerVector idx = n_in_t[t];
     for(i = 0; i < n_t[t]; ++i) {
       id = idx[i];
@@ -527,8 +528,8 @@ DataFrame format_data2(List hmm_info, List d_info, List hap_info) {
   unsigned int total = 0;
   for(t = 0; t < t_max; ++t) {
     List data_info = subsample(t);
-    unsigned int num = data_info["total"];
-    total += num_states[t] * num * MLOGIT_CLASS * NUM_CLASS;
+    unsigned int tt = data_info["total"];
+    total += num_states[t] * tt * MLOGIT_CLASS * NUM_CLASS;
   }
   
   IntegerVector r_ref_pos(total);
@@ -546,7 +547,6 @@ DataFrame format_data2(List hmm_info, List d_info, List hap_info) {
     unsigned int num = data_info["total"];
     unsigned int len = num * MLOGIT_CLASS * NUM_CLASS;
     for(m = 0; m < num_states[t]; ++m) {
-      //Rcout << m << "\n";
       IntegerMatrix haplotype = full_hap_t(m);
       DataFrame df = format_data(data_info, haplotype, time_pos[t]);
       IntegerVector ref_pos = df["ref_pos"];

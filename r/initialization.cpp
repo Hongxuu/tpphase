@@ -6,7 +6,7 @@
 
 #include "baumwelch.h"
 
-using namespace Rcpp;
+using namespace RcppArmadillo;
 using namespace std;
 
 #define MLOGIT_CLASS 4
@@ -94,8 +94,9 @@ List sample_hap2(List hmm_info, unsigned int hap_length, int hap_min_pos)
   IntegerMatrix combination = comb_info["combination"];
   unsigned int num = comb_info["num"];
   unsigned int total = combination.nrow();
-  m = R::runif(0, total - 1);
-  IntegerMatrix haplotype_out = make_hap(hidden_states, haplotype, location, hap_length, combination(m, _), time_pos[0], num, hap_min_pos);
+  IntegerVector mm = sample(total, 1);
+  m = mm[0];
+  IntegerMatrix haplotype_out = make_hap(hidden_states, haplotype, location, hap_length, combination(m, _), hap_min_pos, num, hap_min_pos);
   
   int gap_in = 0;
   for(k = 0; k < NUM_CLASS; ++k) 

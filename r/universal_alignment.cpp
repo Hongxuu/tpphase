@@ -34,6 +34,7 @@ List make_universal(List alignment, unsigned int for_hmm, int ref_idx = -1) {
     for(j = 0; j < dim[i * N_GENOME]; ++j) {
       idx = j + start_id[i];
       if(for_hmm) {
+        Rcout << reads[idx] << "\t" << reads[idx + dim[i * N_GENOME]] << "\n";
         if(reads[idx] == 0 && reads[idx + dim[i * N_GENOME]] != 0) {
           uni_alignment[j] = "J";
         } else if(reads[idx] != 0 && reads[idx + dim[i * N_GENOME]] == 0) {
