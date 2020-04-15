@@ -429,7 +429,6 @@ List full_hap(List hmm_info, IntegerMatrix linkage_info, unsigned int hap_length
 
 List compute_emit(List hmm_info, List dat_info, List hap_info, NumericMatrix beta, NumericVector eta, int PD_LENGTH) 
 {
-  List hidden_states = hmm_info["hidden_states"];
   IntegerVector num_states = hmm_info["num_states"];
   IntegerVector n_t = hmm_info["n_t"];
   List n_in_t = hmm_info["n_in_t"];
@@ -442,7 +441,7 @@ List compute_emit(List hmm_info, List dat_info, List hap_info, NumericMatrix bet
   List emit(t_max);
   NumericVector weight_llk(NUM_CLASS);
   // compute emission based on the initial value of eta and beta
-  for(t = 0; t < t_max; ++t){
+  for(t = 0; t < t_max; ++t) {
     // give h_t, each t has many possible combinations
     List full_hap_t = hap_info(t);
     List w_icm(num_states[t]);
