@@ -7,6 +7,7 @@
 using namespace Rcpp;
 using namespace std;
 #define NUM_CLASS 4
+#define LINKAGE_LEN 2
 
 class Permutation {
 public:
@@ -259,40 +260,90 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
   return(ls);
 }
 
+List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector location,
+                         IntegerMatrix linkage_info, unsigned int num, unsigned int start_idx, unsigned int num_states) {
+  unsigned int i, j, k, idx, m;
+  unsigned int n_observation = linkage_info.nrow();
+  IntegerMatrix sub_hap(NUM_CLASS, num);
+  IntegerMatrix sub_link = linkage_info(_, Range(start_idx, start_idx + num - 1));
+  IntegerVector exclude(num_states);
+  int count, linkage_len, all_excluded;
+  linkage_len = num/2;
+  
+  all_excluded = num_states;
+  while (all_excluded == num_states) {
+    all_excluded = 0;
+    // Rcout << "linkage length " << linkage_len << "\n"; //actual linkage length + 1
+    for (m = 0; m < num_states; ++m) {
+      exclude(m) = 0;
+      IntegerVector comb = combination(m, _);
+      count = 0;
+      for (k = 0; k < NUM_CLASS; ++k) {
+        for (j = 0; j < num; ++j) {
+          IntegerMatrix hidden = hidden_states[location[j]];
+          idx = comb[j];
+          sub_hap(k, j) = hidden(idx, k);
+        }
+        for (i = 0; i < n_observation; i++) {
+          int flag = 0;
+          for (j = 0; j < num - 1; ++j) {
+            // if (sub_link(i, j) != -1 && sub_link(i, j) != 4)
+            if (sub_hap(k, j) == sub_link(i, j) && sub_hap(k, j + 1) == sub_link(i, j + 1))
+              flag++;
+          }
+          if (flag == linkage_len) {
+            count++;
+            break;
+          }
+        }
+      }
+      if (count != NUM_CLASS) {
+        exclude(m) = 1;
+        all_excluded++;
+      }
+    }
+    linkage_len--;
+  }
+  List out = List::create(
+    Named("num_states") = num_states - all_excluded,
+    Named("exclude") = exclude);
+  return(out);
+}
+
 /*
  * determine the hidden state by each time t, only use this on the first time t, then, the rest non_overlapped still use site by site
  */
-List tbt_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, IntegerVector sum_site, 
-               List hmm_info, List dat_info) {
-  
-  List n_in_t = hmm_info["n_in_t"];
-  IntegerVector n_t = hmm_info["n_t"];
-  IntegerVector length = dat_info["length"];
-  IntegerVector obs = dat_info["nuc"];
-  IntegerVector obs_index = dat_info["id"];
-  IntegerVector time_pos = hmm_info["time_pos"];
-  IntegerVector p_tmax = hmm_info["p_tmax"];
-  IntegerVector index = dat_info["start_id"];
-  int hap_max_pos = dat_info["ref_length_max"];
-  int hap_min_pos = dat_info["ref_start"];
-  int hap_length = hap_max_pos - hap_min_pos;
-  unsigned int t_max = hmm_info["t_max"];
-  unsigned int qua_in, obs_in;
-  // hash the reads at the first time position
-  std::string outfile = "./out.fasta";
-  FILE *fp = fopen(outfile.c_str(), "w");
-  if (!fp)
-    stop("Cannot open file");
-  
-  for (unsigned int i = 0; i < n_t[0]; ++i) {
-    int ind = n_in_t[i];
-    for (unsigned int j = 0; j < length[ind]; ++j) {
-      // qua_in = qua[index[ind] + j];
-      obs_in = obs[index[ind] + j];
-    }
-  }
-  
-}
+// List tbt_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, IntegerVector sum_site, 
+//                List hmm_info, List dat_info) {
+//   
+//   List n_in_t = hmm_info["n_in_t"];
+//   IntegerVector n_t = hmm_info["n_t"];
+//   IntegerVector length = dat_info["length"];
+//   IntegerVector obs = dat_info["nuc"];
+//   IntegerVector obs_index = dat_info["id"];
+//   IntegerVector time_pos = hmm_info["time_pos"];
+//   IntegerVector p_tmax = hmm_info["p_tmax"];
+//   IntegerVector index = dat_info["start_id"];
+//   int hap_max_pos = dat_info["ref_length_max"];
+//   int hap_min_pos = dat_info["ref_start"];
+//   int hap_length = hap_max_pos - hap_min_pos;
+//   unsigned int t_max = hmm_info["t_max"];
+//   unsigned int qua_in, obs_in;
+//   // hash the reads at the first time position
+//   std::string outfile = "./out.fasta";
+//   FILE *fp = fopen(outfile.c_str(), "w");
+//   if (!fp)
+//     stop("Cannot open file");
+//   
+//   for (unsigned int i = 0; i < n_t[0]; ++i) {
+//     int ind = n_in_t[i];
+//     for (unsigned int j = 0; j < length[ind]; ++j) {
+//       // qua_in = qua[index[ind] + j];
+//       obs_in = obs[index[ind] + j];
+//     }
+//   }
+//   
+// }
 
 
 

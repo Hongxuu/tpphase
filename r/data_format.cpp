@@ -307,12 +307,12 @@ List read_data(std::string path, unsigned int old_v) {
   }
   max_len = max_len + 1;
   
-  IntegerMatrix ref_index(n_observation, max_len - min_len);
+  IntegerMatrix ref_index(n_observation, max_len - min_len); // start from the first aligned pos
   for(i = 0; i < n_observation; ++i)
      for(m = 0; m < max_len - min_len; ++m)
       ref_index(i, m) = -1;
     
-  /* Find the index of ref position under different read of every j */
+  /* Find the index of ref position under different read of every j, which ref pos aligned to which read pos */
   for(i = 0; i < n_observation; ++i)
     for(m = 0; m < max_len - min_len; ++m)
       for(j = 0; j < length[i]; ++j)
@@ -321,16 +321,16 @@ List read_data(std::string path, unsigned int old_v) {
           break;
         }
   
-  // IntegerVector non_covered_site(max_len);
-  // unsigned int num;
-  // for (m = 0; m < max_len; ++m) {
-  //   num = 0;
-  //   for(i = 0; i < n_observation; ++i)
-  //     if (ref_index(i, m) == -1)
-  //       num++;
-  //     if (num == n_observation)
-  //       non_covered_site[m] = 1;
-  // }
+  IntegerVector non_covered_site(max_len- min_len);
+  unsigned int num;
+  for (m = 0; m < max_len - min_len; ++m) {
+    num = 0;
+    for(i = 0; i < n_observation; ++i)
+      if (ref_index(i, m) == -1)
+        num++;
+      if (num == n_observation)
+        non_covered_site[m] = 1;
+  }
         
   List del = List::create(
     Named("del_id") = del_id[Range(0, del_num - 1)],
@@ -368,7 +368,7 @@ List read_data(std::string path, unsigned int old_v) {
     Named("ref_length_max") = max_len, 
     Named("ref_idx") = ref_index, 
     Named("over_hapmax") = over_hapmax,
-    // Named("non_covered_site") = non_covered_site,
+    Named("non_covered_site") = non_covered_site,
     Named("deletion") = del);
     // Named("insertion") = ins); no insertion for now
   
@@ -385,7 +385,6 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1)
   
   int total = dat_info["total"];
   int hap_max_pos = dat_info["ref_length_max"];
-  int hap_min_pos = dat_info["ref_start"];
   // int hap_length = hap_max_pos - hap_min_pos;
   IntegerVector qua = dat_info["qua"];
   IntegerVector obs = dat_info["nuc"];
@@ -410,6 +409,7 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1)
           //Rcout << haplotype(k, ref_pos[i] - time_pos) << "\t"; Both ref_pos[i] and time_pos has the starting aligned location
           r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = haplotype(k, ref_pos[i] - time_pos); 
         } else {
+          int hap_min_pos = dat_info["ref_start"];
           // the reference position might be longer than the sampled haplotypes
           if(ref_pos[i] > hap_max_pos - 1)
             r_hap_nuc[i * MLOGIT_CLASS * NUM_CLASS + MLOGIT_CLASS * k + l] = -1;
@@ -487,7 +487,7 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
   IntegerVector fake_length = dat_info["fake_length"];
   IntegerVector length = dat_info["length"];
   IntegerVector obs = dat_info["nuc"];
-  
+  IntegerVector non_covered = dat_info["non_covered_site"];
   /* Find the number of reads with alignment start from each t (hash) */
   IntegerVector read_start(n_observation);
   for(i = 0; i < n_observation; ++i)
@@ -545,57 +545,65 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
   IntegerVector pos_possibility(hap_length);
   IntegerVector undecided_pos(hap_length);
   for (j = 0; j < hap_length; ++j) {
-    unsigned int ref_j = j + hap_min_pos;
-    
-    count = 0;
-    for (i = 0; i < n_observation; ++i)
-      if((ref_j >= ref_pos[index[i]]) && (ref_j <= ref_pos[index[i] + length[i] - 1])) {
-        if(ref_index(i, j) == -1) {
-          nuc_j(count++) = -1;
-        } else {
-          nuc_j(count++) = obs[index[i] + ref_index(i, j)];
+    if(!non_covered[j]) {
+      unsigned int ref_j = j + hap_min_pos;
+      
+      count = 0;
+      for (i = 0; i < n_observation; ++i)
+        if((ref_j >= ref_pos[index[i]]) && (ref_j <= ref_pos[index[i] + length[i] - 1])) {
+          if(ref_index(i, j) == -1) {
+            nuc_j(count++) = -1;
+          } else {
+            nuc_j(count++) = obs[index[i] + ref_index(i, j)];
+          }
         }
-      }
-    
-    /* skip the noncovered site */
-    if(count == 0)
-      continue;
-    IntegerVector tmp_nuc = nuc_j[Range(0, count - 1)];
-
-    /* get the nuc table at each site */
-    nuc = unique_map(tmp_nuc);
-    IntegerVector key = nuc["values"];
-    IntegerVector val = nuc["lengths"];
-    num = 0;
-    
-    /* remove some unlikely occurred nuc (notice the situation that only - appears) */
-    for(t = 0; t < val.length(); ++t)
-      if(val[t] >= prop(j)) {
-        keys(num) = key(t);
-        vals(num++) = val(t);
-      }
-    
-    // if only deletion appears
-    if(num == 1 && keys[0] == -1) {
-      nuc_unique[j] = key[Range(0, 1)];
-      nuc_count[j] = val[Range(0, 1)];
-      num++; //for using the codition num == 2
+        
+        /* skip the noncovered site */
+        if(count == 0)
+          continue;
+        IntegerVector tmp_nuc = nuc_j[Range(0, count - 1)];
+        
+        /* get the nuc table at each site */
+        nuc = unique_map(tmp_nuc);
+        IntegerVector key = nuc["values"];
+        IntegerVector val = nuc["lengths"];
+        num = 0;
+        
+        /* remove some unlikely occurred nuc (notice the situation that only - appears) */
+        for(t = 0; t < val.length(); ++t)
+          if(val[t] >= prop(j)) {
+            keys(num) = key(t);
+            vals(num++) = val(t);
+          }
+          
+          // if only deletion appears
+          if(num == 1 && keys[0] == -1) {
+            nuc_unique[j] = key[Range(0, 1)];
+            nuc_count[j] = val[Range(0, 1)];
+            num++; //for using the codition num == 2
+          } else {
+            nuc_unique[j] = keys[Range(0, num - 1)];
+            nuc_count[j] = vals[Range(0, num - 1)];
+          }
+          
+          IntegerVector hap_site = nuc_unique[j];
+          IntegerVector sum_site = nuc_count[j];
+          if(sbs) {
+            List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment);
+            n_row[j] = out["n_row"];
+            List hap_temp = out["haplotype"];
+            haplotype(j) = hap_temp[0];
+            if(n_row[j] > 1) {
+              undecided_pos(more_than1) = j; // relative to the haplotype currently try to infer (alignment start from 0)
+              pos_possibility(more_than1++) = n_row[j];
+            }
+          }
     } else {
-      nuc_unique[j] = keys[Range(0, num - 1)];
-      nuc_count[j] = vals[Range(0, num - 1)];
-    }
-    
-    IntegerVector hap_site = nuc_unique[j];
-    IntegerVector sum_site = nuc_count[j];
-    if(sbs) {
-      List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment);
-      n_row[j] = out["n_row"];
-      List hap_temp = out["haplotype"];
-      haplotype(j) = hap_temp[0];
-      if(n_row[j] > 1) {
-        undecided_pos(more_than1) = j; // relative to the haplotype currently try to infer (alignment start from 0)
-        pos_possibility(more_than1++) = n_row[j];
-      }
+      Rcout << j;
+      Rcout << " is non_covered, cannot genotype \n";
+      n_row[j] = 1;
+      IntegerVector tmp = {-1, -1, -1, -1};
+      haplotype(j) = tmp;
     }
   }
   // find the number of hidden states at each t

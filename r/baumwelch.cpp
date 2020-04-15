@@ -12,6 +12,7 @@
 
 #include "data_format.h"
 #include "baumwelch.h"
+#include "hmm_state.h"
 using namespace Rcpp;
 using namespace std;
 
@@ -321,7 +322,7 @@ List find_combination(IntegerVector undecided_pos, IntegerVector pos_possibility
     IntegerMatrix combination = call_cart_product(location_len[Range(0, num - 1)]);
     List ls = List::create(
       Named("combination") = combination, // possible comb
-      Named("num") = num, // number of comb at time t
+      Named("num") = num, // number of comb sites at time t
       Named("location") = location[Range(0, num - 1)]); // undecided site at time t [here assume alignment starts from 0]
     return(ls);
 }
@@ -343,7 +344,38 @@ IntegerMatrix make_hap(List hidden_states, IntegerMatrix haplotype, IntegerVecto
 }
 
 // [[Rcpp::export]]
-List full_hap(List hmm_info, unsigned int hap_length, int hap_min_pos) {
+IntegerMatrix linkage_info(List dat_info, IntegerVector undecided_pos) {
+  IntegerMatrix ref_index = dat_info["ref_idx"];
+  IntegerVector obs = dat_info["nuc"];
+  IntegerVector index = dat_info["start_id"];
+  IntegerVector ref_pos = dat_info["ref_pos"];
+  IntegerVector length = dat_info["length"];
+  int hap_min_pos = dat_info["ref_start"];
+  int n_observation = dat_info["n_observation"];
+  IntegerMatrix link(n_observation, undecided_pos.size());
+  unsigned int i, j;
+  int idx;
+  
+  for (j = 0; j < undecided_pos.size(); ++j) {
+    unsigned int ref_j = undecided_pos[j] + hap_min_pos;
+    for (i = 0; i < n_observation; i++) {
+      if (ref_pos[index[i]] <= ref_j && ref_j < ref_pos[index[i] + length[i] - 1]) {
+        idx = ref_index(i, ref_j - hap_min_pos); // read pos, start from 0
+        if (idx != -1)
+          link(i, j) = obs[index[i] + idx];
+        else 
+          link(i, j) = 4; // meaning deletion
+      } 
+      else 
+        link(i, j) = -1; // meaning not covered
+    }
+  }
+  return(link);
+}
+
+// function to return all the possible haps at each time t, further reduce the number of hidden states as well
+// [[Rcpp::export]]
+List full_hap(List hmm_info, IntegerMatrix linkage_info, unsigned int hap_length, int hap_min_pos) {
   List hidden_states = hmm_info["hidden_states"];
   IntegerVector num_states = hmm_info["num_states"];
   IntegerVector time_pos = hmm_info["time_pos"];
@@ -352,28 +384,47 @@ List full_hap(List hmm_info, unsigned int hap_length, int hap_min_pos) {
   IntegerVector pos_possibility = hmm_info["pos_possibility"];
   IntegerVector undecided_pos = hmm_info["undecided_pos"];
   unsigned int t_max = hmm_info["t_max"];
-  unsigned int t, m;
+  unsigned int t, m, j, start_idx = 0;
   List full_hap(t_max);
   IntegerMatrix hap = fill_all_hap(hidden_states, hap_length, n_row);
+  IntegerVector new_num_states(t_max);
   for(t = 0; t < t_max; ++t) {
-    List full_hap_t(num_states(t));
+    // find the start id for linkage_info
+    unsigned int id = time_pos[t] - hap_min_pos;
+    for(j = 0; j < undecided_pos.size(); ++j) {
+      start_idx = j;
+      if(undecided_pos[j] >= id)
+        break;
+    }
     // give h_t, each t has many possible combinations
+    List full_hap_t(num_states(t));
     if(num_states[t] != 1) {
       List comb_info = find_combination(undecided_pos, pos_possibility, p_tmax[t], time_pos[t], hap_min_pos);
       IntegerVector location = comb_info["location"];
       //Rcout << location << "\n";
       IntegerMatrix combination = comb_info["combination"];
       unsigned int num = comb_info["num"];
-      for(m = 0; m < num_states[t]; ++m) {
-        IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[t], combination(m, _), time_pos[t], num, hap_min_pos);
-        full_hap_t(m) = haplotype;
-      }
+      List exclude_info = limit_comb(combination, hidden_states, location, linkage_info, num, start_idx, num_states[t]);
+      IntegerVector exclude = exclude_info["exclude"];
+      new_num_states[t] = exclude_info["num_states"];
+      int count = 0;
+      for(m = 0; m < num_states[t]; ++m)
+        if(!exclude[m]) {
+          IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[t], combination(m, _), time_pos[t], num, hap_min_pos);
+          full_hap_t(count++) = haplotype;
+        }
     } else {
       full_hap_t[0] = hap(_, Range(time_pos[t] - hap_min_pos, time_pos[t] + p_tmax[t] - hap_min_pos - 1));
+      new_num_states[t] = num_states[t];
     }
-    full_hap(t) = full_hap_t;
+    full_hap[t] = full_hap_t[Range(0, new_num_states[t] - 1)];
   }
-  return(full_hap);
+  
+  List out = List::create(
+    Named("full_hap") = full_hap,
+    Named("new_num_states") = new_num_states);
+  
+  return(out);
 }
 
 List compute_emit(List hmm_info, List dat_info, List hap_info, NumericMatrix beta, NumericVector eta, int PD_LENGTH) 

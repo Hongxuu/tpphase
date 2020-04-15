@@ -53,9 +53,9 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   ## make universial reference
   align <- read_fasta(alignment)
   ref_in <- strsplit(ref_name, ref_delim, fixed = TRUE) %>% unlist()
-  if(length(align$dim) == 2) #only read in one reference
+  if(length(align$dim) == 2) { #only read in one reference
     universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = 0)
-  else { ## read in many reference, take the one we want
+  } else { ## read in many reference, take the one we want
     ref_index <- ref_in[2] %>% as.integer() - 1 ## index in C
     universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = ref_index)
   }
@@ -64,9 +64,10 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   
   ## prepare data
   dat_info <- read_data(datafile, old_v = old_version)
-  HMM <- hmm_info(dat_info = dat_info, cut_off = 0.16, uni_alignment = universial)
+  HMM <- hmm_info(dat_info = dat_info, cut_off = 0.3, uni_alignment = universial)
   
   ## initialize hap
+  set.seed(seed)
   hap_length <- dat_info$ref_length_max - dat_info$ref_start
   hap_info <- sample_hap2(hmm_info = HMM, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
   hapinit <- hap_info$haplotype
@@ -87,13 +88,16 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   
   ## baum-welch (iterate until converge)
   
-  ## initial
-  hap_full <- full_hap(hmm_info = HMM, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
+  ## initialization
+  linkage_info <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
+  hap_full_info <- full_hap(hmm_info = HMM, linkage_info = linkage_info, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
+  hap_full <- hap_full_info$full_hap
+  HMM$num_states <- hap_full_info$new_num_states
   bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, 
                         par = par, PD_LENGTH = nrow(par$beta))
   
   ###### estimate beta
-  for(m in (1:max_iter)) {
+  for (m in (1:max_iter)) {
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
     
@@ -114,7 +118,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
     bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
                           beta = tmp$par$beta, PD_LENGTH = nrow(par$beta))
     
-    if(abs(bw$par_hmm$phi - phi_old) < tol & 
+    if (abs(bw$par_hmm$phi - phi_old) < tol & 
        compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit") &
        compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans"))
       break;
