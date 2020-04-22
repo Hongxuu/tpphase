@@ -128,7 +128,7 @@ int top_n_map(List unique_map)
 // [[Rcpp::export]]
 List read_data(std::string path, unsigned int old_v) {
   int j, k, l;
-  unsigned int i, m, count = 0, count_del = 0, count_ins = 0;
+  unsigned int i, m, count = 0, count_del = 0;
   char c;
   char str[100];
   int n_observation = 0;
@@ -141,11 +141,7 @@ List read_data(std::string path, unsigned int old_v) {
   while (fgets(str, sizeof(str), fp)) {
     std::sscanf(str, "%d %d %d %d %c", &i, &j, &k, &l, &c);
     /* exclude -1 in ref_pos and qua */
-    if (k == -1) {
-      count_ins++;
-      continue;
-    }
-    else if (l == -1)
+    if (l == -1)
       count_del++;
     else {
       if (temp_n != i) {
@@ -163,11 +159,11 @@ List read_data(std::string path, unsigned int old_v) {
   IntegerVector del_id(n_observation);
   IntegerVector del_flag(n_observation);
   
-  unsigned int ins_num = 0;
-  IntegerVector ins_obs_index(count_ins);
-  IntegerVector ins_id(n_observation);
-  IntegerVector ins_read_pos(count_ins);
-  IntegerVector ins_flag(n_observation);
+  // unsigned int ins_num = 0;
+  // IntegerVector ins_obs_index(count_ins);
+  // IntegerVector ins_id(n_observation);
+  // IntegerVector ins_read_pos(count_ins);
+  // IntegerVector ins_flag(n_observation);
   
   IntegerVector qua(count);
   IntegerVector obs(count);
@@ -181,17 +177,11 @@ List read_data(std::string path, unsigned int old_v) {
   
   count = 0;
   count_del = 0;
-  count_ins = 0;
+  // count_ins = 0;
   while (fgets(str, sizeof(str), fp)) {
     std::sscanf(str, "%d %d %d %d %c", &i, &j, &k, &l, &c);
     /* exclude -1 in ref_pos and qua */
-    if (k == -1) {
-      ins_obs_index[count_ins] = i;
-      ins_read_pos[count_ins] = j;
-      ins_flag[i-1] = 1;
-      count_ins++;
-    }
-    else if (l == -1) {
+    if (l == -1) {
       del_obs_index[count_del] = i;
       del_read_pos[count_del] = j;
       del_ref_pos[count_del] = k;
@@ -214,26 +204,26 @@ List read_data(std::string path, unsigned int old_v) {
   IntegerVector length(n_observation);
   
   //insertion
-  for (m = 0; m < count_ins; ++m) 
-    if (m < count_ins - 1 && ins_obs_index[m] != ins_obs_index[m + 1])
-      ins_id[ins_num++] = ins_obs_index[m];
-  if(ins_id[ins_num- 1] != ins_obs_index[count_ins - 1])
-    ins_id[ins_num++] = ins_obs_index[count_ins - 1];
-    
-  IntegerVector ins_count(ins_num);
-  for (m = 0; m < ins_num; ++m)
-    ins_count[m] = 1;
-  i = 0;
-  for (m = 0; m < count_ins; ++m) {
-    if (m < count_ins - 1 && ins_obs_index[m] == ins_obs_index[m + 1])
-      ins_count[i]++;
-    else
-      i++;
-  }
-  
-  IntegerVector ins_length_all(n_observation);
-  for (m = 0; m < ins_num; ++m)
-        ins_length_all[ins_id[m] - 1] = ins_count[m];
+  // for (m = 0; m < count_ins; ++m) 
+  //   if (m < count_ins - 1 && ins_obs_index[m] != ins_obs_index[m + 1])
+  //     ins_id[ins_num++] = ins_obs_index[m];
+  // if(ins_id[ins_num- 1] != ins_obs_index[count_ins - 1])
+  //   ins_id[ins_num++] = ins_obs_index[count_ins - 1];
+  //   
+  // IntegerVector ins_count(ins_num);
+  // for (m = 0; m < ins_num; ++m)
+  //   ins_count[m] = 1;
+  // i = 0;
+  // for (m = 0; m < count_ins; ++m) {
+  //   if (m < count_ins - 1 && ins_obs_index[m] == ins_obs_index[m + 1])
+  //     ins_count[i]++;
+  //   else
+  //     i++;
+  // }
+  // 
+  // IntegerVector ins_length_all(n_observation);
+  // for (m = 0; m < ins_num; ++m)
+  //       ins_length_all[ins_id[m] - 1] = ins_count[m];
         
   // deletion
   for (m = 0; m < count_del; ++m)
@@ -284,7 +274,7 @@ List read_data(std::string path, unsigned int old_v) {
   IntegerVector true_length(n_observation);
   IntegerVector fake_length(n_observation);
   for (i = 0; i < n_observation; ++i) {
-    true_length[i] = length[i] + ins_length_all[i];
+    true_length[i] = length[i];
     fake_length[i] = length[i] + del_length_all[i];
     //fake_length[i] = length[i] + del_length_all[i] + ref_pos[index[i]];
   }
@@ -343,14 +333,14 @@ List read_data(std::string path, unsigned int old_v) {
     Named("del_total") = count_del,
     Named("del_length_all") = del_length_all,
     Named("del_strat_id") = del_strat_id);
-  
-  List ins = List::create(
-    Named("ins_id") = ins_id[Range(0, ins_num - 1)],
-    Named("ins_read_pos") = ins_read_pos,
-    Named("ins_length") = ins_count,
-    Named("ins_num") = ins_num,
-    Named("ins_flag") = ins_flag,
-    Named("ins_length_all") = ins_length_all);
+  // 
+  // List ins = List::create(
+  //   Named("ins_id") = ins_id[Range(0, ins_num - 1)],
+  //   Named("ins_read_pos") = ins_read_pos,
+  //   Named("ins_length") = ins_count,
+  //   Named("ins_num") = ins_num,
+  //   Named("ins_flag") = ins_flag,
+  //   Named("ins_length_all") = ins_length_all);
   
   List ls = List::create(
     Named("id") = obs_index,
