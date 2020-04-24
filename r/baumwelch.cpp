@@ -20,9 +20,7 @@ using namespace std;
 #define NUM_CLASS 4
 
 // [[Rcpp::depends(RcppArmadillo)]]
-
-
-List ini_hmm (unsigned int t_max,  IntegerVector num_states) {
+List ini_hmm (unsigned int t_max,  IntegerVector num_states, List trans_indicator) {
   NumericVector phi(num_states[0]);
   List trans(t_max - 1);
   // List emit(t_max);
@@ -32,9 +30,14 @@ List ini_hmm (unsigned int t_max,  IntegerVector num_states) {
     phi[w] = 1/double(num_states[0]);
   
   for(t = 0; t < t_max - 1; ++t) {
+    IntegerMatrix trans_ind = trans_indicator[t];
     NumericMatrix transition(num_states[t], num_states[t + 1]);
     for (w = 0; w < num_states[t]; ++w) {
+      int new_num = 0;
       for (m = 0; m < num_states[t + 1]; ++m)
+        if (trans_ind(w, m)) // 1 means not the same, so cannot b transferred
+          new_num = num_states[t + 1] - 1;
+      for (m = 0; m < num_states[t + 1]; ++m) 
         transition(w, m) = 1/double(num_states[t + 1]);
     }
     trans(t) = transition;
@@ -67,7 +70,7 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
     NumericVector alp(num_states[t]);
     NumericVector emission = emit(t);
     NumericVector alp_last;
-    if(t == 0)
+    if (t == 0)
       for (w = 0; w < num_states[t]; ++w)
         alp(w) = phi[w] * emission(w);
     else {
@@ -128,8 +131,9 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
     sum = 0;
     for (w = 0; w < num_states[t]; ++w)
       for (m = 0; m < num_states[t + 1]; ++m) {
-        x(w, m) = log(alp(w)) + log(transition(w, m)) + log(beta(m)) + log(emission(m)); // avoid underflow?
-        x(w, m) = exp(x(w, m));
+        // x(w, m) = log(alp(w)) + log(transition(w, m)) + log(beta(m)) + log(emission(m)); // avoid underflow?
+        // x(w, m) = exp(x(w, m));
+        x(w, m) = alp(w) * transition(w, m) * beta(m) * emission(m); // not logging it since some transition are 0
         sum += x(w, m);
       }
       for (w = 0; w < num_states[t]; ++w)
@@ -386,6 +390,7 @@ List full_hap(List hmm_info, IntegerMatrix linkage_info, unsigned int hap_length
   unsigned int t_max = hmm_info["t_max"];
   unsigned int t, m, j, start_idx = 0;
   List full_hap(t_max);
+  List comb(t_max);
   IntegerMatrix hap = fill_all_hap(hidden_states, hap_length, n_row);
   IntegerVector new_num_states(t_max);
   for(t = 0; t < t_max; ++t) {
@@ -401,18 +406,21 @@ List full_hap(List hmm_info, IntegerMatrix linkage_info, unsigned int hap_length
     if(num_states[t] != 1) {
       List comb_info = find_combination(undecided_pos, pos_possibility, p_tmax[t], time_pos[t], hap_min_pos);
       IntegerVector location = comb_info["location"];
-      //Rcout << location << "\n";
+      // Rcout << t << "\t" << start_idx << "\t" << location << "\n";
       IntegerMatrix combination = comb_info["combination"];
       unsigned int num = comb_info["num"];
       List exclude_info = limit_comb(combination, hidden_states, location, linkage_info, num, start_idx, num_states[t]);
       IntegerVector exclude = exclude_info["exclude"];
       new_num_states[t] = exclude_info["num_states"];
+      IntegerMatrix new_comb(new_num_states[t], combination.ncol());
       int count = 0;
       for(m = 0; m < num_states[t]; ++m)
         if(!exclude[m]) {
           IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[t], combination(m, _), time_pos[t], num, hap_min_pos);
+          new_comb(count, _) = combination(m, _);
           full_hap_t(count++) = haplotype;
         }
+      comb[t] = new_comb;
     } else {
       full_hap_t[0] = hap(_, Range(time_pos[t] - hap_min_pos, time_pos[t] + p_tmax[t] - hap_min_pos - 1));
       new_num_states[t] = num_states[t];
@@ -422,7 +430,8 @@ List full_hap(List hmm_info, IntegerMatrix linkage_info, unsigned int hap_length
   
   List out = List::create(
     Named("full_hap") = full_hap,
-    Named("new_num_states") = new_num_states);
+    Named("new_num_states") = new_num_states, 
+    Named("combination") = comb);
   
   return(out);
 }
@@ -669,7 +678,7 @@ NumericVector make_weight(List wic, List gamma, List hmm_info, List dat_info) {
 }
 
 // [[Rcpp::export]]
-List baum_welch_init(List hmm_info, List data_info, List hap_info, List par, int PD_LENGTH)
+List baum_welch_init(List hmm_info, List data_info, List hap_info, List par, int PD_LENGTH, List trans_indicator)
 {
   IntegerVector num_states = hmm_info["num_states"];
   IntegerVector n_t = hmm_info["n_t"];
@@ -680,7 +689,7 @@ List baum_welch_init(List hmm_info, List data_info, List hap_info, List par, int
   List par_hmm;
   
   /* initialize hmm par */
-  par_hmm = ini_hmm(t_max, num_states);
+  par_hmm = ini_hmm(t_max, num_states, trans_indicator);
   NumericVector phi = par_hmm["phi"];
   List trans = par_hmm["trans"];
   List for_emit = compute_emit(hmm_info, data_info, hap_info, beta, eta, PD_LENGTH);
@@ -748,4 +757,54 @@ List baum_welch_iter(List hmm_info, List par_hmm, List data_info, List hap_info,
     Named("par_hmm_bf") = par_hmm_bf_new);
   
   return(ls);
+}
+
+// find which states at t can transfer to the next states at t+1
+// undecided_pos starts from 0; but time_pos starts from int hap_min_pos = dat_info["ref_start"];
+// [[Rcpp::export]]
+List trans_permit(IntegerVector num_states, List combination, int t_max, IntegerVector undecided_pos, 
+                  IntegerVector time_pos, IntegerVector p_tmax, int hap_min_pos) {
+  List trans_permits(t_max - 1);
+  unsigned int t, j, m, w;
+  int end_t1, begin_t2, end_t2;
+  
+  for (t = 0; t < t_max - 1; ++t) {
+    if(num_states[t + 1] != 1) {
+      end_t1 = time_pos[t] + p_tmax[t];
+      begin_t2 = time_pos[t + 1];
+      end_t2 = time_pos[t + 1] + p_tmax[t + 1];
+      if(end_t1 > end_t2)
+        end_t1 = end_t2; // take the smaller one
+      IntegerMatrix full_hap_t1 = combination(t);
+      IntegerMatrix full_hap_t2 = combination(t + 1);
+      IntegerMatrix trans(num_states[t], num_states[t + 1]);
+      int count = 0; // number of overlapped variational sites
+      int count1 = 0;
+      
+      for(j = 0; j < undecided_pos.size(); ++j)
+        if (undecided_pos[j] + hap_min_pos < end_t1 && undecided_pos[j] >= time_pos[t]) {
+          count1++;
+          if(undecided_pos[j] + hap_min_pos >= begin_t2)
+            count++;
+        }
+        
+        int left = count1 - count;
+        for(m = 0; m < num_states[t]; ++m) {
+          IntegerVector hap_t1 = full_hap_t1(m, _);
+          for(w = 0; w < num_states[t + 1]; ++w) {
+            IntegerVector hap_t2 = full_hap_t2(w, _);
+            for(j = 0; j < count; ++j)
+              if (hap_t2(j) != hap_t1(j + left)) {
+                trans(m, w) = 1; // represents m cannot transfer to w
+                break;
+              }
+          }
+        }
+        trans_permits(t) = trans;
+    } else {
+      IntegerMatrix temp(num_states[t], num_states[t + 1]);
+      trans_permits(t) = temp;
+    }
+  }
+  return(trans_permits);
 }

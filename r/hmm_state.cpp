@@ -277,6 +277,7 @@ List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector loc
     for (m = 0; m < num_states; ++m) {
       exclude(m) = 0;
       IntegerVector comb = combination(m, _);
+      // Rcout << comb << "\t\t";
       count = 0;
       for (k = 0; k < NUM_CLASS; ++k) {
         for (j = 0; j < num; ++j) {
@@ -291,7 +292,7 @@ List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector loc
             if (sub_hap(k, j) == sub_link(i, j) && sub_hap(k, j + 1) == sub_link(i, j + 1))
               flag++;
           }
-          if (flag == linkage_len) {
+          if (flag >= linkage_len) {
             count++;
             break;
           }
@@ -309,6 +310,7 @@ List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector loc
     Named("exclude") = exclude);
   return(out);
 }
+
 
 /*
  * determine the hidden state by each time t, only use this on the first time t, then, the rest non_overlapped still use site by site

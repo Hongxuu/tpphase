@@ -26,11 +26,12 @@ sourceCpp("./r/viterbi.cpp")
 
 ## read the data
 samfile = "../../data/tpphase_res_consensus/WGS/test.sam"
-ref_name = "target.1"
+ref_name = "target.2"
 fastq_file = "./res.fastq"
 datafile = "./res.txt"
-alignment = "../../data/tpphase_res_consensus/WGS/test.fasta"
+alignment = "../../data/tpphase_res_consensus/WGS/new.fasta"
 
+datafile = "../../data/tpphase_res_consensus/WGS/out.txt"
 #######
 formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc
 n_class = 4
@@ -93,6 +94,8 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   hap_full_info <- full_hap(hmm_info = HMM, linkage_info = linkage_info, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
   hap_full <- hap_full_info$full_hap
   HMM$num_states <- hap_full_info$new_num_states
+  HMM$trans_indicator <- trans_permit(HMM$num_states, hap_full_info$combination, HMM$t_max, HMM$undecided_pos, 
+               HMM$time_pos, HMM$p_tmax, dat_info$ref_start)
   bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, 
                         par = par, PD_LENGTH = nrow(par$beta))
   

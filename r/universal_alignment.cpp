@@ -43,8 +43,11 @@ List make_universal(List alignment, unsigned int for_hmm, int ref_idx = -1) {
           uni_alignment[j] = "M";
       } else {
         // Rcout << idx << "\t" << idx + dim[i * N_GENOME] << "\n";
-        if(reads[idx] == reads[idx + dim[i * N_GENOME]]) {
+        if (reads[idx] == reads[idx + dim[i * N_GENOME]]) {
           uni_alignment[j] = seq[idx];
+        } else if (reads[idx] != 0 && reads[idx + dim[i * N_GENOME]] != 0 && 
+          reads[idx] != reads[idx + dim[i * N_GENOME]]) {
+          uni_alignment[j] = "M";
         } else {
           uni_alignment[j] = "N";
         }
