@@ -268,7 +268,15 @@ List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector loc
   IntegerMatrix sub_link = linkage_info(_, Range(start_idx, start_idx + num - 1));
   IntegerVector exclude(num_states);
   int count, linkage_len, all_excluded;
-  linkage_len = num/2;
+  linkage_len = num/2; // change the linkage length to be the length appears in the read
+  IntegerMatrix lengths(n_observation);
+  for (i = 0; i < n_observation; i++) {
+    lengths[i] = num;
+    for (j = 0; j < num - 1; ++j) {
+      if(sub_link(i, j) == -1)
+        lengths[i]--;
+    }
+  }
   
   all_excluded = num_states;
   while (all_excluded == num_states) {
@@ -310,8 +318,31 @@ List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector loc
     Named("exclude") = exclude);
   return(out);
 }
-
-
+ // trans_indicator: indicate which state can transfer to which, further_limit indicate some states should not be considered
+ List prepare_ini_hmm (unsigned int t_max, IntegerVector num_states, List trans_indicator, List further_limit) {
+   List trans_new_ind(t_max - 1);
+   unsigned int w, m, t;
+   
+   for(t = 0; t < t_max - 1; ++t) {
+     // Rcout << t << "\n";
+     IntegerVector more_limit_last = further_limit[t];
+     IntegerVector more_limit = further_limit[t + 1];
+     IntegerMatrix trans_ind = trans_indicator[t];
+     IntegerMatrix trans_ind_new(trans_ind.nrow(), num_states[t + 1]);
+     int count2 = 0;
+     int count = 0;
+     for (w = 0; w < trans_ind.ncol(); ++w)
+       if(!more_limit[w])
+         trans_ind_new(_, count++) = trans_ind(_, w);
+     IntegerMatrix trans_ind_new2(num_states[t], num_states[t + 1]);
+     for (m = 0; m < trans_ind.nrow(); ++m)
+        if(!more_limit_last[m])
+          trans_ind_new2(count2++, _) = trans_ind_new(m, _);
+      trans_new_ind[t] = trans_ind_new2;
+   }
+   
+   return(trans_new_ind);
+ }
 /*
  * determine the hidden state by each time t, only use this on the first time t, then, the rest non_overlapped still use site by site
  */

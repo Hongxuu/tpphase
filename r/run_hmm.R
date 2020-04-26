@@ -90,15 +90,26 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   ## baum-welch (iterate until converge)
   
   ## initialization
+  ##### use linkage info to limit some unlikelily happened transition
   linkage_info <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
-  hap_full_info <- full_hap(hmm_info = HMM, linkage_info = linkage_info, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
+  hap_full_info <- full_hap(hmm_info = HMM, linkage_info = linkage_info, hap_length = hap_length, 
+                            hap_min_pos = dat_info$ref_start)
   hap_full <- hap_full_info$full_hap
   HMM$num_states <- hap_full_info$new_num_states
-  HMM$trans_indicator <- trans_permit(HMM$num_states, hap_full_info$combination, HMM$t_max, HMM$undecided_pos, 
+  ###some transition could not happen, can be set to null
+  trans_indicator_new = NULL;
+  trans_indicator <- trans_permit(HMM$num_states, hap_full_info$combination, HMM$t_max, HMM$undecided_pos, 
                HMM$time_pos, HMM$p_tmax, dat_info$ref_start)
-  bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, 
-                        par = par, PD_LENGTH = nrow(par$beta))
+  HMM$num_states <- trans_indicator$new_num_states
+  hap_full <- final_exclude(full_hap = hap_full, further_limit = trans_indicator$further_limit, 
+                                 t_max = HMM$t_max, num_states = HMM$num_states)
+  trans_indicator_new <- prepare_ini_hmm(HMM$t_max, HMM$num_states, 
+                                         trans_indicator$trans_permits, trans_indicator$further_limit);
   
+  ### start initializing
+  bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, 
+                        par = par, PD_LENGTH = nrow(par$beta), trans_indicator_new = trans_indicator_new)
+  rm(hap_full_info)
   ###### estimate beta
   for (m in (1:max_iter)) {
     par_hmm_old <- bw$par_hmm
@@ -143,3 +154,9 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   res$snp_location <- snp_location
   fnlist(res, fil = "./test.res")
 }
+
+# if(trans_indicator_new.isNotNull()){
+#   trans_permits = trans_indicator["trans_permits"];
+#   further_limit = trans_indicator["further_limit"];
+#   trans_indicator_new = prepare_ini_hmm(t_max, num_states, trans_permits, further_limit);
+# }
