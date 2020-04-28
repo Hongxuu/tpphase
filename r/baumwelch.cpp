@@ -314,7 +314,7 @@ IntegerMatrix fill_all_hap(List hidden_states, unsigned int hap_length, IntegerV
       for(k = 0; k < NUM_CLASS; ++k)
         haplotype(k, j) = nuc_j[k];  
     }
-    return haplotype;
+  return haplotype;
 }
 
 /*

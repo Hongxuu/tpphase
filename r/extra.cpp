@@ -19,7 +19,7 @@ using namespace std;
 
 // [[Rcpp::export]]
 // trans_indicator: indicate which state can transfer to which, further_limit indicate some states should not be considered
-List prepare_ini_hmm (unsigned int t_max, IntegerVector num_states, List trans_indicator, List further_limit) {
+List prepare_ini_hmm2 (unsigned int t_max, IntegerVector num_states, List trans_indicator, List further_limit) {
   List trans_new_ind(t_max - 1);
   // List emit(t_max);
   unsigned int w, m, t;
@@ -113,7 +113,7 @@ List prepare_ini_hmm (unsigned int t_max, IntegerVector num_states, List trans_i
       IntegerVector more_limits_row(num_states[t]);
       IntegerVector more_limits_col(num_states[t + 1]);
       IntegerVector more_limits_col_last;
-     
+      IntegerMatrix trans = trans_permits(t);
       int exluded_col = 0;
       for(w = 0; w < num_states[t + 1]; ++w) {
         int num_col = 0;
@@ -235,7 +235,7 @@ IntegerMatrix call_cart_product(IntegerVector len) {
   
   return(out);
 }
-
+// [[Rcpp::export]]
 List find_combination(IntegerVector undecided_pos, IntegerVector pos_possibility, 
                       unsigned int p_tmax, unsigned int time_pos, int hap_min_pos) {
   //possible combination of the rest non-unique loci
@@ -255,6 +255,7 @@ List find_combination(IntegerVector undecided_pos, IntegerVector pos_possibility
     return(ls);
 }
 
+// [[Rcpp::export]]
 List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector location,
                 IntegerMatrix linkage_info, unsigned int num, unsigned int start_idx, unsigned int num_states) {
   unsigned int i, j, k, idx, m;

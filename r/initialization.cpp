@@ -86,17 +86,27 @@ List sample_hap2(List hmm_info, unsigned int hap_length, int hap_min_pos)
   IntegerVector n_row = hmm_info["n_row"];
   IntegerVector pos_possibility = hmm_info["pos_possibility"];
   IntegerVector undecided_pos = hmm_info["undecided_pos"];
-  unsigned int m, k, j;
+  unsigned int i, k, j;
   
   IntegerMatrix haplotype = fill_all_hap(hidden_states, hap_length, n_row);
-  List comb_info = find_combination(undecided_pos, pos_possibility, hap_length, time_pos[0], hap_min_pos);
-  IntegerVector location = comb_info["location"];
-  IntegerMatrix combination = comb_info["combination"];
-  unsigned int num = comb_info["num"];
-  unsigned int total = combination.nrow();
-  IntegerVector mm = sample(total, 1);
-  m = mm[0];
-  IntegerMatrix haplotype_out = make_hap(hidden_states, haplotype, location, hap_length, combination(m, _), hap_min_pos, num, hap_min_pos);
+  // When hidden space too big, not working
+  // List comb_info = find_combination(undecided_pos, pos_possibility, hap_length, time_pos[0], hap_min_pos);
+  // IntegerVector location = comb_info["location"];
+  // IntegerMatrix combination = comb_info["combination"];
+  // unsigned int num = comb_info["num"];
+  // unsigned int total = combination.nrow();
+  // IntegerVector mm = sample(total, 1);
+  // m = mm[0];
+  unsigned int num = pos_possibility.size();
+  IntegerVector rnd_samp(num);
+  for(i = 0; i < num; ++i) {
+    IntegerVector mm = sample(pos_possibility[i], 1);
+    rnd_samp[i] = mm[0] - 1;
+  }
+  Rcout << "Random Sample " << rnd_samp << "\n";
+  
+  IntegerMatrix haplotype_out = make_hap(hidden_states, haplotype, undecided_pos, hap_length, rnd_samp, 
+                                         hap_min_pos, num, hap_min_pos);
   
   int gap_in = 0;
   for(k = 0; k < NUM_CLASS; ++k) 

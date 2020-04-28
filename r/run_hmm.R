@@ -71,6 +71,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   
   ## initialization
   ##### use linkage info to limit some unlikelily happened transition
+  hap_length <- dat_info$ref_length_max - dat_info$ref_start
   linkage_info <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
   hap_full_info <- full_hap(hmm_info = HMM, linkage_info = linkage_info, hap_length = hap_length, 
                             hap_min_pos = dat_info$ref_start)
@@ -79,7 +80,6 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   
   ## initialize hap
   set.seed(seed)
-  hap_length <- dat_info$ref_length_max - dat_info$ref_start
   hap_info <- sample_hap2(hmm_info = HMM, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
   hapinit <- hap_info$haplotype
   data <- format_data(dat_info = dat_info, haplotype = hapinit)
