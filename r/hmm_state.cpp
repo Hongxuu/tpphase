@@ -71,15 +71,26 @@ List aux_noN_S2(IntegerVector sum_site, IntegerVector hap_site) {
   int n_row;
   double sum;
   IntegerMatrix temp;
+  IntegerMatrix temp2;
   
   sum = sum_site[1] + sum_site[0];
   if (sum_site[0]/sum <= 0.38) { //1st one appears 3 times
     temp = call_permute({hap_site[0], hap_site[1], hap_site[1], hap_site[1]});
-    n_row = 4;
+    temp2 = Twopossible(hap_site);
+    arma::mat m1 = as<arma::mat>(temp);
+    arma::mat m2 = as<arma::mat>(temp2);
+    arma::mat out = join_cols(m1, m2);
+    temp = wrap(out);
+    n_row = 6;
   } else if (sum_site[0]/sum >= 0.62) {//2nd one appears 3 times
     temp = call_permute({hap_site[0], hap_site[0], hap_site[0], hap_site[1]});
-    n_row = 4;
-  } else { // the possibility of occuring ACAC is small? so elimiate this possibility???
+    temp2 = Twopossible(hap_site);
+    arma::mat m1 = as<arma::mat>(temp);
+    arma::mat m2 = as<arma::mat>(temp2);
+    arma::mat out = join_cols(m1, m2);
+    temp = wrap(out);
+    n_row = 6;
+  } else {
     temp = Twopossible(hap_site);
     n_row = 2;
   }
@@ -153,6 +164,27 @@ List aux_noN_S3(IntegerVector sum_site, IntegerVector hap_site) {
     temp = wrap(out);
     n_row = 12;
   }
+  // also include the situation of 2 possibles
+  int min_id = which_min(sum_site);
+  IntegerVector sum_site2(2);
+  IntegerVector hap_site2(2);
+  int num = 0;
+  for(unsigned int i = 0; i < 3; ++i) {
+    if(i != min_id) {
+      sum_site2[num] = sum_site[i];
+      hap_site2[num] = hap_site[i];
+      num++;
+    }
+  }
+  List list_2pos = aux_noN_S2(sum_site2, hap_site2);
+  IntegerMatrix temp2 = list_2pos["temp"];
+  int more_row = list_2pos["n_row"];
+  n_row += more_row;
+  arma::mat m1 = as<arma::mat>(temp);
+  arma::mat m2 = as<arma::mat>(temp2);
+  arma::mat out = join_cols(m1, m2);
+  temp = wrap(out);
+  
   List ls = List::create(
     Named("n_row") = n_row,
     Named("temp") = temp);

@@ -65,7 +65,17 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   
   ## prepare data
   dat_info <- read_data(datafile, old_v = old_version)
-  HMM <- hmm_info(dat_info = dat_info, cut_off = 0.3, uni_alignment = universial)
+  HMM <- hmm_info(dat_info = dat_info, cut_off = 0.15, uni_alignment = universial)
+  
+  ########################## baum-welch (iterate until converge)
+  
+  ## initialization
+  ##### use linkage info to limit some unlikelily happened transition
+  linkage_info <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
+  hap_full_info <- full_hap(hmm_info = HMM, linkage_info = linkage_info, hap_length = hap_length, 
+                            hap_min_pos = dat_info$ref_start)
+  hap_full <- hap_full_info$full_hap
+  HMM$num_states <- hap_full_info$new_num_states
   
   ## initialize hap
   set.seed(seed)
@@ -87,15 +97,6 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   par <- ini_par(dat = data, n_observation = dat_info$n_observation, formula = formula, old_version = old_version,
                  n_class = n_class, num_cat = num_cat, ncores = ncores, weight_id = weight_id)
   
-  ## baum-welch (iterate until converge)
-  
-  ## initialization
-  ##### use linkage info to limit some unlikelily happened transition
-  linkage_info <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
-  hap_full_info <- full_hap(hmm_info = HMM, linkage_info = linkage_info, hap_length = hap_length, 
-                            hap_min_pos = dat_info$ref_start)
-  hap_full <- hap_full_info$full_hap
-  HMM$num_states <- hap_full_info$new_num_states
   ###some transition could not happen, can be set to null
   trans_indicator_new = NULL;
   trans_indicator <- trans_permit(HMM$num_states, hap_full_info$combination, HMM$t_max, HMM$undecided_pos, 
@@ -111,20 +112,20 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
                         par = par, PD_LENGTH = nrow(par$beta), trans_indicator_new = trans_indicator_new)
   rm(hap_full_info)
   ###### estimate beta
+  weight_id <- NULL
+  data <- format_data2(hmm_info = HMM, d_info = dat_info, hap_info = hap_full)
+  if(hap_info$gap_in) {
+    data_rm <- data %>% filter(mode == 1) 
+    weight_id <- which(data_rm$hap_nuc == -1)
+    data <- data %>% filter(hap_nuc != -1) # mnlogit only takes data without indels in read or in haplotypes
+  }
+  data$nuc <- to_char_r(data$nuc)
+  data$hap_nuc <- to_char_r(data$hap_nuc)
+  id <- data["id"]
   for (m in (1:max_iter)) {
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
     
-    weight_id <- NULL
-    data <- format_data2(hmm_info = HMM, d_info = dat_info, hap_info = hap_full)
-    if(hap_info$gap_in) {
-      data_rm <- data %>% filter(mode == 1) 
-      weight_id <- which(data_rm$hap_nuc == -1)
-      data <- data %>% filter(hap_nuc != -1) # mnlogit only takes data without indels in read or in haplotypes
-    }
-    data$nuc <- to_char_r(data$nuc)
-    data$hap_nuc <- to_char_r(data$hap_nuc)
-    id <- data["id"]
     tmp <- m_beta(res = bw$par_aux, id = id, weight_id = weight_id, data = data, formula = formula, 
                   reads_lengths = read_length, ncores = ncores, old_version = 0, weight = bw$par_aux$weight)
     
