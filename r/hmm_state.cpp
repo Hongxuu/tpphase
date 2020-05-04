@@ -4,11 +4,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "utils.h"
+#include "hmm_state.h"
 using namespace Rcpp;
 using namespace std;
 #define NUM_CLASS 4
 #define LINKAGE_LEN 2
 
+// [[Rcpp::depends(RcppArmadillo)]]
 class Permutation {
 public:
   vector<vector<int> > permuteUnique(vector<int>& nums) {
@@ -292,8 +295,9 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
   return(ls);
 }
 
-List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector location,
-                         IntegerMatrix linkage_info, unsigned int num, unsigned int start_idx, unsigned int num_states) {
+// limit combination based on linkage information
+List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector location,
+                   IntegerMatrix linkage_info, unsigned int num, unsigned int start_idx, unsigned int num_states) {
   unsigned int i, j, k, idx, m;
   unsigned int n_observation = linkage_info.nrow();
   IntegerMatrix sub_hap(NUM_CLASS, num);
@@ -301,50 +305,53 @@ List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector loc
   IntegerVector exclude(num_states);
   int count, linkage_len, all_excluded;
   linkage_len = num/2; // change the linkage length to be the length appears in the read
-  IntegerMatrix lengths(n_observation);
-  for (i = 0; i < n_observation; i++) {
-    lengths[i] = num;
-    for (j = 0; j < num - 1; ++j) {
-      if(sub_link(i, j) == -1)
-        lengths[i]--;
-    }
-  }
-  
+  int cut_off;
   all_excluded = num_states;
   while (all_excluded == num_states) {
-    all_excluded = 0;
+    cut_off = NUM_CLASS;
     // Rcout << "linkage length " << linkage_len << "\n"; //actual linkage length + 1
-    for (m = 0; m < num_states; ++m) {
-      exclude(m) = 0;
-      IntegerVector comb = combination(m, _);
-      // Rcout << comb << "\t\t";
-      count = 0;
-      for (k = 0; k < NUM_CLASS; ++k) {
-        for (j = 0; j < num; ++j) {
-          IntegerMatrix hidden = hidden_states[location[j]];
-          idx = comb[j];
-          sub_hap(k, j) = hidden(idx, k);
+    while (cut_off >= 1 && all_excluded == num_states) {
+      all_excluded = 0;
+      for (m = 0; m < num_states; ++m) {
+        exclude(m) = 0;
+        IntegerVector comb = combination(m, _);
+        // Rcout << comb << "\t\t";
+        count = 0;
+        for (k = 0; k < NUM_CLASS; ++k) {
+          // Rcout << "k" << k << "\n";
+          for (j = 0; j < num; ++j) {
+            IntegerMatrix hidden = hidden_states[location[j]];
+            idx = comb[j];
+            sub_hap(k, j) = hidden(idx, k);
+            // Rcout << sub_hap(k, j) << "\t";
+          }
+          // Rcout << "read" << "\n";
+          for (i = 0; i < n_observation; i++) {
+            int flag = 0;
+            for (j = 0; j < num - 1; ++j) {
+              // Rcout << sub_link(i, j) << "\t" << sub_link(i, j + 1);
+              // if (sub_link(i, j) != -1 && sub_link(i, j) != 4)
+              if (sub_hap(k, j) == sub_link(i, j) && sub_hap(k, j + 1) == sub_link(i, j + 1))
+                flag++;
+            }
+            // Rcout << "\n" << flag << "\n" ;
+            if (flag >= linkage_len) {
+              count++;
+              break;
+            }
+          }
         }
-        for (i = 0; i < n_observation; i++) {
-          int flag = 0;
-          for (j = 0; j < num - 1; ++j) {
-            // if (sub_link(i, j) != -1 && sub_link(i, j) != 4)
-            if (sub_hap(k, j) == sub_link(i, j) && sub_hap(k, j + 1) == sub_link(i, j + 1))
-              flag++;
-          }
-          if (flag >= linkage_len) {
-            count++;
-            break;
-          }
+        // Rcout << "count "<< count << "\n";
+        if (count != cut_off) {
+          exclude(m) = 1;
+          all_excluded++;
         }
       }
-      if (count != NUM_CLASS) {
-        exclude(m) = 1;
-        all_excluded++;
-      }
+      cut_off--;
     }
     linkage_len--;
   }
+  // Rcout << exclude << "\n";
   List out = List::create(
     Named("num_states") = num_states - all_excluded,
     Named("exclude") = exclude);
@@ -375,6 +382,277 @@ List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector loc
    
    return(trans_new_ind);
  }
+
+template <typename T>
+inline bool approx_equal_cpp(const T& lhs, const T& rhs, double tol = 0.00000001) {
+  return arma::approx_equal(lhs, rhs, "absdiff", tol);
+}
+
+arma::mat unique_rows(const arma::mat& m) {
+  arma::uvec ulmt = arma::zeros<arma::uvec>(m.n_rows);
+  for (arma::uword i = 0; i < m.n_rows; i++)
+    for (arma::uword j = i + 1; j < m.n_rows; j++)
+      if (approx_equal_cpp(m.row(i), m.row(j))) { ulmt(j) = 1; break; }
+  
+  return m.rows(find(ulmt == 0));
+}
+
+// get the unique rows for overlapped region
+IntegerMatrix unique_overlap(IntegerVector overlapped, IntegerVector exclude_last, IntegerMatrix overlap_comb, IntegerVector overlap_loci, 
+                             unsigned int overlap_new_states, unsigned int overlap_num_states) {
+  unsigned int i, m;
+  // unsigned int n_observation = linkage_info.nrow();
+  //decide the first t 
+  unsigned int overlap_len = overlapped.size();
+  // limit the space based on the last limition first
+  int start_overlap = 0;
+  for(i = 0; i < overlap_loci.size(); ++i)
+    if (overlap_loci[i] == overlapped[0]) {
+      start_overlap = i;
+      break;
+    }
+    
+    //find the unique states
+    IntegerMatrix comb_last(overlap_new_states, overlap_len);
+    unsigned int count = 0;
+    for (m = 0; m < overlap_num_states; ++m)
+      if(!exclude_last[m]) {
+        IntegerVector tmp = overlap_comb(m, _);
+        comb_last(count++, _) = tmp[Range(start_overlap, start_overlap + overlap_len - 1)];
+      }
+    arma::mat out = unique_rows(as<arma::mat>(comb_last));
+    return(wrap(out));
+}
+
+List get_overlap(IntegerVector p_tmax, IntegerVector time_pos, IntegerVector num_states,
+                 IntegerVector undecided_pos, unsigned int t_max, int hap_min_pos)
+{
+  unsigned int start_t = 0;
+  // get the first t which has variation
+  for (unsigned int t = 0; t < t_max; ++t)
+    if(num_states[t] > 1) {
+      start_t = t;
+      break;
+    }
+    List overlapped(t_max);
+    List location(t_max);
+    IntegerVector overlapped_idx(t_max);
+    unsigned int begin, end, end1, min;
+    
+    for (unsigned int t = 0; t < t_max; ++t) {
+      
+      if (num_states[t] == 1) {
+        overlapped[t] = -1;
+        overlapped_idx[t] = -1;
+        location[t] = -1;
+        continue;
+      }
+      if(t == start_t) {
+        overlapped[t] = -1;
+        overlapped_idx[t] = -1;
+        begin = time_pos[start_t] - hap_min_pos;
+        end = time_pos[start_t] + p_tmax[start_t] - hap_min_pos;
+        int num = 0;
+        IntegerVector location_t(undecided_pos.size());
+        for (unsigned int m = 0; m < undecided_pos.size(); ++m)
+          if (undecided_pos[m] >= begin && undecided_pos[m] < end)
+            location_t(num++) = undecided_pos[m];
+          location[start_t] = location_t[Range(0, num - 1)];
+          continue;
+      }
+      begin = time_pos[t] - hap_min_pos;
+      end = time_pos[t] + p_tmax[t] - hap_min_pos;
+      // store location
+      int num = 0;
+      IntegerVector location_t(undecided_pos.size());
+      for (unsigned int m = 0; m < undecided_pos.size(); ++m)
+        if (undecided_pos[m] >= begin && undecided_pos[m] < end)
+          location_t(num++) = undecided_pos[m];
+        location[t] = location_t[Range(0, num - 1)];
+        int len = 0;
+        int id_t = 0;
+        int index = 0;
+        // Rcout << "location" << location_t[num - 1] << "\n";
+        for (unsigned int t1 = 0; t1 < t; ++t1) {
+          IntegerVector last_location = location[t1];
+          // begin1 = time_pos[t1] - hap_min_pos;
+          end1 = last_location[last_location.size() - 1];
+          // Rcout << end1 << "\t";
+          // end1 = time_pos[t1] + p_tmax[t1] - hap_min_pos;
+          if(begin <= end1) {
+            min = end1;
+            // minimum overlapped region
+            if(location_t[num - 1] < end1)
+              min = location_t[num - 1];
+            // find the time t which has the longest coverage
+            if(min - location_t[0] > len) {
+              // Rcout << t << " has coverage with " << t1 << "\n";
+              len = min - location_t[0];
+              id_t = min;
+              index = t1;
+            }
+          }
+        }
+        // Rcout<< "\n" << begin << "\t" << id_t << "\n";
+        int count = 0;
+        IntegerVector position(undecided_pos.size());
+        for (unsigned int m = 0; m < undecided_pos.size(); ++m) 
+          if (undecided_pos[m] >= begin && undecided_pos[m] <= id_t)
+            position(count++) = undecided_pos[m];
+          // Rcout << position << "\n";
+          if(count) { 
+            overlapped[t] = position[Range(0, count - 1)];
+            overlapped_idx[t] = index;
+          }
+    }
+    
+    List overlap = List::create(
+      Named("location") = location,
+      Named("overlapped") = overlapped,
+      Named("overlapped_id") = overlapped_idx, 
+      Named("start_t") = start_t);
+    return(overlap);
+}
+
+IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVector overlapped, IntegerVector exclude_last, IntegerMatrix overlap_comb, 
+                              IntegerVector overlap_loci, IntegerMatrix linkage_info, unsigned int overlap_new_states, unsigned int overlap_num_states) {
+  
+  IntegerMatrix first_comb = unique_overlap(overlapped, exclude_last, overlap_comb, overlap_loci, 
+                                            overlap_new_states, overlap_num_states);
+  //find combinatio of the rest position(include 1 overlap to make sure the linkage)
+  List hidden_states = hmm_info["hidden_states"];
+  IntegerVector pos_possibility = hmm_info["pos_possibility"];
+  IntegerVector undecided_pos = hmm_info["undecided_pos"];
+  unsigned int i, j, m, w, k;
+  int overlap_len = overlapped.size();
+  
+  IntegerVector left_loci = location[Range(overlap_len - 1, location.size() - 1)];
+  int count = 0;
+  int len = left_loci.size();
+  IntegerVector left_possible(len);
+  for(i = 0; i < undecided_pos.size(); ++i) {
+    if (undecided_pos[i] >= left_loci[0] && undecided_pos[i] <= left_loci[len - 1]) {
+      left_possible[count++] = pos_possibility[i];
+    }
+  }
+  
+  IntegerMatrix combination = call_cart_product(left_possible[Range(0, count - 1)]);
+  // get the appeared possiblilities at the overlapped position
+  IntegerVector last_col = first_comb(_, first_comb.ncol() - 1);
+  List first_uni = unique_map(last_col); // start might not from 0 (e.g. ailgnment starts from 2)
+  IntegerVector n1 = first_uni["lengths"];
+  IntegerVector allowed = first_uni["values"];
+  // IntegerVector allowed = unique(last_col);
+  IntegerVector first_col = combination(_, 0);
+  IntegerVector exist = unique(first_col);
+  List exclude_info(2);
+  int flag = 0;
+  int num = 0;
+  IntegerMatrix new_combination(combination.nrow(), combination.ncol());
+  unsigned int start_idx = 0;
+  for(i = 0; i < undecided_pos.size(); ++i)
+    if (undecided_pos[i] == left_loci[0]) {
+      start_idx = i;
+      break;
+    }
+    
+    // Rcout << allowed << "\n";
+  for(m = 0; m < exist.size(); ++m)
+    for(w = 0; w < allowed.size(); ++w)
+      if(exist[m] != allowed[w]) {
+        flag = 1;
+        break;
+      }
+      
+  if(flag) {
+    for(m = 0; m < combination.nrow(); ++m)
+      for(w = 0; w < allowed.size(); ++w)
+        if(allowed(w) == combination(m, 0))
+          new_combination(num++, _) = combination(m, _);
+    exclude_info = limit_comb_t0(new_combination(Range(0, num - 1), _), hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, num);
+  } else {
+    exclude_info = limit_comb_t0(combination, hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, combination.nrow());
+  }
+        
+        // // Now give the limited combination
+  int num_states = exclude_info["num_states"];
+  IntegerVector exclude = exclude_info["exclude"];
+  // Rcout << num_states << "\n";
+  
+  IntegerMatrix next_comb(num_states, combination.ncol());
+  count = 0;
+        // Now combine first and second part
+  if(flag) {
+    for(m = 0; m < num; ++m) {
+      if(!exclude[m])
+          next_comb(count++, _) = new_combination(m, _);
+      }
+  } else {
+      for(m = 0; m < combination.nrow(); ++m) {
+        if(!exclude[m])
+          next_comb(count++, _) = combination(m, _);
+      }
+  }
+        
+  IntegerVector new_col = next_comb(_, 0);
+  List second_uni = unique_map(new_col); // start might not from 0 (e.g. ailgnment starts from 2)
+  IntegerVector n2 = second_uni["lengths"];
+  IntegerVector possible = second_uni["values"];
+  int all = 0;
+  
+  for(m = 0; m < n2.size(); ++m)
+    all += n2[m] * n1[m];
+  IntegerMatrix final_comb(all, location.size());
+  
+  all = 0;
+        
+  for(k = 0; k < last_col.size(); ++k)
+    for(w = 0; w < count; ++w) {
+      if(new_col(w) == last_col(k)) {
+        for(j = 0; j < overlap_len; ++j)
+          final_comb(all, j) = first_comb(k, j);
+        for(i = len - 1; i < len; ++i)
+          final_comb(all++, i + overlap_len - len + 1) = next_comb(w, i);
+      }
+    }
+        
+  return(final_comb);
+}
+
+vector<vector<int> > cart_product (const vector<vector<int> > &v) {
+  vector<vector<int> > s = {{}};
+  for (const auto& u : v) {
+    vector<vector<int> > r;
+    for (const auto& x : s) {
+      for (const auto y : u) {
+        r.push_back(x);
+        r.back().push_back(y);
+      }
+    }
+    s = move(r);
+  }
+  return s;
+}
+
+IntegerMatrix call_cart_product(IntegerVector len) {
+  unsigned int row = len.size();
+  vector<vector<int> > vec(row);
+  unsigned int col, count, i, j;
+  for (i = 0; i < row; i++) {
+    count = 1;
+    col = len[i];
+    vec[i] = vector<int>(col);
+    for (j = 0; j < col; j++)
+      vec[i][j] = count++;
+  }
+  vector<vector<int> > res = cart_product(vec);
+  IntegerMatrix out(res.size(), row);
+  for(i = 0; i < res.size(); ++i)
+    for(j = 0; j < row; ++j) 
+      out(i, j) = res[i][j] - 1; //minus 1 for the index in C
+  
+  return(out);
+}
 /*
  * determine the hidden state by each time t, only use this on the first time t, then, the rest non_overlapped still use site by site
  */
@@ -409,6 +687,7 @@ List limit_comb(IntegerMatrix combination, List hidden_states, IntegerVector loc
 //   }
 //   
 // }
+
 
 
 
