@@ -535,7 +535,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
       left_possible[count++] = pos_possibility[i];
     }
   }
-  
+  // get the coombination of the non-overlapped location (include last overlapped)
   IntegerMatrix combination = call_cart_product(left_possible[Range(0, count - 1)]);
   // get the appeared possiblilities at the overlapped position
   IntegerVector last_col = first_comb(_, first_comb.ncol() - 1);
@@ -574,7 +574,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
     exclude_info = limit_comb_t0(combination, hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, combination.nrow());
   }
         
-        // // Now give the limited combination
+  // Now give the limited combination
   int num_states = exclude_info["num_states"];
   IntegerVector exclude = exclude_info["exclude"];
   // Rcout << num_states << "\n";
@@ -611,8 +611,8 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
       if(new_col(w) == last_col(k)) {
         for(j = 0; j < overlap_len; ++j)
           final_comb(all, j) = first_comb(k, j);
-        for(i = len - 1; i < len; ++i)
-          final_comb(all++, i + overlap_len - len + 1) = next_comb(w, i);
+        for(i = 1; i < len; ++i)
+          final_comb(all++, i + overlap_len - 1) = next_comb(w, i);
       }
     }
         

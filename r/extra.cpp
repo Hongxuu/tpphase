@@ -215,7 +215,7 @@ vector<vector<int> > cart_product (const vector<vector<int> > &v) {
   }
   return s;
 }
-
+// [[Rcpp::export]]
 IntegerMatrix call_cart_product(IntegerVector len) {
   unsigned int row = len.size();
   vector<vector<int> > vec(row);
@@ -412,12 +412,13 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
   IntegerMatrix sub_link = linkage_info(_, Range(start_idx, start_idx + num - 1));
   IntegerVector exclude(num_states);
   int count, linkage_len, all_excluded;
+  // Rcout << "no. location " << num << "\n";
   linkage_len = num/2; // change the linkage length to be the length appears in the read
   int cut_off;
   all_excluded = num_states;
   while (all_excluded == num_states) {
     cut_off = NUM_CLASS;
-      // Rcout << "linkage length " << linkage_len << "\n"; //actual linkage length + 1
+    // Rcout << "linkage length " << linkage_len << "\n"; //actual linkage length + 1
     while (cut_off >= 1 && all_excluded == num_states) {
       all_excluded = 0;
       for (m = 0; m < num_states; ++m) {
@@ -614,8 +615,9 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   // // Now give the limited combination
   int num_states = exclude_info["num_states"];
   IntegerVector exclude = exclude_info["exclude"];
-  // Rcout << num_states << "\n";
-  
+  Rcout << exclude << "\n";
+  Rcout << "left states:" << num_states << "\n";
+  Rcout << "first states " << first_comb.nrow() << "\n";
   IntegerMatrix next_comb(num_states, combination.ncol());
   count = 0;
   // Now combine first and second part
@@ -630,7 +632,11 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
         next_comb(count++, _) = combination(m, _);
     }
   }
- 
+  // for(m = 0; m < count; ++m){
+  //   for(k = 0; k < combination.ncol(); ++m) {
+  //     Rcout << next_comb(m, k) << "\t";
+  //   }
+  //   Rcout << "\n";}
   IntegerVector new_col = next_comb(_, 0);
   List second_uni = unique_map(new_col); // start might not from 0 (e.g. ailgnment starts from 2)
   IntegerVector n2 = second_uni["lengths"];
@@ -640,20 +646,22 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   for(m = 0; m < n2.size(); ++m)
     all += n2[m] * n1[m];
   IntegerMatrix final_comb(all, location.size());
-  
+  Rcout << all << "\n";
   all = 0;
   
   for(k = 0; k < last_col.size(); ++k) {
     for(w = 0; w < count; ++w) {
-      if(new_col(w) == last_col(k)) {
           for(j = 0; j < overlap_len; ++j) {
-            final_comb(all, j) = first_comb(k, j);
+          Rcout << first_comb(k, j) << "\t";
+           final_comb(all, j) = first_comb(k, j);
           }
-          for(i = len - 1; i < len; ++i) {
-            final_comb(all++, i + overlap_len - len + 1) = next_comb(w, i);
+          for(i = 1; i < len; ++i) {
+          Rcout << next_comb(w, i) << "\t";
+          final_comb(all++, i + overlap_len - 1) = next_comb(w, i);
           }
+          Rcout << "\n";
         }
-    }
+  
   }
  
   return(final_comb);
