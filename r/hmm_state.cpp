@@ -424,94 +424,42 @@ IntegerMatrix unique_overlap(IntegerVector overlapped, IntegerVector exclude_las
     return(wrap(out));
 }
 
-List get_overlap(IntegerVector p_tmax, IntegerVector time_pos, IntegerVector num_states,
-                 IntegerVector undecided_pos, unsigned int t_max, int hap_min_pos)
-{
-  unsigned int start_t = 0;
-  // get the first t which has variation
-  for (unsigned int t = 0; t < t_max; ++t)
-    if(num_states[t] > 1) {
-      start_t = t;
-      break;
+//fill haplotype at the rest sites (with variation) at time t
+IntegerMatrix make_hap(List hidden_states, IntegerMatrix haplotype, IntegerVector location, unsigned int p_tmax,
+                       IntegerVector combination, unsigned int time_pos, unsigned int num, int hap_min_pos) {
+  unsigned int j, k, idx;
+  
+  for(j = 0; j < num; ++j) {
+    IntegerMatrix hidden = hidden_states[location[j]];
+    //Rcout << hidden << "\n";
+    idx = combination[j];
+    //Rcout << idx << "\n";
+    for(k = 0; k < NUM_CLASS; ++k)
+      haplotype(k, location[j]) = hidden(idx, k);
+  }
+  return(haplotype(_, Range(time_pos - hap_min_pos, time_pos + p_tmax - hap_min_pos - 1)));
+}
+
+/*
+ * Return the combination of sites with variation within one time t[NOTE:time_pos might not start from 0, but undecided_pos starts from 0]
+ */
+List find_combination(IntegerVector undecided_pos, IntegerVector pos_possibility, 
+                      unsigned int p_tmax, unsigned int time_pos, int hap_min_pos) {
+  //possible combination of the rest non-unique loci
+  IntegerVector location(pos_possibility.size());
+  IntegerVector location_len(pos_possibility.size());
+  unsigned int num = 0;
+  for(unsigned int i = 0; i < pos_possibility.size(); ++i)
+    if(time_pos - hap_min_pos <= undecided_pos[i] && undecided_pos[i] < time_pos + p_tmax - hap_min_pos) {
+      location(num) = undecided_pos[i];
+      location_len(num++) = pos_possibility[i];
     }
-    List overlapped(t_max);
-    List location(t_max);
-    IntegerVector overlapped_idx(t_max);
-    unsigned int begin, end, end1, min;
-    
-    for (unsigned int t = 0; t < t_max; ++t) {
-      
-      if (num_states[t] == 1) {
-        overlapped[t] = -1;
-        overlapped_idx[t] = -1;
-        location[t] = -1;
-        continue;
-      }
-      if(t == start_t) {
-        overlapped[t] = -1;
-        overlapped_idx[t] = -1;
-        begin = time_pos[start_t] - hap_min_pos;
-        end = time_pos[start_t] + p_tmax[start_t] - hap_min_pos;
-        int num = 0;
-        IntegerVector location_t(undecided_pos.size());
-        for (unsigned int m = 0; m < undecided_pos.size(); ++m)
-          if (undecided_pos[m] >= begin && undecided_pos[m] < end)
-            location_t(num++) = undecided_pos[m];
-          location[start_t] = location_t[Range(0, num - 1)];
-          continue;
-      }
-      begin = time_pos[t] - hap_min_pos;
-      end = time_pos[t] + p_tmax[t] - hap_min_pos;
-      // store location
-      int num = 0;
-      IntegerVector location_t(undecided_pos.size());
-      for (unsigned int m = 0; m < undecided_pos.size(); ++m)
-        if (undecided_pos[m] >= begin && undecided_pos[m] < end)
-          location_t(num++) = undecided_pos[m];
-        location[t] = location_t[Range(0, num - 1)];
-        int len = 0;
-        int id_t = 0;
-        int index = 0;
-        // Rcout << "location" << location_t[num - 1] << "\n";
-        for (unsigned int t1 = 0; t1 < t; ++t1) {
-          IntegerVector last_location = location[t1];
-          // begin1 = time_pos[t1] - hap_min_pos;
-          end1 = last_location[last_location.size() - 1];
-          // Rcout << end1 << "\t";
-          // end1 = time_pos[t1] + p_tmax[t1] - hap_min_pos;
-          if(begin <= end1) {
-            min = end1;
-            // minimum overlapped region
-            if(location_t[num - 1] < end1)
-              min = location_t[num - 1];
-            // find the time t which has the longest coverage
-            if(min - location_t[0] > len) {
-              // Rcout << t << " has coverage with " << t1 << "\n";
-              len = min - location_t[0];
-              id_t = min;
-              index = t1;
-            }
-          }
-        }
-        // Rcout<< "\n" << begin << "\t" << id_t << "\n";
-        int count = 0;
-        IntegerVector position(undecided_pos.size());
-        for (unsigned int m = 0; m < undecided_pos.size(); ++m) 
-          if (undecided_pos[m] >= begin && undecided_pos[m] <= id_t)
-            position(count++) = undecided_pos[m];
-          // Rcout << position << "\n";
-          if(count) { 
-            overlapped[t] = position[Range(0, count - 1)];
-            overlapped_idx[t] = index;
-          }
-    }
-    
-    List overlap = List::create(
-      Named("location") = location,
-      Named("overlapped") = overlapped,
-      Named("overlapped_id") = overlapped_idx, 
-      Named("start_t") = start_t);
-    return(overlap);
+    IntegerMatrix combination = call_cart_product(location_len[Range(0, num - 1)]);
+    List ls = List::create(
+      Named("combination") = combination, // possible comb
+      Named("num") = num, // number of comb sites at time t
+      Named("location") = location[Range(0, num - 1)]); // undecided site at time t [here assume alignment starts from 0]
+    return(ls);
 }
 
 IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVector overlapped, IntegerVector exclude_last, IntegerMatrix overlap_comb, 
@@ -559,10 +507,12 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
     // Rcout << allowed << "\n";
   for(m = 0; m < exist.size(); ++m)
     for(w = 0; w < allowed.size(); ++w)
-      if(exist[m] != allowed[w]) {
-        flag = 1;
-        break;
+      if(exist[m] == allowed[w]) {
+        num++;
       }
+  if(num != exist.size())
+    flag = 1;
+  num = 0;
       
   if(flag) {
     for(m = 0; m < combination.nrow(); ++m)
@@ -612,7 +562,8 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
         for(j = 0; j < overlap_len; ++j)
           final_comb(all, j) = first_comb(k, j);
         for(i = 1; i < len; ++i)
-          final_comb(all++, i + overlap_len - 1) = next_comb(w, i);
+          final_comb(all, i + overlap_len - 1) = next_comb(w, i);
+        all++;
       }
     }
         

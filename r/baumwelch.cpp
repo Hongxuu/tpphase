@@ -33,20 +33,20 @@ List ini_hmm (unsigned int t_max,  IntegerVector num_states, Rcpp::Nullable<Rcpp
     NumericMatrix transition(num_states[t], num_states[t + 1]);
     // 
     // if(trans_indicator.isNotNull()) {
-    //   IntegerMatrix trans_ind = trans_indicator[t];
-    //   for (w = 0; w < num_states[t]; ++w) {
-    //     int new_num = num_states[t + 1];
-    //     for (m = 0; m < num_states[t + 1]; ++m)
-    //       if (trans_ind(w, m)) // 1 means not the same, so cannot b transferred
-    //         new_num--;
-    //       for (m = 0; m < num_states[t + 1]; ++m) 
-    //         if (!trans_ind(w, m)) 
-    //           transition(w, m) = 1/double(new_num);
-    //   }
+      IntegerMatrix trans_ind = trans_indicator[t];
+      for (w = 0; w < num_states[t]; ++w) {
+        int new_num = num_states[t + 1];
+        for (m = 0; m < num_states[t + 1]; ++m)
+          if (trans_ind(w, m)) // 1 means not the same, so cannot b transferred
+            new_num--;
+          for (m = 0; m < num_states[t + 1]; ++m)
+            if (!trans_ind(w, m))
+              transition(w, m) = 1/double(new_num);
+      }
     // } else {
-      for (w = 0; w < num_states[t]; ++w)
-        for (m = 0; m < num_states[t + 1]; ++m) 
-          transition(w, m) = 1/double(num_states[t + 1]);
+      // for (w = 0; w < num_states[t]; ++w)
+      //   for (m = 0; m < num_states[t + 1]; ++m) 
+      //     transition(w, m) = 1/double(num_states[t + 1]);
     // }
     trans(t) = transition;
   }
@@ -283,44 +283,6 @@ IntegerMatrix fill_all_hap(List hidden_states, unsigned int hap_length, IntegerV
   return haplotype;
 }
 
-/*
- * Return the combination of sites with variation within one time t[NOTE:time_pos might not start from 0, but undecided_pos starts from 0]
- */
-List find_combination(IntegerVector undecided_pos, IntegerVector pos_possibility, 
-                      unsigned int p_tmax, unsigned int time_pos, int hap_min_pos) {
-  //possible combination of the rest non-unique loci
-  IntegerVector location(pos_possibility.size());
-  IntegerVector location_len(pos_possibility.size());
-  unsigned int num = 0;
-  for(unsigned int i = 0; i < pos_possibility.size(); ++i)
-    if(time_pos - hap_min_pos <= undecided_pos[i] && undecided_pos[i] < time_pos + p_tmax - hap_min_pos) {
-      location(num) = undecided_pos[i];
-      location_len(num++) = pos_possibility[i];
-    }
-    IntegerMatrix combination = call_cart_product(location_len[Range(0, num - 1)]);
-    List ls = List::create(
-      Named("combination") = combination, // possible comb
-      Named("num") = num, // number of comb sites at time t
-      Named("location") = location[Range(0, num - 1)]); // undecided site at time t [here assume alignment starts from 0]
-    return(ls);
-}
-
-//fill haplotype at the rest sites (with variation) at time t
-IntegerMatrix make_hap(List hidden_states, IntegerMatrix haplotype, IntegerVector location, unsigned int p_tmax,
-                       IntegerVector combination, unsigned int time_pos, unsigned int num, int hap_min_pos) {
-  unsigned int j, k, idx;
-  
-  for(j = 0; j < num; ++j) {
-    IntegerMatrix hidden = hidden_states[location[j]];
-    //Rcout << hidden << "\n";
-    idx = combination[j];
-    //Rcout << idx << "\n";
-    for(k = 0; k < NUM_CLASS; ++k)
-      haplotype(k, location[j]) = hidden(idx, k);
-  }
-  return(haplotype(_, Range(time_pos - hap_min_pos, time_pos + p_tmax - hap_min_pos - 1)));
-}
-
 // [[Rcpp::export]]
 IntegerMatrix linkage_info(List dat_info, IntegerVector undecided_pos) {
   IntegerMatrix ref_index = dat_info["ref_idx"];
@@ -350,9 +312,99 @@ IntegerMatrix linkage_info(List dat_info, IntegerVector undecided_pos) {
   }
   return(link);
 }
+// [[Rcpp::export]]
+List get_overlap(IntegerVector p_tmax, IntegerVector time_pos, IntegerVector num_states,
+                 IntegerVector undecided_pos, unsigned int t_max, int hap_min_pos)
+{
+  unsigned int start_t = 0;
+  // get the first t which has variation
+  for (unsigned int t = 0; t < t_max; ++t)
+    if(num_states[t] > 1) {
+      start_t = t;
+      break;
+    }
+    List overlapped(t_max);
+    List location(t_max);
+    IntegerVector overlapped_idx(t_max);
+    unsigned int begin, end, end1, min;
+    
+    for (unsigned int t = 0; t < t_max; ++t) {
+      
+      if (num_states[t] == 1) {
+        overlapped[t] = -1;
+        overlapped_idx[t] = -1;
+        location[t] = -1;
+        continue;
+      }
+      if(t == start_t) {
+        overlapped[t] = -1;
+        overlapped_idx[t] = -1;
+        begin = time_pos[start_t] - hap_min_pos;
+        end = time_pos[start_t] + p_tmax[start_t] - hap_min_pos;
+        int num = 0;
+        IntegerVector location_t(undecided_pos.size());
+        for (unsigned int m = 0; m < undecided_pos.size(); ++m)
+          if (undecided_pos[m] >= begin && undecided_pos[m] < end)
+            location_t(num++) = undecided_pos[m];
+          location[start_t] = location_t[Range(0, num - 1)];
+          continue;
+      }
+      begin = time_pos[t] - hap_min_pos;
+      end = time_pos[t] + p_tmax[t] - hap_min_pos;
+      // store location
+      int num = 0;
+      IntegerVector location_t(undecided_pos.size());
+      for (unsigned int m = 0; m < undecided_pos.size(); ++m)
+        if (undecided_pos[m] >= begin && undecided_pos[m] < end)
+          location_t(num++) = undecided_pos[m];
+        location[t] = location_t[Range(0, num - 1)];
+        int len = 0;
+        int id_t = 0;
+        int index = 0;
+        // Rcout << "location" << location_t[num - 1] << "\n";
+        for (unsigned int t1 = 0; t1 < t; ++t1) {
+          IntegerVector last_location = location[t1];
+          // begin1 = time_pos[t1] - hap_min_pos;
+          end1 = last_location[last_location.size() - 1];
+          // Rcout << end1 << "\t";
+          // end1 = time_pos[t1] + p_tmax[t1] - hap_min_pos;
+          if(begin <= end1) {
+            min = end1;
+            // minimum overlapped region
+            if(location_t[num - 1] < end1)
+              min = location_t[num - 1];
+            // find the time t which has the longest coverage
+            if(min - location_t[0] > len) {
+              // Rcout << t << " has coverage with " << t1 << "\n";
+              len = min - location_t[0];
+              id_t = min;
+              index = t1;
+            }
+          }
+        }
+        // Rcout<< "\n" << begin << "\t" << id_t << "\n";
+        int count = 0;
+        IntegerVector position(undecided_pos.size());
+        for (unsigned int m = 0; m < undecided_pos.size(); ++m) 
+          if (undecided_pos[m] >= begin && undecided_pos[m] <= id_t)
+            position(count++) = undecided_pos[m];
+          // Rcout << position << "\n";
+          if(count) { 
+            overlapped[t] = position[Range(0, count - 1)];
+            overlapped_idx[t] = index;
+          }
+    }
+    
+    List overlap = List::create(
+      Named("location") = location,
+      Named("overlapped") = overlapped,
+      Named("overlapped_id") = overlapped_idx, 
+      Named("start_t") = start_t);
+    return(overlap);
+}
 
 // [[Rcpp::export]]
-List full_hap_new (List hmm_info, IntegerMatrix linkage_info, unsigned int hap_length, int hap_min_pos) {
+List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info, unsigned int hap_length, int hap_min_pos) {
   List hidden_states = hmm_info["hidden_states"];
   IntegerVector num_states = hmm_info["num_states"];
   IntegerVector time_pos = hmm_info["time_pos"];
@@ -366,7 +418,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, unsigned int hap_l
   List comb(t_max);
   IntegerMatrix hap = fill_all_hap(hidden_states, hap_length, n_row);
   IntegerVector new_num_states(t_max);
-  List overlap_info = get_overlap(p_tmax, time_pos, num_states, undecided_pos, t_max, hap_min_pos);
+  // List overlap_info = get_overlap(p_tmax, time_pos, num_states, undecided_pos, t_max, hap_min_pos);
   List overlapped = overlap_info["overlapped"];
   IntegerVector overlapped_id = overlap_info["overlapped_id"];
   int start_t = overlap_info["start_t"];
@@ -888,145 +940,190 @@ List baum_welch_iter(List hmm_info, List par_hmm, List data_info, List hap_info,
 // undecided_pos starts from 0; but time_pos starts from int hap_min_pos = dat_info["ref_start"];
 
 // [[Rcpp::export]]
-List trans_permit(IntegerVector num_states, List combination, int t_max, IntegerVector undecided_pos, 
-                   IntegerVector time_pos, IntegerVector p_tmax, int hap_min_pos) {
+List trans_permit(IntegerVector num_states, List combination, List loci, int t_max) {
   List trans_permits(t_max - 1);
-  List further_limit_col(t_max - 1);
-  List further_limit_row(t_max - 1);
-  IntegerVector new_num_states(t_max);
   unsigned int t, j, m, w;
-  int end_t1, begin_t2, end_t2;
-  for (t = 0; t < t_max; ++t)
-    new_num_states[t] = num_states[t];
   
-  for (t = 0; t < t_max - 1; ++t) {
+  for(t = 0; t < t_max - 1; ++t) {
     if(num_states[t + 1] != 1) {
-      end_t1 = time_pos[t] + p_tmax[t];
-      begin_t2 = time_pos[t + 1];
-      end_t2 = time_pos[t + 1] + p_tmax[t + 1];
-      if(end_t1 > end_t2)
-        end_t1 = end_t2; // take the smaller one
-      IntegerMatrix full_hap_t1 = combination(t);
-      IntegerMatrix full_hap_t2 = combination(t + 1);
       IntegerMatrix trans(num_states[t], num_states[t + 1]);
-      int count = 0; // number of overlapped variational sites
-      int count1 = 0;
-      
-      for(j = 0; j < undecided_pos.size(); ++j)
-        if (undecided_pos[j] + hap_min_pos < end_t1 && undecided_pos[j] >= time_pos[t]) {
-          count1++;
-          if(undecided_pos[j] + hap_min_pos >= begin_t2)
-            count++;
+      IntegerMatrix comb_t1 = combination[t];
+      IntegerMatrix comb_t2 = combination[t + 1];
+      IntegerVector location_t1 = loci[t];
+      IntegerVector location_t2 = loci[t + 1];
+      // Rcout << location_t1 << "\n";
+      // Rcout << location_t2 << "\n";
+      // get the overlapped region, this moght be different from the overlapped states we had
+      int id = 0;
+      for(j = 0; j < location_t1.size(); ++j) 
+        if(location_t1[j] == location_t2[0]) {
+          id = j;
+          break;
         }
-        // Rcout << t << "\t" << count << "\n";
-        int left = count1 - count;
-        for(m = 0; m < num_states[t]; ++m) {
-          IntegerVector hap_t1 = full_hap_t1(m, _);
-          // Rcout << hap_t1 << "\n";
-          for(w = 0; w < num_states[t + 1]; ++w) {
-            IntegerVector hap_t2 = full_hap_t2(w, _);
-            // Rcout << hap_t2 << "\t";
-            for(j = 0; j < count; ++j)
-              if (hap_t2(j) != hap_t1(j + left)) {
-                trans(m, w) = 1; // represents m cannot transfer to w
-                break;
-              }
-          }
-          // Rcout << "\n";
-        }
-        // if for a row, all == 1 or for a column all == 1, then these two should be excluded
-        IntegerVector more_limits_row(num_states[t]);
-        IntegerVector more_limits_col(num_states[t + 1]);
-        trans_permits(t) = trans;
-        for(w = 0; w < num_states[t + 1]; ++w) {
-          int num_col = 0;
+        int end = 0;
+        for(j = id; j < location_t1.size(); ++j)
+          if(location_t1[j] == location_t2[j - id])
+            end = j;
+          
           for(m = 0; m < num_states[t]; ++m) {
-            if(trans(m, w) == 1)
-              num_col++;
+            IntegerVector hap_t1 = comb_t1(m, _);
+            for(w = 0; w < num_states[t + 1]; ++w) {
+              IntegerVector hap_t2 = comb_t2(w, _);
+              for(j = id; j < end; ++j)
+                if (hap_t1(j) != hap_t2(j - id)) {
+                  trans(m, w) = 1; // represents m cannot transfer to w
+                  break;
+                }
+            }
           }
-          if(num_col == num_states[t]){
-            more_limits_col[w] = 1; 
-          }// meaning no states transfer to it, there must be some overlaps??? what if not?
-        }
-        for(m = 0; m < num_states[t]; ++m) {
-          int num_row = 0;
-          for(w = 0; w < num_states[t + 1]; ++w) {
-            if(trans(m, w) == 1)
-              num_row++;
-          }
-          if(num_row == num_states[t + 1]){
-            more_limits_row[m] = 1; 
-          }
-        }
-        // found the states that never appears
-        further_limit_col(t) = more_limits_col;
-        further_limit_row(t) = more_limits_row;
+          trans_permits(t) = trans;
     } else {
-      IntegerVector more_limits_col(num_states[t + 1]);
-      IntegerVector more_limits_row(num_states[t]);
       IntegerMatrix temp(num_states[t], num_states[t + 1]);
       trans_permits(t) = temp;
-      further_limit_col(t) = more_limits_col;
-      further_limit_row(t) = more_limits_row;
     }
   }
-  List further_limit(t_max);
-  IntegerVector more_limits_row = further_limit_row[0];
-  for (m = 0; m < num_states[0]; ++m)
-    if (more_limits_row[m] == 1)
-      new_num_states[0]--;
-    further_limit[0] = further_limit_row[0];
-    IntegerVector more_limits_col = further_limit_col[t_max - 2];
-    for(w = 0; w < num_states[t_max - 1]; ++w) {
-      if(more_limits_col[w] == 1)
-        new_num_states[t_max - 1]--;
-    }
-    further_limit[t_max - 1] = further_limit_col[t_max - 2];
-    
-    for(t = 1; t < t_max - 1; ++t) {
-      more_limits_row = further_limit_row(t);
-      more_limits_col = further_limit_col(t - 1);
-      IntegerVector combine(more_limits_row.size());
-      // find the union of these two vector
-      for(w = 0; w < num_states[t]; ++w) {
-        if(more_limits_col[w] == 1 || more_limits_row[w] == 1)
-          combine[w] = 1;
-      }
-      further_limit[t] = combine; // indicates some states cannot appear
-      for(w = 0; w < num_states[t]; ++w)
-        if(combine[w] == 1)
-          new_num_states[t]--;
-    }
-    
-    List out = List::create(
-      Named("trans_permits") = trans_permits,
-      Named("further_limit") = further_limit, 
-      Named("new_num_states") = new_num_states);
-    
-    return(out);
+  
+  return(trans_permits);
 }
+// List trans_permit(IntegerVector num_states, List combination, int t_max, IntegerVector undecided_pos, 
+//                    IntegerVector time_pos, IntegerVector p_tmax, int hap_min_pos) {
+//   List trans_permits(t_max - 1);
+//   List further_limit_col(t_max - 1);
+//   List further_limit_row(t_max - 1);
+//   IntegerVector new_num_states(t_max);
+//   unsigned int t, j, m, w;
+//   int end_t1, begin_t2, end_t2;
+//   for (t = 0; t < t_max; ++t)
+//     new_num_states[t] = num_states[t];
+//   
+//   for (t = 0; t < t_max - 1; ++t) {
+//     if(num_states[t + 1] != 1) {
+//       end_t1 = time_pos[t] + p_tmax[t];
+//       begin_t2 = time_pos[t + 1];
+//       end_t2 = time_pos[t + 1] + p_tmax[t + 1];
+//       if(end_t1 > end_t2)
+//         end_t1 = end_t2; // take the smaller one
+//       IntegerMatrix full_hap_t1 = combination(t);
+//       IntegerMatrix full_hap_t2 = combination(t + 1);
+//       IntegerMatrix trans(num_states[t], num_states[t + 1]);
+//       int count = 0; // number of overlapped variational sites
+//       int count1 = 0;
+//       
+//       for(j = 0; j < undecided_pos.size(); ++j)
+//         if (undecided_pos[j] + hap_min_pos < end_t1 && undecided_pos[j] >= time_pos[t]) {
+//           count1++;
+//           if(undecided_pos[j] + hap_min_pos >= begin_t2)
+//             count++;
+//         }
+//         // Rcout << t << "\t" << count << "\n";
+//         int left = count1 - count;
+//         for(m = 0; m < num_states[t]; ++m) {
+//           IntegerVector hap_t1 = full_hap_t1(m, _);
+//           // Rcout << hap_t1 << "\n";
+//           for(w = 0; w < num_states[t + 1]; ++w) {
+//             IntegerVector hap_t2 = full_hap_t2(w, _);
+//             // Rcout << hap_t2 << "\t";
+//             for(j = 0; j < count; ++j)
+//               if (hap_t2(j) != hap_t1(j + left)) {
+//                 trans(m, w) = 1; // represents m cannot transfer to w
+//                 break;
+//               }
+//           }
+//           // Rcout << "\n";
+//         }
+//         // if for a row, all == 1 or for a column all == 1, then these two should be excluded
+//         IntegerVector more_limits_row(num_states[t]);
+//         IntegerVector more_limits_col(num_states[t + 1]);
+//         trans_permits(t) = trans;
+//         for(w = 0; w < num_states[t + 1]; ++w) {
+//           int num_col = 0;
+//           for(m = 0; m < num_states[t]; ++m) {
+//             if(trans(m, w) == 1)
+//               num_col++;
+//           }
+//           if(num_col == num_states[t]){
+//             more_limits_col[w] = 1; 
+//           }// meaning no states transfer to it, there must be some overlaps??? what if not?
+//         }
+//         for(m = 0; m < num_states[t]; ++m) {
+//           int num_row = 0;
+//           for(w = 0; w < num_states[t + 1]; ++w) {
+//             if(trans(m, w) == 1)
+//               num_row++;
+//           }
+//           if(num_row == num_states[t + 1]){
+//             more_limits_row[m] = 1; 
+//           }
+//         }
+//         // found the states that never appears
+//         further_limit_col(t) = more_limits_col;
+//         further_limit_row(t) = more_limits_row;
+//     } else {
+//       IntegerVector more_limits_col(num_states[t + 1]);
+//       IntegerVector more_limits_row(num_states[t]);
+//       IntegerMatrix temp(num_states[t], num_states[t + 1]);
+//       trans_permits(t) = temp;
+//       further_limit_col(t) = more_limits_col;
+//       further_limit_row(t) = more_limits_row;
+//     }
+//   }
+//   List further_limit(t_max);
+//   IntegerVector more_limits_row = further_limit_row[0];
+//   for (m = 0; m < num_states[0]; ++m)
+//     if (more_limits_row[m] == 1)
+//       new_num_states[0]--;
+//     further_limit[0] = further_limit_row[0];
+//     IntegerVector more_limits_col = further_limit_col[t_max - 2];
+//     for(w = 0; w < num_states[t_max - 1]; ++w) {
+//       if(more_limits_col[w] == 1)
+//         new_num_states[t_max - 1]--;
+//     }
+//     further_limit[t_max - 1] = further_limit_col[t_max - 2];
+//     
+//     for(t = 1; t < t_max - 1; ++t) {
+//       more_limits_row = further_limit_row(t);
+//       more_limits_col = further_limit_col(t - 1);
+//       IntegerVector combine(more_limits_row.size());
+//       // find the union of these two vector
+//       for(w = 0; w < num_states[t]; ++w) {
+//         if(more_limits_col[w] == 1 || more_limits_row[w] == 1)
+//           combine[w] = 1;
+//       }
+//       further_limit[t] = combine; // indicates some states cannot appear
+//       for(w = 0; w < num_states[t]; ++w)
+//         if(combine[w] == 1)
+//           new_num_states[t]--;
+//     }
+//     
+//     List out = List::create(
+//       Named("trans_permits") = trans_permits,
+//       Named("further_limit") = further_limit, 
+//       Named("new_num_states") = new_num_states);
+//     
+//     return(out);
+// }
 
-// [[Rcpp::export]]
-List final_exclude(List full_hap, List further_limit, int t_max, IntegerVector num_states) {
-  unsigned int t, m;
-  List full_hap_new(t_max);
-  
-  for (t = 0; t < t_max; ++t) {
-    List full_hap_t = full_hap[t];
-    List full_hap_t_new(num_states[t]);
-    IntegerVector more_limits = further_limit[t];
-    int count = 0;
-    for (m = 0; m < more_limits.size(); ++m) {
-      if (!more_limits[m]) {
-        IntegerMatrix haplotype = full_hap_t(m);
-        full_hap_t_new[count++] = haplotype;
-      }
-    }
-    full_hap_new[t] = full_hap_t_new;
-  }
-  
-  return(full_hap_new);
-}
+// 
+// List final_exclude(List full_hap, List further_limit, int t_max, IntegerVector num_states) {
+//   unsigned int t, m;
+//   List full_hap_new(t_max);
+//   
+//   for (t = 0; t < t_max; ++t) {
+//     List full_hap_t = full_hap[t];
+//     List full_hap_t_new(num_states[t]);
+//     IntegerVector more_limits = further_limit[t];
+//     int count = 0;
+//     for (m = 0; m < more_limits.size(); ++m) {
+//       if (!more_limits[m]) {
+//         IntegerMatrix haplotype = full_hap_t(m);
+//         full_hap_t_new[count++] = haplotype;
+//       }
+//     }
+//     full_hap_new[t] = full_hap_t_new;
+//   }
+//   
+//   return(full_hap_new);
+// }
 
 
 

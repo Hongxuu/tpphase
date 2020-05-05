@@ -73,7 +73,8 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   ##### use linkage info to limit some unlikelily happened transition
   hap_length <- dat_info$ref_length_max - dat_info$ref_start
   linkage_info <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
-  hap_full_info <- full_hap_new(HMM, linkage_info, hap_length, dat_info$ref_start)
+  overlap_info <- get_overlap(HMM$p_tmax, HMM$time_pos, HMM$num_states, HMM$undecided_pos, HMM$t_max, dat_info$ref_start)
+  hap_full_info <- full_hap_new(HMM, linkage_info, overlap_info, hap_length, dat_info$ref_start)
   # hap_full_info <- full_hap(hmm_info = HMM, linkage_info = linkage_info, hap_length = hap_length, 
   #                           hap_min_pos = dat_info$ref_start)
   hap_full <- hap_full_info$full_hap
@@ -99,18 +100,20 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
                  n_class = n_class, num_cat = num_cat, ncores = ncores, weight_id = weight_id)
   # 
   ###some transition could not happen, can be set to null
-  trans_indicator_new = NULL;
-  trans_indicator <- trans_permit(HMM$num_states, hap_full_info$combination, HMM$t_max, HMM$undecided_pos, 
-               HMM$time_pos, HMM$p_tmax, dat_info$ref_start)
-  HMM$num_states <- trans_indicator$new_num_states
-  hap_full <- final_exclude(full_hap = hap_full, further_limit = trans_indicator$further_limit, 
-                                 t_max = HMM$t_max, num_states = HMM$num_states)
-  trans_indicator_new <- prepare_ini_hmm(HMM$t_max, HMM$num_states, 
-                                         trans_indicator$trans_permits, trans_indicator$further_limit);
+  trans_indicator <- trans_permit(num_states = HMM$num_states, combination = hap_full_info$combination, 
+                                  loci = overlap_info$location, t_max = HMM$t_max)
+  # trans_indicator_new = NULL;
+  # trans_indicator <- trans_permit(HMM$num_states, hap_full_info$combination, HMM$t_max, HMM$undecided_pos, 
+  #              HMM$time_pos, HMM$p_tmax, dat_info$ref_start)
+  # HMM$num_states <- trans_indicator$new_num_states
+  # hap_full <- final_exclude(full_hap = hap_full, further_limit = trans_indicator$further_limit, 
+  #                                t_max = HMM$t_max, num_states = HMM$num_states)
+  # trans_indicator_new <- prepare_ini_hmm(HMM$t_max, HMM$num_states, 
+  #                                        trans_indicator$trans_permits, trans_indicator$further_limit);
   
   ### start initializing
   bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, 
-                        par = par, PD_LENGTH = nrow(par$beta), trans_indicator_new = trans_indicator_new)
+                        par = par, PD_LENGTH = nrow(par$beta), trans_indicator_new = trans_indicator)
   rm(hap_full_info)
   ###### estimate beta
   weight_id <- NULL
@@ -171,29 +174,48 @@ comb_info5 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax
 comb_info6 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[6], HMM$time_pos[6], dat_info$ref_start)
 comb_info7 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[7], HMM$time_pos[7], dat_info$ref_start)
 comb_info8 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[8], HMM$time_pos[8], dat_info$ref_start)
-get_overlap(HMM$p_tmax, HMM$time_pos, HMM$num_states, HMM$undecided_pos, HMM$t_max, dat_info$ref_start) -> aaa
+
 
 t0 <- limit_comb_t0(comb_info1$combination, HMM$hidden_states, comb_info1$location, linkage_info = linkage_info, 
                     comb_info1$num, 0, HMM$num_states[1])
 t1 <- t0
-t2 <- unique_overlap(overlapped = aaa$overlapped[[3]], exclude_last = t0$exclude, overlap_comb = comb_info1$combination, 
-                     overlap_loci = aaa$location[[1]], overlap_new_states = t0$num_states, overlap_num_states = HMM$num_states[1])
+t2 <- unique_overlap(overlapped = overlap_info$overlapped[[3]], exclude_last = t0$exclude, overlap_comb = comb_info1$combination, 
+                     overlap_loci = overlap_info$location[[1]], overlap_new_states = t0$num_states, overlap_num_states = HMM$num_states[1])
 
-t3 <- new_combination(HMM, location = aaa$location[[4]], overlapped = aaa$overlapped[[4]], exclude_last = t0$exclude, 
+t3 <- new_combination(HMM, location = overlap_info$location[[4]], overlapped = overlap_info$overlapped[[4]], exclude_last = t0$exclude, 
                      overlap_comb = comb_info1$combination, 
-                overlap_loci = aaa$location[[1]], linkage_info = linkage_info,
+                overlap_loci = overlap_info$location[[1]], linkage_info = linkage_info,
                 overlap_new_states = t0$num_states, overlap_num_states = HMM$num_states[1])
 
-t4 <- unique_overlap(overlapped = aaa$overlapped[[5]], exclude_last = t0$exclude, overlap_comb = comb_info1$combination, 
-                     overlap_loci = aaa$location[[1]], overlap_new_states = t0$num_states, overlap_num_states = HMM$num_states[1])
+t4 <- unique_overlap(overlapped = overlap_info$overlapped[[5]], exclude_last = t0$exclude, overlap_comb = comb_info1$combination, 
+                     overlap_loci = overlap_info$location[[1]], overlap_new_states = t0$num_states, overlap_num_states = HMM$num_states[1])
 exclude <- rep(0, nrow(t3))
-t5 <- new_combination(HMM, location = aaa$location[[6]], overlapped = aaa$overlapped[[6]], exclude_last = exclude, 
-                      overlap_comb = t3, overlap_loci = aaa$location[[4]], linkage_info = linkage_info,
+t5 <- new_combination(HMM, location = overlap_info$location[[6]], overlapped = overlap_info$overlapped[[6]], exclude_last = exclude, 
+                      overlap_comb = t3, overlap_loci = overlap_info$location[[4]], linkage_info = linkage_info,
                       overlap_new_states = nrow(t3), overlap_num_states = nrow(t3))
-t6 <- unique_overlap(overlapped = aaa$overlapped[[7]], exclude_last = t0$exclude, overlap_comb = comb_info1$combination, 
-                     overlap_loci = aaa$location[[1]], overlap_new_states = t0$num_states, overlap_num_states = HMM$num_states[1])
-full_hap_new (HMM, linkage_info, hap_length, dat_info$ref_start) -> test
+t6 <- unique_overlap(overlapped = overlap_info$overlapped[[7]], exclude_last = t0$exclude, overlap_comb = comb_info1$combination, 
+                     overlap_loci = overlap_info$location[[1]], overlap_new_states = t0$num_states, overlap_num_states = HMM$num_states[1])
+t11 <- hap_full_info$combination[[11]]
+exclude <- rep(0, nrow(t11))
+t7 <- hap_full_info$combination[[8]]
+t12 <- new_combination(HMM, location = overlap_info$location[[12]], overlapped = overlap_info$overlapped[[12]], exclude_last = exclude, 
+                      overlap_comb = t11, overlap_loci = overlap_info$location[[11]], linkage_info = linkage_info,
+                      overlap_new_states = nrow(t11), overlap_num_states = nrow(t11))
+exclude <- rep(0, nrow(t7))
+first_comb = unique_overlap(overlap_info$overlapped[[11]], exclude, t7, overlap_info$location[[11]], 
+                            nrow(t7),  nrow(t7))
+t11 <- new_combination(HMM, location = overlap_info$location[[11]], overlapped = overlap_info$overlapped[[11]], exclude_last = exclude, 
+                       overlap_comb = t7, overlap_loci = overlap_info$location[[8]], linkage_info = linkage_info,
+                       overlap_new_states = nrow(t7), overlap_num_states = nrow(t7))
+tmp <- new_combination(HMM, location = overlap_info$location[[11]], overlapped = overlap_info$overlapped[[11]], exclude_last = rep(0, nrow(hap_full_info$combination[[8]])), 
+                       overlap_comb = hap_full_info$combination[[8]], overlap_loci = overlap_info$location[[8]], linkage_info = linkage_info,
+                       overlap_new_states = nrow(hap_full_info$combination[[8]]), 
+                       overlap_num_states =  nrow(hap_full_info$combination[[8]]))
 
+unique_overlap(overlapped = overlap_info$overlapped[[11]], exclude_last = rep(0, nrow(hap_full_info$combination[[8]])), 
+               overlap_comb = hap_full_info$combination[[8]], 
+               overlap_loci = overlap_info$location[[8]], overlap_new_states = nrow(hap_full_info$combination[[8]]), 
+               overlap_num_states =  nrow(hap_full_info$combination[[8]]))
 
 
 
