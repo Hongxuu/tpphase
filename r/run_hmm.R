@@ -113,8 +113,9 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   
   ### start initializing
   bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, 
-                        par = par, PD_LENGTH = nrow(par$beta), trans_indicator_new = trans_indicator)
+                        par = par, PD_LENGTH = nrow(par$beta), trans_indicator = trans_indicator)
   rm(hap_full_info)
+  rm(trans_indicator)
   ###### estimate beta
   weight_id <- NULL
   data <- format_data2(hmm_info = HMM, d_info = dat_info, hap_info = hap_full)
@@ -174,6 +175,7 @@ comb_info5 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax
 comb_info6 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[6], HMM$time_pos[6], dat_info$ref_start)
 comb_info7 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[7], HMM$time_pos[7], dat_info$ref_start)
 comb_info8 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[8], HMM$time_pos[8], dat_info$ref_start)
+comb_info13 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[13], HMM$time_pos[13], dat_info$ref_start)
 
 
 t0 <- limit_comb_t0(comb_info1$combination, HMM$hidden_states, comb_info1$location, linkage_info = linkage_info, 

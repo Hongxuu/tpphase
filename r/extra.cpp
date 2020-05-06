@@ -17,189 +17,276 @@ using namespace std;
 #define MLOGIT_CLASS 4
 
 
-// [[Rcpp::export]]
 // trans_indicator: indicate which state can transfer to which, further_limit indicate some states should not be considered
-List prepare_ini_hmm2 (unsigned int t_max, IntegerVector num_states, List trans_indicator, List further_limit) {
-  List trans_new_ind(t_max - 1);
-  // List emit(t_max);
-  unsigned int w, m, t;
-  // 
-  // IntegerVector more_limit = further_limit[0];
-  // IntegerMatrix trans_ind = trans_indicator[0];
-  // IntegerMatrix trans_id_new(num_states[0], num_states[1]);
-  // int count = 0;
-  // for (w = 0; w < trans_ind.ncol(); ++w)
-  //   if(!more_limit[w])
-  //     trans_id_new(_, count++) = trans_ind(_, w);
-  //   trans_new_ind[0] = trans_id_new;
+// List prepare_ini_hmm2 (unsigned int t_max, IntegerVector num_states, List trans_indicator, List further_limit) {
+//   List trans_new_ind(t_max - 1);
+//   // List emit(t_max);
+//   unsigned int w, m, t;
+//   // 
+//   // IntegerVector more_limit = further_limit[0];
+//   // IntegerMatrix trans_ind = trans_indicator[0];
+//   // IntegerMatrix trans_id_new(num_states[0], num_states[1]);
+//   // int count = 0;
+//   // for (w = 0; w < trans_ind.ncol(); ++w)
+//   //   if(!more_limit[w])
+//   //     trans_id_new(_, count++) = trans_ind(_, w);
+//   //   trans_new_ind[0] = trans_id_new;
+//   
+//   for(t = 0; t < t_max - 1; ++t) {
+//     // Rcout << t << "\n";
+//     IntegerVector more_limit_last = further_limit[t];
+//     IntegerVector more_limit = further_limit[t + 1];
+//     IntegerMatrix trans_ind = trans_indicator[t];
+//     IntegerMatrix trans_ind_new(trans_ind.nrow(), num_states[t + 1]);
+//     int count2 = 0;
+//     int count = 0;
+//     for (w = 0; w < trans_ind.ncol(); ++w)
+//       if(!more_limit[w])
+//         trans_ind_new(_, count++) = trans_ind(_, w);
+//       for (m = 0; m < trans_ind.nrow(); ++m)
+//         if(!more_limit_last[m])
+//           trans_ind_new2(count2++, _) = trans_ind_new(m, _);
+//         trans_new_ind[t] = trans_ind_new2;
+//   }
+//   
+//   return(trans_new_ind);
+// }
+// [[Rcpp::export]]
+List trans_permit(IntegerVector num_states, List combination, List loci, int t_max) {
+  List trans_permits(t_max - 1);
+  unsigned int t, j, m, w;
   
   for(t = 0; t < t_max - 1; ++t) {
-    // Rcout << t << "\n";
-    IntegerVector more_limit_last = further_limit[t];
-    IntegerVector more_limit = further_limit[t + 1];
-    IntegerMatrix trans_ind = trans_indicator[t];
-    IntegerMatrix trans_ind_new(trans_ind.nrow(), num_states[t + 1]);
-    int count2 = 0;
-    int count = 0;
-    for (w = 0; w < trans_ind.ncol(); ++w)
-      if(!more_limit[w])
-        trans_ind_new(_, count++) = trans_ind(_, w);
-      IntegerMatrix trans_ind_new2(num_states[t], num_states[t + 1]);
-      for (m = 0; m < trans_ind.nrow(); ++m)
-        if(!more_limit_last[m])
-          trans_ind_new2(count2++, _) = trans_ind_new(m, _);
-        trans_new_ind[t] = trans_ind_new2;
-  }
-  
-  return(trans_new_ind);
-}
-  
-  // [[Rcpp::export]]
-  List trans_permit2(IntegerVector num_states, List combination, int t_max, IntegerVector undecided_pos, 
-                    IntegerVector time_pos, IntegerVector p_tmax, int hap_min_pos) {
-    List trans_permits(t_max - 1);
-    List further_limit_col(t_max - 1);
-    List further_limit_row(t_max - 1);
-    IntegerVector new_num_states(t_max);
-    unsigned int t, j, m, w;
-    int end_t1, begin_t2, end_t2;
-    for (t = 0; t < t_max; ++t)
-      new_num_states[t] = num_states[t];
-    
-    for (t = 0; t < t_max - 1; ++t) {
-      if(num_states[t + 1] != 1 && num_states[t] != 1) { // assume if no. state = 1, then it can transfer to all
-        end_t1 = time_pos[t] + p_tmax[t];
-        begin_t2 = time_pos[t + 1];
-        end_t2 = time_pos[t + 1] + p_tmax[t + 1];
-        if(end_t1 > end_t2)
-          end_t1 = end_t2; // take the smaller one
-        IntegerMatrix full_hap_t1 = combination(t);
-        IntegerMatrix full_hap_t2 = combination(t + 1);
-        IntegerMatrix trans(num_states[t], num_states[t + 1]);
-        int count = 0; // number of overlapped variational sites
-        int count1 = 0;
+    if(num_states[t + 1] != 1) {
+      IntegerMatrix trans(num_states[t], num_states[t + 1]);
+      IntegerMatrix comb_t1 = combination[t];
+      IntegerMatrix comb_t2 = combination[t + 1];
+      IntegerVector location_t1 = loci[t];
+      IntegerVector location_t2 = loci[t + 1];
+      // Rcout << location_t1 << "\n";
+      // Rcout << location_t2 << "\n";
+      // get the overlapped region, this moght be different from the overlapped states we had
+      int id = 0;
+      for(j = 0; j < location_t1.size(); ++j) 
+        if(location_t1[j] == location_t2[0]) {
+          id = j;
+          break;
+        }
+      int end = 0;
+      for(j = id; j < location_t1.size(); ++j)
+        if(location_t1[j] == location_t2[j - id])
+          end = j;
         
-        for(j = 0; j < undecided_pos.size(); ++j)
-          if (undecided_pos[j] + hap_min_pos < end_t1 && undecided_pos[j] >= time_pos[t]) {
-            count1++;
-            if(undecided_pos[j] + hap_min_pos >= begin_t2)
-              count++;
-          }
-          // Rcout << t << "\t" << count << "\n";
-        int left = count1 - count;
-          for(m = 0; m < num_states[t]; ++m) {
-            IntegerVector hap_t1 = full_hap_t1(m, _);
-            // Rcout << hap_t1 << "\n";
-            for(w = 0; w < num_states[t + 1]; ++w) {
-              IntegerVector hap_t2 = full_hap_t2(w, _);
-              // Rcout << hap_t2 << "\t";
-              for(j = 0; j < count; ++j)
-                if (hap_t2(j) != hap_t1(j + left)) {
-                  trans(m, w) = 1; // represents m cannot transfer to w
-                  break;
-                }
-            }
-          }
-          trans_permits(t) = trans;
-      } else {
-        IntegerMatrix temp(num_states[t], num_states[t + 1]);
-        trans_permits(t) = temp;
-      }
-    }
-    // label the states that should be excluded (go forward)
-    for(t = 0; t < t_max - 1; ++t) {
-      if(num_states[t + 1] != 1 || num_states[t] != 1) { 
-      // if for a row, all == 1 or for a column all == 1, then these two should be excluded
-      IntegerVector more_limits_row(num_states[t]);
-      IntegerVector more_limits_col(num_states[t + 1]);
-      IntegerVector more_limits_col_last;
-      IntegerMatrix trans = trans_permits(t);
-      int exluded_col = 0;
-      for(w = 0; w < num_states[t + 1]; ++w) {
-        int num_col = 0;
         for(m = 0; m < num_states[t]; ++m) {
-          if(trans(m, w) == 1)
-            num_col++;
+          IntegerVector hap_t1 = comb_t1(m, _);
+          for(w = 0; w < num_states[t + 1]; ++w) {
+            IntegerVector hap_t2 = comb_t2(w, _);
+            for(j = id; j < end; ++j)
+              if (hap_t1(j) != hap_t2(j - id)) {
+                trans(m, w) = 1; // represents m cannot transfer to w
+                break;
+              }
+          }
         }
-        if(num_col == num_states[t]){
-          more_limits_col[w] = 1; // meaning no state transfer to it
-          exluded_col++;
-        }
-      }
-      for(m = 0; m < num_states[t]; ++m) {
-        int num_row = 0;
-        for(w = 0; w < num_states[t + 1]; ++w) {
-          if(trans(m, w) == 1 && more_limits_col[w] != 1)
-            num_row++;
-        }
-        if(num_row == num_states[t + 1] - exluded_col){
-          more_limits_row[m] = 1; // meaning it transfer to no state, considering the excluded column 
-        }
-      }
-      // found the states that never appears
-      further_limit_col(t) = more_limits_col;
-      further_limit_row(t) = more_limits_row;
+        trans_permits(t) = trans;
     } else {
-      IntegerVector more_limits_col(num_states[t + 1]);
-      IntegerVector more_limits_row(num_states[t]);
-      further_limit_col(t) = more_limits_col;
-      further_limit_row(t) = more_limits_row;
+      IntegerMatrix temp(num_states[t], num_states[t + 1]);
+      trans_permits(t) = temp;
     }
-    }
-    // go backward
-    for(t = t_max - 1; t <= 0; --t) {
-      if(num_states[t + 1] != 1 || num_states[t] != 1) { 
-        // if for a row, all == 1 or for a column all == 1, then these two should be excluded
-        IntegerVector more_limits_row = further_limit_row(t);
-        IntegerVector more_limits_col = further_limit_col[t - 1];
-        
-        int index;
-        for(w = 0; w < more_limits_col.size(); ++w) {
-          if(more_limits_row[w] != more_limits_col[w])
-            index = 0;
-        }
-       
-        // found the states that never appears
-        further_limit_col(t) = more_limits_col;
-        further_limit_row(t) = more_limits_row;
-      } 
-    }
-    // get new number of states
-    List further_limit(t_max);
-    IntegerVector more_limits_row = further_limit_row[0];
-    for (m = 0; m < num_states[0]; ++m)
-      if (more_limits_row[m] == 1)
-        new_num_states[0]--;
-    further_limit[0] = further_limit_row[0];
-    IntegerVector more_limits_col = further_limit_col[t_max - 2];
-    for(w = 0; w < num_states[t_max - 1]; ++w) {
-        if(more_limits_col[w] == 1)
-          new_num_states[t_max - 1]--;
-    }
-    further_limit[t_max - 1] = further_limit_col[t_max - 2];
-    
-    for(t = 1; t < t_max - 1; ++t) {
-      more_limits_row = further_limit_row(t);
-      more_limits_col = further_limit_col(t - 1);
-      IntegerVector combine(more_limits_row.size());
-      // find the union of these two vector
-      for(w = 0; w < num_states[t]; ++w) {
-        if(more_limits_col[w] == 1 || more_limits_row[w] == 1)
-          combine[w] = 1;
-      }
-      further_limit[t] = combine; // indicates some states cannot appear
-      for(w = 0; w < num_states[t]; ++w)
-        if(combine[w] == 1)
-          new_num_states[t]--;
-    }
-    
-    List out = List::create(
-      Named("trans_permits") = trans_permits,
-      Named("further_limit") = further_limit, 
-      Named("new_num_states") = new_num_states);
-    
-    return(out);
   }
+
+  return(trans_permits);
+}
+// [[Rcpp::export]]
+  List ini_hmm (unsigned int t_max,  IntegerVector num_states, List trans_indicator) {
+    NumericVector phi(num_states[0]);
+    List trans(t_max - 1);
+    // List emit(t_max);
+    unsigned int w, m, t;
+    
+    for(w = 0; w < num_states[0]; ++w)
+      phi[w] = 1/double(num_states[0]);
+    
+    for(t = 0; t < t_max - 1; ++t) {
+      NumericMatrix transition(num_states[t], num_states[t + 1]);
+      // 
+      // if(trans_indicator.isNotNull()) {
+      IntegerMatrix trans_ind = trans_indicator[t];
+      for (w = 0; w < num_states[t]; ++w) {
+        int new_num = num_states[t + 1];
+        for (m = 0; m < num_states[t + 1]; ++m)
+          if (trans_ind(w, m)) // 1 means not the same, so cannot b transferred
+            new_num--;
+          // Rcout << new_num << "\n";
+          for (m = 0; m < num_states[t + 1]; ++m)
+            if (!trans_ind(w, m))
+              transition(w, m) = 1/double(new_num);
+      }
+      // } else {
+      // for (w = 0; w < num_states[t]; ++w)
+      //   for (m = 0; m < num_states[t + 1]; ++m) 
+      //     transition(w, m) = 1/double(num_states[t + 1]);
+      // }
+      trans(t) = transition;
+    }
+    // for(t = 0; t < t_max; ++t) {
+    //   NumericVector emission(num_states[t]);
+    //   for (w = 0; w < num_states[t]; ++w)
+    //     emission(w) = 1/double(num_states[t]);
+    //   emit(t) = emission;
+    // }
+    // 
+    List par_hmm = List::create(
+      Named("phi") = phi,
+      // Named("emit") = emit
+      Named("trans") = trans);
+    return(par_hmm);
+  }
+  // List trans_permit2(IntegerVector num_states, List combination, int t_max, IntegerVector undecided_pos, 
+  //                   IntegerVector time_pos, IntegerVector p_tmax, int hap_min_pos) {
+  //   List trans_permits(t_max - 1);
+  //   List further_limit_col(t_max - 1);
+  //   List further_limit_row(t_max - 1);
+  //   IntegerVector new_num_states(t_max);
+  //   unsigned int t, j, m, w;
+  //   int end_t1, begin_t2, end_t2;
+  //   for (t = 0; t < t_max; ++t)
+  //     new_num_states[t] = num_states[t];
+  //   
+  //   for (t = 0; t < t_max - 1; ++t) {
+  //     if(num_states[t + 1] != 1 && num_states[t] != 1) { // assume if no. state = 1, then it can transfer to all
+  //       end_t1 = time_pos[t] + p_tmax[t];
+  //       begin_t2 = time_pos[t + 1];
+  //       end_t2 = time_pos[t + 1] + p_tmax[t + 1];
+  //       if(end_t1 > end_t2)
+  //         end_t1 = end_t2; // take the smaller one
+  //       IntegerMatrix full_hap_t1 = combination(t);
+  //       IntegerMatrix full_hap_t2 = combination(t + 1);
+  //       IntegerMatrix trans(num_states[t], num_states[t + 1]);
+  //       int count = 0; // number of overlapped variational sites
+  //       int count1 = 0;
+  //       
+  //       for(j = 0; j < undecided_pos.size(); ++j)
+  //         if (undecided_pos[j] + hap_min_pos < end_t1 && undecided_pos[j] >= time_pos[t]) {
+  //           count1++;
+  //           if(undecided_pos[j] + hap_min_pos >= begin_t2)
+  //             count++;
+  //         }
+  //         // Rcout << t << "\t" << count << "\n";
+  //       int left = count1 - count;
+  //         for(m = 0; m < num_states[t]; ++m) {
+  //           IntegerVector hap_t1 = full_hap_t1(m, _);
+  //           // Rcout << hap_t1 << "\n";
+  //           for(w = 0; w < num_states[t + 1]; ++w) {
+  //             IntegerVector hap_t2 = full_hap_t2(w, _);
+  //             // Rcout << hap_t2 << "\t";
+  //             for(j = 0; j < count; ++j)
+  //               if (hap_t2(j) != hap_t1(j + left)) {
+  //                 trans(m, w) = 1; // represents m cannot transfer to w
+  //                 break;
+  //               }
+  //           }
+  //         }
+  //         trans_permits(t) = trans;
+  //     } else {
+  //       IntegerMatrix temp(num_states[t], num_states[t + 1]);
+  //       trans_permits(t) = temp;
+  //     }
+  //   }
+  //   // label the states that should be excluded (go forward)
+  //   for(t = 0; t < t_max - 1; ++t) {
+  //     if(num_states[t + 1] != 1 || num_states[t] != 1) { 
+  //     // if for a row, all == 1 or for a column all == 1, then these two should be excluded
+  //     IntegerVector more_limits_row(num_states[t]);
+  //     IntegerVector more_limits_col(num_states[t + 1]);
+  //     IntegerVector more_limits_col_last;
+  //     IntegerMatrix trans = trans_permits(t);
+  //     int exluded_col = 0;
+  //     for(w = 0; w < num_states[t + 1]; ++w) {
+  //       int num_col = 0;
+  //       for(m = 0; m < num_states[t]; ++m) {
+  //         if(trans(m, w) == 1)
+  //           num_col++;
+  //       }
+  //       if(num_col == num_states[t]){
+  //         more_limits_col[w] = 1; // meaning no state transfer to it
+  //         exluded_col++;
+  //       }
+  //     }
+  //     for(m = 0; m < num_states[t]; ++m) {
+  //       int num_row = 0;
+  //       for(w = 0; w < num_states[t + 1]; ++w) {
+  //         if(trans(m, w) == 1 && more_limits_col[w] != 1)
+  //           num_row++;
+  //       }
+  //       if(num_row == num_states[t + 1] - exluded_col){
+  //         more_limits_row[m] = 1; // meaning it transfer to no state, considering the excluded column 
+  //       }
+  //     }
+  //     // found the states that never appears
+  //     further_limit_col(t) = more_limits_col;
+  //     further_limit_row(t) = more_limits_row;
+  //   } else {
+  //     IntegerVector more_limits_col(num_states[t + 1]);
+  //     IntegerVector more_limits_row(num_states[t]);
+  //     further_limit_col(t) = more_limits_col;
+  //     further_limit_row(t) = more_limits_row;
+  //   }
+  //   }
+  //   // go backward
+  //   for(t = t_max - 1; t <= 0; --t) {
+  //     if(num_states[t + 1] != 1 || num_states[t] != 1) { 
+  //       // if for a row, all == 1 or for a column all == 1, then these two should be excluded
+  //       IntegerVector more_limits_row = further_limit_row(t);
+  //       IntegerVector more_limits_col = further_limit_col[t - 1];
+  //       
+  //       int index;
+  //       for(w = 0; w < more_limits_col.size(); ++w) {
+  //         if(more_limits_row[w] != more_limits_col[w])
+  //           index = 0;
+  //       }
+  //      
+  //       // found the states that never appears
+  //       further_limit_col(t) = more_limits_col;
+  //       further_limit_row(t) = more_limits_row;
+  //     } 
+  //   }
+  //   // get new number of states
+  //   List further_limit(t_max);
+  //   IntegerVector more_limits_row = further_limit_row[0];
+  //   for (m = 0; m < num_states[0]; ++m)
+  //     if (more_limits_row[m] == 1)
+  //       new_num_states[0]--;
+  //   further_limit[0] = further_limit_row[0];
+  //   IntegerVector more_limits_col = further_limit_col[t_max - 2];
+  //   for(w = 0; w < num_states[t_max - 1]; ++w) {
+  //       if(more_limits_col[w] == 1)
+  //         new_num_states[t_max - 1]--;
+  //   }
+  //   further_limit[t_max - 1] = further_limit_col[t_max - 2];
+  //   
+  //   for(t = 1; t < t_max - 1; ++t) {
+  //     more_limits_row = further_limit_row(t);
+  //     more_limits_col = further_limit_col(t - 1);
+  //     IntegerVector combine(more_limits_row.size());
+  //     // find the union of these two vector
+  //     for(w = 0; w < num_states[t]; ++w) {
+  //       if(more_limits_col[w] == 1 || more_limits_row[w] == 1)
+  //         combine[w] = 1;
+  //     }
+  //     further_limit[t] = combine; // indicates some states cannot appear
+  //     for(w = 0; w < num_states[t]; ++w)
+  //       if(combine[w] == 1)
+  //         new_num_states[t]--;
+  //   }
+  //   
+  //   List out = List::create(
+  //     Named("trans_permits") = trans_permits,
+  //     Named("further_limit") = further_limit, 
+  //     Named("new_num_states") = new_num_states);
+  //   
+  //   return(out);
+  // }
 
 vector<vector<int> > cart_product (const vector<vector<int> > &v) {
   vector<vector<int> > s = {{}};
@@ -412,7 +499,6 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
   IntegerMatrix sub_link = linkage_info(_, Range(start_idx, start_idx + num - 1));
   IntegerVector exclude(num_states);
   int count, linkage_len, all_excluded;
-  // Rcout << "no. location " << num << "\n";
   linkage_len = num/2; // change the linkage length to be the length appears in the read
   int cut_off;
   all_excluded = num_states;
@@ -593,18 +679,22 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
       start_idx = i;
       break;
     }
-  
-  // Rcout << allowed << "\n";
+  Rcout <<  "exists: " << exist << "\n";
+  Rcout << "allowed: " << n1 << "\n";
+  Rcout << allowed << "\n";
   for(m = 0; m < exist.size(); ++m)
     for(w = 0; w < allowed.size(); ++w)
-      if(exist[m] != allowed[w]) {
-        flag = 1;
-        break;
+      if(exist[m] == allowed[w]) {
+        num++;
         }
+  if(num != exist.size())
+    flag = 1;
+  num = 0;
   if(flag) {
+    Rcout << "different unique at same col" << "\n";
     for(m = 0; m < combination.nrow(); ++m)
       for(w = 0; w < allowed.size(); ++w)
-        if(allowed(w) == combination(m, 0)) {
+        if(allowed(w) == first_col(m)) {
           new_combination(num++, _) = combination(m, _);
         }
     exclude_info = limit_comb_t0(new_combination(Range(0, num - 1), _), hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, num);
@@ -632,11 +722,11 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
         next_comb(count++, _) = combination(m, _);
     }
   }
-  // for(m = 0; m < count; ++m){
-  //   for(k = 0; k < combination.ncol(); ++m) {
-  //     Rcout << next_comb(m, k) << "\t";
-  //   }
-  //   Rcout << "\n";}
+  for(m = 0; m < count; ++m) {
+    for(k = 0; k < next_comb.ncol(); ++k) {
+      Rcout << next_comb(m, k) << "\t";
+    }
+    Rcout << "\n";}
   IntegerVector new_col = next_comb(_, 0);
   List second_uni = unique_map(new_col); // start might not from 0 (e.g. ailgnment starts from 2)
   IntegerVector n2 = second_uni["lengths"];
@@ -649,23 +739,48 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   Rcout << all << "\n";
   all = 0;
   
-  for(k = 0; k < last_col.size(); ++k) {
+  for(k = 0; k < last_col.size(); ++k)
     for(w = 0; w < count; ++w) {
-          for(j = 0; j < overlap_len; ++j) {
+      if(new_col(w) == last_col(k)) {
+        for(j = 0; j < overlap_len; ++j) {
           Rcout << first_comb(k, j) << "\t";
-           final_comb(all, j) = first_comb(k, j);
-          }
-          for(i = 1; i < len; ++i) {
-          Rcout << next_comb(w, i) << "\t";
-          final_comb(all++, i + overlap_len - 1) = next_comb(w, i);
-          }
-          Rcout << "\n";
+          final_comb(all, j) = first_comb(k, j);
         }
-  
-  }
+        for(i = 1; i < len; ++i) {
+          Rcout << next_comb(w, i) << "\t";
+          final_comb(all, i + overlap_len - 1) = next_comb(w, i);
+        }
+        all++;
+        Rcout << "\n";
+      }
+    }
  
   return(final_comb);
 }
+// function to do left join by the last column of first and first of second
+
+IntegerMatrix left_join(IntegerMatrix first, IntegerMatrix second, int nrow, int ncol) {
+  IntegerMatrix final_comb(nrow, ncol);
+  int all = 0;
+  for(int k = 0; k < first.nrow(); ++k) {
+    for(int w = 0; w < second.nrow(); ++w) {
+      if(second(w, 0) == first(k, first.ncol() - 1)) {
+          for(int j = 0; j < first.ncol(); ++j) {
+          Rcout << first(k, j) << "\t";
+           final_comb(all, j) = first(k, j);
+          }
+          for(int i = 1; i < second.ncol(); ++i) {
+          Rcout << second(w, i) << "\t";
+          final_comb(all, i + first.ncol() - 1) = second(w, i);
+          }
+          all++;
+          Rcout << "\n";
+        }
+    }
+  }
+  return(final_comb);
+}
+
 
 IntegerMatrix fill_all_hap(List hidden_states, unsigned int hap_length, IntegerVector n_row) {
   unsigned int j, k;

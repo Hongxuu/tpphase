@@ -20,7 +20,7 @@ using namespace std;
 #define NUM_CLASS 4
 
 // [[Rcpp::depends(RcppArmadillo)]]
-List ini_hmm (unsigned int t_max,  IntegerVector num_states, Rcpp::Nullable<Rcpp::List> trans_indicator = R_NilValue) {
+List ini_hmm (unsigned int t_max,  IntegerVector num_states, List trans_indicator) {
   NumericVector phi(num_states[0]);
   List trans(t_max - 1);
   // List emit(t_max);
@@ -39,9 +39,9 @@ List ini_hmm (unsigned int t_max,  IntegerVector num_states, Rcpp::Nullable<Rcpp
         for (m = 0; m < num_states[t + 1]; ++m)
           if (trans_ind(w, m)) // 1 means not the same, so cannot b transferred
             new_num--;
-          for (m = 0; m < num_states[t + 1]; ++m)
-            if (!trans_ind(w, m))
-              transition(w, m) = 1/double(new_num);
+        for (m = 0; m < num_states[t + 1]; ++m)
+          if (!trans_ind(w, m))
+            transition(w, m) = 1/double(new_num);
       }
     // } else {
       // for (w = 0; w < num_states[t]; ++w)
@@ -499,10 +499,15 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
               }
               if(!identical) {
                 Rcout << "same sites\n";
-                comb[t] = comb[last_t];
+                IntegerMatrix new_comb = comb[last_t];
+                comb[t] = new_comb;
                 new_num_states[t] = new_num_states[last_t];
                 full_hap_t = List(new_num_states[t]);
-                full_hap_t = full_hap[last_t];
+                // haps are still different since the entire covered sites are different
+                for(m = 0; m < new_num_states[t]; ++m) {
+                  IntegerMatrix haplotype = make_hap(hidden_states, hap, loci_currt, p_tmax[t], new_comb(m, _), time_pos[t], loci_currt.size(), hap_min_pos);
+                  full_hap_t(count++) = haplotype;
+                }
               }
           }
         } 
@@ -553,7 +558,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
 }
 
 // function to return all the possible haps at each time t, further reduce the number of hidden states as well
-// [[Rcpp::export]]
+
 List full_hap(List hmm_info, IntegerMatrix linkage_info, unsigned int hap_length, int hap_min_pos) {
   List hidden_states = hmm_info["hidden_states"];
   IntegerVector num_states = hmm_info["num_states"];
@@ -856,7 +861,7 @@ NumericVector make_weight(List wic, List gamma, List hmm_info, List dat_info) {
 
 // [[Rcpp::export]]
 List baum_welch_init(List hmm_info, List data_info, List hap_info, int PD_LENGTH, List par, 
-                     Nullable<List> trans_indicator_new = R_NilValue)
+                     List trans_indicator)
 {
   IntegerVector num_states = hmm_info["num_states"];
   IntegerVector n_t = hmm_info["n_t"];
@@ -866,7 +871,7 @@ List baum_welch_init(List hmm_info, List data_info, List hap_info, int PD_LENGTH
   
   List par_hmm;
   /* initialize hmm par */
-  par_hmm = ini_hmm(t_max, num_states, trans_indicator_new);
+  par_hmm = ini_hmm(t_max, num_states, trans_indicator);
   NumericVector phi = par_hmm["phi"];
   List trans = par_hmm["trans"];
   List for_emit = compute_emit(hmm_info, data_info, hap_info, beta, eta, PD_LENGTH);
