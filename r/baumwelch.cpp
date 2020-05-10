@@ -13,6 +13,7 @@
 #include "data_format.h"
 #include "baumwelch.h"
 #include "hmm_state.h"
+#include "utils.h"
 using namespace Rcpp;
 using namespace std;
 
@@ -758,35 +759,32 @@ List sub_sample(List hmm_info, List dat_info) {
  * format the data for mnlogit, note here ref_pos should be shifted according the strating t
  */
 // [[Rcpp::export]]
-DataFrame format_data2(List hmm_info, List d_info, List hap_info) {
+List format_data2(List hmm_info, List d_info, List hap_info) {
   IntegerVector num_states = hmm_info["num_states"];
   IntegerVector time_pos = hmm_info["time_pos"];
   unsigned int t_max = hmm_info["t_max"];
-  unsigned int t, m, i;
+  unsigned int t, m, i, j, k;
   
   List subsample = sub_sample(hmm_info, d_info);
   
-  unsigned int total = 0;
+  unsigned int all = 0;
   for(t = 0; t < t_max; ++t) {
     List data_info = subsample(t);
     unsigned int tt = data_info["total"];
-    total += num_states[t] * tt * MLOGIT_CLASS * NUM_CLASS;
+    all += num_states[t] * tt * NUM_CLASS;
   }
-  
-  IntegerVector r_ref_pos(total);
-  IntegerVector r_read_pos(total);
-  IntegerVector r_qua(total);
-  IntegerVector r_obs(total);
-  IntegerVector r_hap_nuc(total);
-  IntegerVector r_mode(total);
-  IntegerVector r_id(total);
-  
-  unsigned int count = 0;
+  // Rcout << all << "\n";
+  IntegerMatrix full_dat(all, 6);
+  // unsigned int count = 0;
+  unsigned int numerate = 0;
   for(t = 0; t < t_max; ++t) {
     List full_hap_t = hap_info(t);
     List data_info = subsample(t);
     unsigned int num = data_info["total"];
+    
     unsigned int len = num * MLOGIT_CLASS * NUM_CLASS;
+    // Rcout << t << "\t" << num << "\t" << len << "\n";
+    // unsigned int new_len = num * NUM_CLASS;
     for(m = 0; m < num_states[t]; ++m) {
       IntegerMatrix haplotype = full_hap_t(m);
       DataFrame df = format_data(data_info, haplotype, time_pos[t]);
@@ -797,18 +795,62 @@ DataFrame format_data2(List hmm_info, List d_info, List hap_info) {
       IntegerVector hap_nuc = df["hap_nuc"];
       IntegerVector mode = df["mode"];
       IntegerVector id = df["id"];
-      for(i = 0; i < len; ++i) {
-        r_ref_pos(count) = ref_pos(i);
-        r_read_pos(count) = read_pos(i);
-        r_qua(count) = qua(i);
-        r_obs(count) = obs(i);
-        r_hap_nuc(count) = hap_nuc(i);
-        r_mode(count) = mode(i);
-        r_id(count++) = id(i);
-      }
+      // group the same record together
+      for(j = 0; j < len; ++j)
+        if(mode(j) == 1) {
+          full_dat(numerate, 0) = id(j);
+          full_dat(numerate, 1) = ref_pos(j);
+          full_dat(numerate, 2) = read_pos(j);
+          full_dat(numerate, 3) = obs(j);
+          full_dat(numerate, 4) = qua(j);
+          full_dat(numerate++, 5) = hap_nuc(j);
+        }
     }
   }
-  
+  // Rcout << numerate << "\n";
+  // hash the matrix
+  List hashed_dat = hash_mat(full_dat);
+  List all_id = hashed_dat["all_id"];
+  IntegerVector idx =  hashed_dat["idx"];
+  // make a new dataframe cased on the hash table, i.e. repeat each record 4 times with changing the nuc
+  IntegerMatrix subset_dat = ss(full_dat, idx);
+  IntegerVector ref_pos = subset_dat(_, 1);
+  IntegerVector read_pos = subset_dat(_, 2);
+  IntegerVector qua = subset_dat(_, 4);
+  IntegerVector obs = subset_dat(_, 3);
+  IntegerVector hap_nuc = subset_dat(_, 5);
+  IntegerVector obs_index = subset_dat(_, 0);
+
+  int input_arr[] = {0, 1, 2, 3};
+  size_t input_arr_sz = sizeof input_arr / sizeof *input_arr;
+
+  unsigned int total = idx.size() * MLOGIT_CLASS;
+
+  IntegerVector r_ref_pos(total);
+  IntegerVector r_read_pos(total);
+  IntegerVector r_qua(total);
+  IntegerVector r_obs(total);
+  IntegerVector r_hap_nuc(total);
+  IntegerVector r_mode(total);
+  IntegerVector r_id(total);
+
+  for (k = 0; k < idx.size(); ++k)
+    for (i = 0; i < MLOGIT_CLASS; ++i) {
+      r_ref_pos[k * MLOGIT_CLASS + i] = ref_pos[k];
+      r_read_pos[k * MLOGIT_CLASS + i] = read_pos[k];
+      r_qua[k * MLOGIT_CLASS + i] = qua[k];
+      r_id[k * MLOGIT_CLASS + i] = obs_index[k];
+      r_hap_nuc[k * MLOGIT_CLASS + i] = hap_nuc[k];
+    }
+
+  for (i = 0; i < idx.size() * MLOGIT_CLASS; ++i)
+    r_obs[i] = input_arr[i % input_arr_sz];
+
+  for (i = 0; i < idx.size(); ++i)
+    for (k = 0; k < MLOGIT_CLASS; ++k)
+      if (r_obs[k + MLOGIT_CLASS * i] == obs[i])
+        r_mode[k + MLOGIT_CLASS * i] = 1;
+
   DataFrame df_new = DataFrame::create(
     Named("id") = r_id,
     Named("mode") = r_mode,
@@ -817,7 +859,9 @@ DataFrame format_data2(List hmm_info, List d_info, List hap_info) {
     Named("qua") = r_qua,
     Named("nuc") = r_obs,
     Named("hap_nuc") = r_hap_nuc);
-  return(df_new);
+  
+  return List::create(_["idx"] = all_id, _["df_new"] = df_new);
+  // return List::create(_["subset_dat"] = subset_dat, _["hashed_dat"] = hashed_dat, _["full_dat"] = full_dat);
 }
 
 NumericVector make_weight(List wic, List gamma, List hmm_info, List dat_info) {
@@ -859,9 +903,22 @@ NumericVector make_weight(List wic, List gamma, List hmm_info, List dat_info) {
   return(weight);
 }
 
+NumericVector comb_weight(NumericVector weight, List hash_idx) {
+  int len = hash_idx.size();
+  NumericVector new_weight(len);
+  for (int i = 0; i < len; ++i) {
+    // subset weight
+    IntegerVector idx = hash_idx[i];
+    NumericVector weig = weight[idx];
+    for(int j = 0; j < weig.size(); ++j) {
+      new_weight[i] += weig[j];
+    }
+  }
+  return(new_weight);
+}
 // [[Rcpp::export]]
 List baum_welch_init(List hmm_info, List data_info, List hap_info, int PD_LENGTH, List par, 
-                     List trans_indicator)
+                     List trans_indicator, List hash_idx)
 {
   IntegerVector num_states = hmm_info["num_states"];
   IntegerVector n_t = hmm_info["n_t"];
@@ -880,8 +937,8 @@ List baum_welch_init(List hmm_info, List data_info, List hap_info, int PD_LENGTH
   List par_hmm_bf = forward_backward(par_hmm, t_max, num_states);
   List gamma = par_hmm_bf["gamma"];
   /* prepare weight for beta */
-  NumericVector weight = make_weight(w_ic, gamma, hmm_info, data_info);
-  
+  NumericVector wei = make_weight(w_ic, gamma, hmm_info, data_info);
+  NumericVector weight = comb_weight(wei, hash_idx);
   //store the parmaeters for calling mnlogit
   List par_aux = List::create(
     Named("beta") = beta,
@@ -896,7 +953,8 @@ List baum_welch_init(List hmm_info, List data_info, List hap_info, int PD_LENGTH
   return(ls);
 }
 // [[Rcpp::export]]
-List baum_welch_iter(List hmm_info, List par_hmm, List data_info, List hap_info, NumericMatrix beta, int PD_LENGTH)
+List baum_welch_iter(List hmm_info, List par_hmm, List data_info, List hap_info, 
+                     NumericMatrix beta, int PD_LENGTH, List hash_idx)
 {
   List par_aux = par_hmm["par_aux"];
   List par_hmm_bf = par_hmm["par_hmm_bf"];
@@ -925,7 +983,8 @@ List baum_welch_iter(List hmm_info, List par_hmm, List data_info, List hap_info,
   List gamma_new = par_hmm_bf_new["gamma"];
   
   /* prepare weight for beta */
-  NumericVector weight = make_weight(wic_new, gamma_new, hmm_info, data_info);
+  NumericVector wei = make_weight(wic_new, gamma_new, hmm_info, data_info);
+  NumericVector weight = comb_weight(wei, hash_idx);
   
   List par_aux_out = List::create(
     Named("beta") = beta,
