@@ -59,27 +59,55 @@ List hash_mat(IntegerMatrix x) {
     hashes[i] = s;
   }
   
-  using Pair = std::pair<int, vector<int>>;
-  std::unordered_map<string, Pair> map_counts;
-  for (int i = 0; i < n; i++) {
-    Pair& p = map_counts[hashes[i]];
-    if(p.first == 0) {
-      p.first = i;
-    }
-    p.second.push_back(i);
-  }
+  std::unordered_map<string, vector<int>> map;
+  for (int i = 0; i < n; i++)
+    map[hashes[i]].push_back(i);
   
-  int nres = map_counts.size();
+  int nres = map.size();
   IntegerVector idx(nres);
   List all_id(nres);
-  auto it = map_counts.begin();
-  for(int i = 0; i < nres; i++, ++it) {
-    idx[i] = it->second.first;
-    all_id[i] = wrap(it->second.second);
-  }
   
+  int i = 0; 
+  for (auto itr = map.begin(); itr != map.end(); ++itr) { 
+    idx[i] = itr->second[0];
+    all_id[i++] = wrap(itr->second);
+  } 
   return List::create( _["all_id"] = all_id, _["idx"] = idx );
 }
+// maybe a slower version
+// List hash_mat(IntegerMatrix x) {
+//   int n = x.nrow() ;
+//   int nc = x.ncol() ;
+//   std::vector<string> hashes(n) ;
+//   // arma::Mat<int> X = as<arma::Mat<int>>(x);
+//   for (int i = 0; i < n; i++) {
+//     string s = "";  
+//     for(int j = 0; j < nc; j++)  
+//       s += to_string(x(i,j));  
+//     hashes[i] = s;
+//   }
+//   
+//   using Pair = std::pair<int, vector<int>>;
+//   std::unordered_map<string, Pair> map_counts;
+//   for (int i = 0; i < n; i++) {
+//     Pair& p = map_counts[hashes[i]];
+//     if(p.first == 0) {
+//       p.first = i;
+//     }
+//     p.second.push_back(i);
+//   }
+//   
+//   int nres = map_counts.size();
+//   IntegerVector idx(nres);
+//   List all_id(nres);
+//   auto it = map_counts.begin();
+//   for(int i = 0; i < nres; i++, ++it) {
+//     idx[i] = it->second.first;
+//     all_id[i] = wrap(it->second.second);
+//   }
+//   
+//   return List::create( _["all_id"] = all_id, _["idx"] = idx );
+// }
 
 // subset matrix by row index
 IntegerMatrix ss(IntegerMatrix X_, IntegerVector ind_) {
