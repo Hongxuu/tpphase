@@ -9,18 +9,32 @@ using namespace Rcpp;
 using namespace std;
 
 // [[Rcpp::export]]
-NumericVector comb_weight(NumericVector weight, List hash_idx) {
-  int len = hash_idx.size();
-  NumericVector new_weight(len);
-  for (int i = 0; i < len; ++i) {
-    // subset weight
-    IntegerVector idx = hash_idx[i];
-    NumericVector weig = weight[idx];
-    for(int j = 0; j < weig.size(); ++j) {
-      new_weight[i] += weig[j];
-    }
+List hash_mat(IntegerMatrix x) {
+  int n = x.nrow() ;
+  int nc = x.ncol() ;
+  std::vector<string> hashes(n) ;
+  // arma::Mat<int> X = as<arma::Mat<int>>(x);
+  for (int i = 0; i < n; i++) {
+    string s = "";  
+    for(int j = 0; j < nc; j++)  
+      s += to_string(x(i,j));  
+    hashes[i] = s;
   }
-  return(new_weight);
+  
+  std::unordered_map<string, int> map;
+  for (int i = 0; i < n; i++)
+    map[hashes[i]];
+
+  int nres = map.size();
+  IntegerVector idx(nres);
+  
+  int i = 0; 
+  for (auto itr = map.begin(); itr != map.end(); ++itr) { 
+    idx[i] = itr->second;
+  } 
+ 
+  return List::create(  _["idx"] = idx );
+
 }
 // struct VectorHasher {
 //   int operator()(const vector<int> &V) const {

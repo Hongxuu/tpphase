@@ -42,18 +42,18 @@ IntegerMatrix viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm)
     NumericVector emission = emit[t];
     if (t == 0) {
       for(m = 0; m < num_states[t]; ++m) 
-        path_t(m) = log(phi[m]) + log(emission(m));
+        path_t(m) = phi[m] + emission(m);
     } else {
       NumericMatrix transition = trans[t - 1];
       for(m = 0; m < num_states[t]; ++m) {
         NumericVector path_last = path[t - 1];
         max = -INFINITY;
         for(w = 0; w < num_states[t - 1]; ++w) {
-          max_prob = path_last(w) + log(transition(w, m));
+          max_prob = path_last(w) + transition(w, m);
           if (max_prob > max)
             max = max_prob;
         }
-        path_t(m) = log(emission(m)) + max;
+        path_t(m) = emission(m) + max;
       }
     }
     path(t) = path_t;

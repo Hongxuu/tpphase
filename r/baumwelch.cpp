@@ -27,9 +27,11 @@ List ini_hmm (unsigned int t_max,  IntegerVector num_states, List trans_indicato
   // List emit(t_max);
   unsigned int w, m, t;
   
+  // change this to log scale
   for(w = 0; w < num_states[0]; ++w)
-    phi[w] = 1/double(num_states[0]);
+    phi[w] = log(1/double(num_states[0]));
   
+  // keep some trans to 0
   for(t = 0; t < t_max - 1; ++t) {
     NumericMatrix transition(num_states[t], num_states[t + 1]);
     // 
@@ -42,7 +44,9 @@ List ini_hmm (unsigned int t_max,  IntegerVector num_states, List trans_indicato
             new_num--;
         for (m = 0; m < num_states[t + 1]; ++m)
           if (!trans_ind(w, m))
-            transition(w, m) = 1/double(new_num);
+            transition(w, m) = log(1/double(new_num));
+          else
+            transition(w, m) = R_NegInf;
       }
     // } else {
       // for (w = 0; w < num_states[t]; ++w)
@@ -64,7 +68,7 @@ List ini_hmm (unsigned int t_max,  IntegerVector num_states, List trans_indicato
     Named("trans") = trans);
   return(par_hmm);
 }
-
+//  to avoid underflow, use log sum exp
 List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states)
 {
   NumericVector phi = par_hmm["phi"];
@@ -74,6 +78,7 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
   List alpha(t_max);
   List beta_wt(t_max);
   unsigned int w, t, m;
+  double max_penality;
   
   for (t = 0; t < t_max; ++t) {
     NumericVector alp(num_states[t]);
@@ -81,14 +86,20 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
     NumericVector alp_last;
     if (t == 0)
       for (w = 0; w < num_states[t]; ++w)
-        alp(w) = phi[w] * emission(w);
+        alp(w) = phi[w] + emission(w);
     else {
       alp_last = alpha(t - 1);
       NumericMatrix transition = trans(t - 1);
       for (w = 0; w < num_states[t]; ++w) {
+        max_penality = R_NegInf;
+        for (m = 0; m < num_states[t - 1]; ++m) {
+          double value = alp_last(m) + transition(m, w);
+          if (value > max_penality)
+            max_penality = value;
+        }
         for (m = 0; m < num_states[t - 1]; ++m)
-          alp(w) += alp_last(m) * transition(m, w);
-        alp(w) = alp(w) * emission(w); // will this cause underflow?
+          alp(w) += exp(alp_last(m) + transition(m, w) - max_penality);
+        alp(w) = log(alp(w)) + emission(w) + max_penality;
       }
     }
     alpha(t) = alp;
@@ -100,14 +111,21 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
     
     if(t == t_max - 1) {
       for (w = 0; w < num_states[t]; ++w)
-        beta(w) = 1.0;
+        beta(w) = 0;
     } else {
       NumericVector emission = emit(t + 1);
       NumericMatrix transition = trans(t);
       beta_after = beta_wt(t + 1);
       for (w = 0; w < num_states[t]; ++w) {
+        max_penality = R_NegInf;
+        for (m = 0; m < num_states[t + 1]; ++m) {
+          double value = beta_after(m) + transition(w, m) + emission(m);
+          if (value > max_penality)
+            max_penality = value;
+        }
         for (m = 0; m < num_states[t + 1]; ++m)
-          beta(w) += beta_after(m) * transition(w, m) * emission(m);
+            beta(w) += exp(beta_after(m) + transition(w, m) + emission(m) - max_penality); // need further adjust if not work
+        beta(w) = log(beta(w)) + max_penality;
       }
     }
     beta_wt(t) = beta;
@@ -117,15 +135,15 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
   double sum = 0;
   for (t = 0; t < t_max; ++t) {
     NumericVector beta = beta_wt(t);
-    NumericVector alp = alpha(t); // maybe change this to a long vector instead a list?
+    NumericVector alp = alpha(t);
     sum = 0;
     NumericVector gam(num_states[t]);
     for (w = 0; w < num_states[t]; ++w) {
-      gam(w) = alp(w) * beta(w);
-      sum += gam(w);
+      gam(w) = alp(w) + beta(w);
+      sum += exp(gam(w));
     }
     for (w = 0; w < num_states[t]; ++w)
-      gam(w) /= sum;
+      gam(w) -= log(sum);
     gamma(t) = gam;
   }
   
@@ -142,12 +160,12 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
       for (m = 0; m < num_states[t + 1]; ++m) {
         // x(w, m) = log(alp(w)) + log(transition(w, m)) + log(beta(m)) + log(emission(m)); // avoid underflow?
         // x(w, m) = exp(x(w, m));
-        x(w, m) = alp(w) * transition(w, m) * beta(m) * emission(m); // not logging it since some transition are 0
-        sum += x(w, m);
+        x(w, m) = alp(w) + transition(w, m) + beta(m) + emission(m); // not logging it since some transition are 0
+        sum += exp(x(w, m));
       }
       for (w = 0; w < num_states[t]; ++w)
         for (m = 0; m < num_states[t + 1]; ++m)
-          x(w, m) /= sum;
+          x(w, m) -= log(sum);
     xi(t) = x;
   }
   List par_hmm_out = List::create(
@@ -182,7 +200,7 @@ List update_trans(List par_hmm, unsigned int t_max, IntegerVector num_states) {
     NumericMatrix x = xi[t];
     for (w = 0; w < num_states[t]; ++w)
       for (m = 0; m < num_states[t + 1]; ++m)
-        transition(w, m) = x(w, m)/gam(w);
+        transition(w, m) = x(w, m) - gam(w);
     trans[t] = transition;
   }
   return(trans);
@@ -640,12 +658,13 @@ List compute_emit(List hmm_info, List dat_info, List hap_info, NumericMatrix bet
     NumericVector emission(num_states[t]);
     sum_emit_prob = 0;
     IntegerVector idx = n_in_t[t];
+   
     for(m = 0; m < num_states[t]; ++m) {
       //Rcout << m;
       NumericVector read_likelihood(n_t[t]);
       NumericMatrix read_class_llk(n_t[t], NUM_CLASS);
-      IntegerMatrix haplotype = full_hap_t(m);
       NumericMatrix w_tic(n_t[t], NUM_CLASS);
+      IntegerMatrix haplotype = full_hap_t(m);
       for (i = 0; i < n_t[t]; ++i) {
         unsigned int id = idx[i];
         for (k = 0; k < NUM_CLASS; ++k) {
@@ -663,10 +682,11 @@ List compute_emit(List hmm_info, List dat_info, List hap_info, NumericMatrix bet
       // Rcout << w_tic;
     }
     w_ic(t) = w_icm;
+    // scale the emission prob (log scale)
     for(m = 0; m < num_states[t]; ++m) 
-      emission[m] = emission[m]/sum_emit_prob;
+      emission[m] = log(emission[m]) - log(sum_emit_prob);
     if(num_states[t] == 1)
-      emission[0] = 1;
+      emission[0] = 0;
     emit(t) = emission;
   }
   List par_hmm_out = List::create(
@@ -692,7 +712,7 @@ NumericVector update_eta(List w_ic, List gamma, IntegerVector num_states, Intege
         for (i = 0; i < n_t[t]; ++i) {
           sum_wic += w_tic(i, k);
         }
-        inner += gam(m) * sum_wic;
+        inner += exp(gam(m)) * sum_wic;
       }
       eta_new[k] += inner;
     }
@@ -896,7 +916,7 @@ NumericVector make_weight(List wic, List gamma, List hmm_info, List dat_info) {
         id = n_set[i];
         for(j = 0; j < length[id]; ++j)
           for (k = 0; k < NUM_CLASS; ++k)
-            weight(count++) = w_tic(i, k) * gam(m);
+            weight(count++) = w_tic(i, k) * exp(gam(m));
       }
     }
   }

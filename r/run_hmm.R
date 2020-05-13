@@ -24,14 +24,14 @@ sourceCpp("./r/viterbi.cpp")
 
 ##### targeted data
 
-## read the data
+## read the data, reference has to indicate which pair of reference it is processing
 samfile = "../../data/tpphase_res_consensus/WGS/test.sam"
-ref_name = "target.2"
+ref_name = "target.66"
 fastq_file = "./res.fastq"
 datafile = "./res.txt"
 alignment = "../../data/tpphase_res_consensus/WGS/new.fasta"
 
-datafile = "../../data/tpphase_res_consensus/WGS/out.txt"
+datafile = "../../data/tpphase_res_consensus/WGS/out_chr07_366557.txt"
 #######
 formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc
 n_class = 4
@@ -112,14 +112,15 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   #                                        trans_indicator$trans_permits, trans_indicator$further_limit);
   
   ### start initializing
-  bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, 
-                        par = par, PD_LENGTH = nrow(par$beta), trans_indicator = trans_indicator)
-  rm(hap_full_info)
-  rm(trans_indicator)
+
   ###### estimate beta
   weight_id <- NULL
   data_new <- format_data2(hmm_info = HMM, d_info = dat_info, hap_info = hap_full)
   data <- data_new$df_new
+  bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, par = par, 
+                        PD_LENGTH = nrow(par$beta), trans_indicator = trans_indicator, hash_idx = data_new$idx)
+  rm(hap_full_info)
+  rm(trans_indicator)
   if(hap_info$gap_in) {
     data_rm <- data %>% filter(mode == 1) 
     weight_id <- which(data_rm$hap_nuc == -1)
@@ -128,20 +129,21 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   data$nuc <- to_char_r(data$nuc)
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
+  init <- list()
   for (m in (1:max_iter)) {
+    cat(m, "\n");
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
-    
     tmp <- m_beta(res = bw$par_aux, id = id, weight_id = weight_id, data = data, formula = formula, 
                   reads_lengths = read_length, ncores = ncores, old_version = 0, weight = bw$par_aux$weight)
-    
+    init[[m]] <- bw
     ## estimation other parameters
     bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
-                          beta = tmp$par$beta, PD_LENGTH = nrow(par$beta))
+                          beta = tmp$par$beta, PD_LENGTH = nrow(par$beta), hash_idx = data_new$idx)
     
-    if (abs(bw$par_hmm$phi - phi_old) < tol & 
-       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit") &
-       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans"))
+    if (abs(bw$par_hmm$phi - phi_old) < tol && 
+       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", tol) &&
+       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", tol))
       break;
   }
   
