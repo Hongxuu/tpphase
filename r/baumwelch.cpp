@@ -427,8 +427,10 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
   Rcout << "start t " << start_t << "\n";
   List exclude_t(n_start);
   List combination_t(n_start);
+  List full_hap_t;
+  List full_hap_ns(n_start);
+  
   for(t = 0; t < n_start; ++t) {
-    List full_hap_t;
     int count = 0;
     List comb_info_t0 = find_combination(undecided_pos, pos_possibility, p_tmax[start_t[t]], time_pos[start_t[t]], hap_min_pos);
     IntegerVector location = comb_info_t0["location"];
@@ -441,6 +443,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
     new_num_states[start_t[t]] = t0["num_states"];
     IntegerMatrix new_comb(new_num_states[start_t[t]], combination.ncol());
     full_hap_t = List(new_num_states[start_t[t]]);
+    Rcout << start_t[t] << " new no. states: " << new_num_states[start_t[t]] << "\n";
     for(m = 0; m < num_states[start_t[t]]; ++m)
       if(!exclude[m]) {
         IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[start_t[t]], combination(m, _), time_pos[start_t[t]], num, hap_min_pos);
@@ -448,14 +451,13 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
         full_hap_t(count++) = haplotype;
       }
     comb[start_t[t]] = new_comb;
-    full_hap[start_t[t]] = full_hap_t;
+    full_hap_ns[t] = full_hap_t;
   }
-  Rcout << "start ts done" << "\n";
+ 
   IntegerVector exclude_last;
   IntegerMatrix comb_in; 
   // get the states  
   for(t = 0; t < t_max; ++t) {
-    List full_hap_t;
     if(num_states[t] != 1 && overlapped_id[t] != -1) {
       int count = 0;
       Rcout << t << "\t";
@@ -565,6 +567,9 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
     Rcout << "new no. states: " << new_num_states[t] << "\n";
     full_hap[t] = full_hap_t;
   }
+  // I don't understand why directly give values would be overwritted, it doesn't work!!!!
+  for(t = 0; t < n_start; ++t)
+    full_hap[start_t[t]] = full_hap_ns[t];
   
   List out = List::create(
     Named("full_hap") = full_hap,
@@ -576,64 +581,64 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
 
 // function to return all the possible haps at each time t, further reduce the number of hidden states as well
 
-List full_hap(List hmm_info, IntegerMatrix linkage_info, unsigned int hap_length, int hap_min_pos) {
-  List hidden_states = hmm_info["hidden_states"];
-  IntegerVector num_states = hmm_info["num_states"];
-  IntegerVector time_pos = hmm_info["time_pos"];
-  IntegerVector p_tmax = hmm_info["p_tmax"];
-  IntegerVector n_row = hmm_info["n_row"];
-  IntegerVector pos_possibility = hmm_info["pos_possibility"];
-  IntegerVector undecided_pos = hmm_info["undecided_pos"];
-  unsigned int t_max = hmm_info["t_max"];
-  unsigned int t, m, j, start_idx = 0;
-  List full_hap(t_max);
-  List comb(t_max);
-  IntegerMatrix hap = fill_all_hap(hidden_states, hap_length, n_row);
-  IntegerVector new_num_states(t_max);
-  for(t = 0; t < t_max; ++t) {
-    // find the start id for linkage_info
-    unsigned int id = time_pos[t] - hap_min_pos;
-    for(j = 0; j < undecided_pos.size(); ++j) {
-      start_idx = j;
-      if(undecided_pos[j] >= id)
-        break;
-    }
-    // give h_t, each t has many possible combinations
-    List full_hap_t(num_states(t));
-    if(num_states[t] != 1) {
-      // if the current covered the same site as the last one, then directly use the last combined information
-      
-      List comb_info = find_combination(undecided_pos, pos_possibility, p_tmax[t], time_pos[t], hap_min_pos);
-      IntegerVector location = comb_info["location"];
-      // Rcout << t << "\t" << start_idx << "\t" << location << "\n";
-      IntegerMatrix combination = comb_info["combination"];
-      unsigned int num = comb_info["num"];
-      List exclude_info = limit_comb_t0(combination, hidden_states, location, linkage_info, num, start_idx, num_states[t]);
-      IntegerVector exclude = exclude_info["exclude"];
-      new_num_states[t] = exclude_info["num_states"];
-      IntegerMatrix new_comb(new_num_states[t], combination.ncol());
-      int count = 0;
-      for(m = 0; m < num_states[t]; ++m)
-        if(!exclude[m]) {
-          IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[t], combination(m, _), time_pos[t], num, hap_min_pos);
-          new_comb(count, _) = combination(m, _);
-          full_hap_t(count++) = haplotype;
-        }
-      comb[t] = new_comb;
-    } else {
-      full_hap_t[0] = hap(_, Range(time_pos[t] - hap_min_pos, time_pos[t] + p_tmax[t] - hap_min_pos - 1));
-      new_num_states[t] = num_states[t];
-    }
-    full_hap[t] = full_hap_t[Range(0, new_num_states[t] - 1)];
-  }
-  
-  List out = List::create(
-    Named("full_hap") = full_hap,
-    Named("new_num_states") = new_num_states, 
-    Named("combination") = comb);
-  
-  return(out);
-}
+// List full_hap(List hmm_info, IntegerMatrix linkage_info, unsigned int hap_length, int hap_min_pos) {
+//   List hidden_states = hmm_info["hidden_states"];
+//   IntegerVector num_states = hmm_info["num_states"];
+//   IntegerVector time_pos = hmm_info["time_pos"];
+//   IntegerVector p_tmax = hmm_info["p_tmax"];
+//   IntegerVector n_row = hmm_info["n_row"];
+//   IntegerVector pos_possibility = hmm_info["pos_possibility"];
+//   IntegerVector undecided_pos = hmm_info["undecided_pos"];
+//   unsigned int t_max = hmm_info["t_max"];
+//   unsigned int t, m, j, start_idx = 0;
+//   List full_hap(t_max);
+//   List comb(t_max);
+//   IntegerMatrix hap = fill_all_hap(hidden_states, hap_length, n_row);
+//   IntegerVector new_num_states(t_max);
+//   for(t = 0; t < t_max; ++t) {
+//     // find the start id for linkage_info
+//     unsigned int id = time_pos[t] - hap_min_pos;
+//     for(j = 0; j < undecided_pos.size(); ++j) {
+//       start_idx = j;
+//       if(undecided_pos[j] >= id)
+//         break;
+//     }
+//     // give h_t, each t has many possible combinations
+//     List full_hap_t(num_states(t));
+//     if(num_states[t] != 1) {
+//       // if the current covered the same site as the last one, then directly use the last combined information
+//       
+//       List comb_info = find_combination(undecided_pos, pos_possibility, p_tmax[t], time_pos[t], hap_min_pos);
+//       IntegerVector location = comb_info["location"];
+//       // Rcout << t << "\t" << start_idx << "\t" << location << "\n";
+//       IntegerMatrix combination = comb_info["combination"];
+//       unsigned int num = comb_info["num"];
+//       List exclude_info = limit_comb_t0(combination, hidden_states, location, linkage_info, num, start_idx, num_states[t]);
+//       IntegerVector exclude = exclude_info["exclude"];
+//       new_num_states[t] = exclude_info["num_states"];
+//       IntegerMatrix new_comb(new_num_states[t], combination.ncol());
+//       int count = 0;
+//       for(m = 0; m < num_states[t]; ++m)
+//         if(!exclude[m]) {
+//           IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[t], combination(m, _), time_pos[t], num, hap_min_pos);
+//           new_comb(count, _) = combination(m, _);
+//           full_hap_t(count++) = haplotype;
+//         }
+//       comb[t] = new_comb;
+//     } else {
+//       full_hap_t[0] = hap(_, Range(time_pos[t] - hap_min_pos, time_pos[t] + p_tmax[t] - hap_min_pos - 1));
+//       new_num_states[t] = num_states[t];
+//     }
+//     full_hap[t] = full_hap_t[Range(0, new_num_states[t] - 1)];
+//   }
+//   
+//   List out = List::create(
+//     Named("full_hap") = full_hap,
+//     Named("new_num_states") = new_num_states, 
+//     Named("combination") = comb);
+//   
+//   return(out);
+// }
 
 List compute_emit(List hmm_info, List dat_info, List hap_info, NumericMatrix beta, NumericVector eta, int PD_LENGTH) 
 {
@@ -1027,7 +1032,7 @@ List trans_permit(IntegerVector num_states, List combination, List loci, int t_m
   unsigned int t, j, m, w;
   
   for(t = 0; t < t_max - 1; ++t) {
-    if(num_states[t + 1] != 1) {
+    if(num_states[t + 1] != 1 && num_states[t] != 1) {
       IntegerMatrix trans(num_states[t], num_states[t + 1]);
       IntegerMatrix comb_t1 = combination[t];
       IntegerMatrix comb_t2 = combination[t + 1];

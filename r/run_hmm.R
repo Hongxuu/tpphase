@@ -75,8 +75,6 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   linkage_in <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
   overlap_info <- get_overlap(HMM$p_tmax, HMM$time_pos, HMM$num_states, HMM$undecided_pos, HMM$t_max, dat_info$ref_start)
   hap_full_info <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start)
-  # hap_full_info <- full_hap(hmm_info = HMM, linkage_info = linkage_info, hap_length = hap_length, 
-  #                           hap_min_pos = dat_info$ref_start)
   hap_full <- hap_full_info$full_hap
   HMM$num_states <- hap_full_info$new_num_states
   
@@ -102,17 +100,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   ###some transition could not happen, can be set to null
   trans_indicator <- trans_permit(num_states = HMM$num_states, combination = hap_full_info$combination, 
                                   loci = overlap_info$location, t_max = HMM$t_max)
-  # trans_indicator_new = NULL;
-  # trans_indicator <- trans_permit(HMM$num_states, hap_full_info$combination, HMM$t_max, HMM$undecided_pos, 
-  #              HMM$time_pos, HMM$p_tmax, dat_info$ref_start)
-  # HMM$num_states <- trans_indicator$new_num_states
-  # hap_full <- final_exclude(full_hap = hap_full, further_limit = trans_indicator$further_limit, 
-  #                                t_max = HMM$t_max, num_states = HMM$num_states)
-  # trans_indicator_new <- prepare_ini_hmm(HMM$t_max, HMM$num_states, 
-  #                                        trans_indicator$trans_permits, trans_indicator$further_limit);
-  
   ### start initializing
-
   ###### estimate beta
   weight_id <- NULL
   data_new <- format_data2(hmm_info = HMM, d_info = dat_info, hap_info = hap_full)
@@ -132,6 +120,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   init <- list()
   for (m in (1:max_iter)) {
     cat(m, "\n");
+    m = m + 1
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
     tmp <- m_beta(res = bw$par_aux, id = id, weight_id = weight_id, data = data, formula = formula, 
