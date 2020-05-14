@@ -24,14 +24,14 @@ sourceCpp("./r/viterbi.cpp")
 
 ##### targeted data
 
-## read the data, reference has to indicate which pair of reference it is processing
+## read the data, reference has to indicate which pair of reference it is processing (change this to only input the paried fasta file)
 samfile = "../../data/tpphase_res_consensus/WGS/test.sam"
 ref_name = "target.66"
 fastq_file = "./res.fastq"
 datafile = "./res.txt"
 alignment = "../../data/tpphase_res_consensus/WGS/new.fasta"
 
-datafile = "../../data/tpphase_res_consensus/WGS/out_chr07_366557.txt"
+datafile = "../../data/tpphase_res_consensus/WGS/out_chr06_104680449.txt"
 #######
 formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc
 n_class = 4
@@ -72,9 +72,9 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   ## initialization
   ##### use linkage info to limit some unlikelily happened transition
   hap_length <- dat_info$ref_length_max - dat_info$ref_start
-  linkage_info <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
+  linkage_in <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
   overlap_info <- get_overlap(HMM$p_tmax, HMM$time_pos, HMM$num_states, HMM$undecided_pos, HMM$t_max, dat_info$ref_start)
-  hap_full_info <- full_hap_new(HMM, linkage_info, overlap_info, hap_length, dat_info$ref_start)
+  hap_full_info <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start)
   # hap_full_info <- full_hap(hmm_info = HMM, linkage_info = linkage_info, hap_length = hap_length, 
   #                           hap_min_pos = dat_info$ref_start)
   hap_full <- hap_full_info$full_hap

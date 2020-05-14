@@ -303,70 +303,41 @@ IntegerMatrix fill_all_hap(List hidden_states, unsigned int hap_length, IntegerV
 }
 
 // [[Rcpp::export]]
-IntegerMatrix linkage_info(List dat_info, IntegerVector undecided_pos) {
-  IntegerMatrix ref_index = dat_info["ref_idx"];
-  IntegerVector obs = dat_info["nuc"];
-  IntegerVector index = dat_info["start_id"];
-  IntegerVector ref_pos = dat_info["ref_pos"];
-  IntegerVector length = dat_info["length"];
-  int hap_min_pos = dat_info["ref_start"];
-  int n_observation = dat_info["n_observation"];
-  IntegerMatrix link(n_observation, undecided_pos.size());
-  unsigned int i, j;
-  int idx;
-  
-  for (j = 0; j < undecided_pos.size(); ++j) {
-    unsigned int ref_j = undecided_pos[j] + hap_min_pos;
-    for (i = 0; i < n_observation; i++) {
-      if (ref_pos[index[i]] <= ref_j && ref_j < ref_pos[index[i] + length[i] - 1]) {
-        idx = ref_index(i, ref_j - hap_min_pos); // read pos, start from 0
-        if (idx != -1)
-          link(i, j) = obs[index[i] + idx];
-        else 
-          link(i, j) = 4; // meaning deletion
-      } 
-      else 
-        link(i, j) = -1; // meaning not covered
-    }
-  }
-  return(link);
-}
-// [[Rcpp::export]]
+// NOTE: Rcpp doesn't accept comparison between int and unsigned int!!!
 List get_overlap(IntegerVector p_tmax, IntegerVector time_pos, IntegerVector num_states,
                  IntegerVector undecided_pos, unsigned int t_max, int hap_min_pos)
 {
-  unsigned int start_t = 0;
+  IntegerVector start_t(t_max);
   // get the first t which has variation
   for (unsigned int t = 0; t < t_max; ++t)
     if(num_states[t] > 1) {
-      start_t = t;
+      start_t[0] = t;
       break;
     }
-    List overlapped(t_max);
-    List location(t_max);
-    IntegerVector overlapped_idx(t_max);
-    unsigned int begin, end, end1, min;
-    
-    for (unsigned int t = 0; t < t_max; ++t) {
-      
+  List overlapped(t_max);
+  List location(t_max);
+  IntegerVector overlapped_idx(t_max);
+  int begin, end, end1, min;
+  unsigned int s_t = 1;
+  for (unsigned int t = 0; t < t_max; ++t) {
       if (num_states[t] == 1) {
         overlapped[t] = -1;
         overlapped_idx[t] = -1;
         location[t] = -1;
         continue;
       }
-      if(t == start_t) {
+      if(t == start_t[0]) {
         overlapped[t] = -1;
         overlapped_idx[t] = -1;
-        begin = time_pos[start_t] - hap_min_pos;
-        end = time_pos[start_t] + p_tmax[start_t] - hap_min_pos;
+        begin = time_pos[start_t[0]] - hap_min_pos;
+        end = time_pos[start_t[0]] + p_tmax[start_t[0]] - hap_min_pos;
         int num = 0;
         IntegerVector location_t(undecided_pos.size());
         for (unsigned int m = 0; m < undecided_pos.size(); ++m)
           if (undecided_pos[m] >= begin && undecided_pos[m] < end)
             location_t(num++) = undecided_pos[m];
-          location[start_t] = location_t[Range(0, num - 1)];
-          continue;
+        location[start_t[0]] = location_t[Range(0, num - 1)];
+        continue;
       }
       begin = time_pos[t] - hap_min_pos;
       end = time_pos[t] + p_tmax[t] - hap_min_pos;
@@ -376,31 +347,40 @@ List get_overlap(IntegerVector p_tmax, IntegerVector time_pos, IntegerVector num
       for (unsigned int m = 0; m < undecided_pos.size(); ++m)
         if (undecided_pos[m] >= begin && undecided_pos[m] < end)
           location_t(num++) = undecided_pos[m];
-        location[t] = location_t[Range(0, num - 1)];
-        int len = 0;
-        int id_t = 0;
-        int index = 0;
-        // Rcout << "location" << location_t[num - 1] << "\n";
-        for (unsigned int t1 = 0; t1 < t; ++t1) {
-          IntegerVector last_location = location[t1];
+      location[t] = location_t[Range(0, num - 1)];
+      int len = -1;
+      int id_t = 0;
+      int index = 0;
+      
+      int flag = 0; //indicate if this has overlapped
+      for (unsigned int t1 = 0; t1 < t; ++t1) {
+        if(num_states[t1] == 1) 
+          continue;
+        IntegerVector last_location = location[t1];
           // begin1 = time_pos[t1] - hap_min_pos;
-          end1 = last_location[last_location.size() - 1];
-          // Rcout << end1 << "\t";
-          // end1 = time_pos[t1] + p_tmax[t1] - hap_min_pos;
-          if(begin <= end1) {
-            min = end1;
+        end1 = last_location[last_location.size() - 1];
+        // Rcout << "end1 " << end1 << "location_t[0] " << location_t[0] << "\n";
+        if(location_t[0] <= end1) {
+          flag = 1;
+          min = end1;
             // minimum overlapped region
-            if(location_t[num - 1] < end1)
-              min = location_t[num - 1];
+          if(location_t[num - 1] < end1)
+            min = location_t[num - 1];
             // find the time t which has the longest coverage
-            if(min - location_t[0] > len) {
+            // Rcout << len << " " << min - location_t[0] << "\n";
+          if(min - location_t[0] > len) {
               // Rcout << t << " has coverage with " << t1 << "\n";
-              len = min - location_t[0];
-              id_t = min;
-              index = t1;
-            }
+            len = min - location_t[0];
+            id_t = min;
+            index = t1;
           }
         }
+      }
+      if(!flag) {
+        start_t[s_t++] = t;
+        overlapped[t] = -1;
+        overlapped_idx[t] = -1;
+      } else {
         // Rcout<< "\n" << begin << "\t" << id_t << "\n";
         int count = 0;
         IntegerVector position(undecided_pos.size());
@@ -408,17 +388,16 @@ List get_overlap(IntegerVector p_tmax, IntegerVector time_pos, IntegerVector num
           if (undecided_pos[m] >= begin && undecided_pos[m] <= id_t)
             position(count++) = undecided_pos[m];
           // Rcout << position << "\n";
-          if(count) { 
-            overlapped[t] = position[Range(0, count - 1)];
-            overlapped_idx[t] = index;
-          }
+        overlapped[t] = position[Range(0, count - 1)];
+        overlapped_idx[t] = index;
+      }
     }
     
     List overlap = List::create(
       Named("location") = location,
       Named("overlapped") = overlapped,
       Named("overlapped_id") = overlapped_idx, 
-      Named("start_t") = start_t);
+      Named("start_t") = start_t[Range(0, s_t - 1)]);
     return(overlap);
 }
 
@@ -432,67 +411,81 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
   IntegerVector pos_possibility = hmm_info["pos_possibility"];
   IntegerVector undecided_pos = hmm_info["undecided_pos"];
   unsigned int t_max = hmm_info["t_max"];
-  unsigned int t, m;
+  unsigned int t, m, st;
   List full_hap(t_max);
   List comb(t_max);
   IntegerMatrix hap = fill_all_hap(hidden_states, hap_length, n_row);
   IntegerVector new_num_states(t_max);
+  Rcout << "overlap" << "\n";
   // List overlap_info = get_overlap(p_tmax, time_pos, num_states, undecided_pos, t_max, hap_min_pos);
   List overlapped = overlap_info["overlapped"];
   IntegerVector overlapped_id = overlap_info["overlapped_id"];
-  int start_t = overlap_info["start_t"];
+  IntegerVector start_t = overlap_info["start_t"];
   List loci = overlap_info["location"];
-  
-  //start t info
-  List comb_info_t0 = find_combination(undecided_pos, pos_possibility, p_tmax[start_t], time_pos[start_t], hap_min_pos);
-  IntegerVector location = comb_info_t0["location"];
-  IntegerMatrix combination = comb_info_t0["combination"];
-  unsigned int num = comb_info_t0["num"];
-  List t0 = limit_comb_t0(combination, hidden_states, location, linkage_info, num, 0, num_states[start_t]);
-  IntegerVector exclude = t0["exclude"];
-  IntegerVector exclude_last = exclude;
-  IntegerMatrix comb_in = combination; 
+  int n_start = start_t.size();
+  //start t info(store this for t that needs to use this info)
+  Rcout << "start t " << start_t << "\n";
+  List exclude_t(n_start);
+  List combination_t(n_start);
+  for(t = 0; t < n_start; ++t) {
+    List full_hap_t;
+    int count = 0;
+    List comb_info_t0 = find_combination(undecided_pos, pos_possibility, p_tmax[start_t[t]], time_pos[start_t[t]], hap_min_pos);
+    IntegerVector location = comb_info_t0["location"];
+    IntegerMatrix combination = comb_info_t0["combination"];
+    combination_t[t] = combination;
+    unsigned int num = comb_info_t0["num"];
+    List t0 = limit_comb_t0(combination, hidden_states, location, linkage_info, num, 0, num_states[start_t[t]]);
+    IntegerVector exclude = t0["exclude"];
+    exclude_t[t] = exclude;
+    new_num_states[start_t[t]] = t0["num_states"];
+    IntegerMatrix new_comb(new_num_states[start_t[t]], combination.ncol());
+    full_hap_t = List(new_num_states[start_t[t]]);
+    for(m = 0; m < num_states[start_t[t]]; ++m)
+      if(!exclude[m]) {
+        IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[start_t[t]], combination(m, _), time_pos[start_t[t]], num, hap_min_pos);
+        new_comb(count, _) = combination(m, _);
+        full_hap_t(count++) = haplotype;
+      }
+    comb[start_t[t]] = new_comb;
+    full_hap[start_t[t]] = full_hap_t;
+  }
+  Rcout << "start ts done" << "\n";
+  IntegerVector exclude_last;
+  IntegerMatrix comb_in; 
   // get the states  
   for(t = 0; t < t_max; ++t) {
     List full_hap_t;
-    if(num_states[t] != 1) {
+    if(num_states[t] != 1 && overlapped_id[t] != -1) {
       int count = 0;
-      if(t == start_t) {
-        // decide start_t first
-        new_num_states[t] = t0["num_states"];
-        IntegerMatrix new_comb(new_num_states[t], combination.ncol());
-        full_hap_t = List(new_num_states[t]);
-        for(m = 0; m < num_states[t]; ++m)
-          if(!exclude[m]) {
-            IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[t], combination(m, _), time_pos[t], num, hap_min_pos);
-            new_comb(count, _) = combination(m, _);
-            full_hap_t(count++) = haplotype;
-          }
-          comb[t] = new_comb;
-          Rcout << "start done" << "\n";
-      }
-      else {
+      Rcout << t << "\t";
         int identical = 0;
         int last_t = overlapped_id[t];
         IntegerVector overlapped_t = overlapped[t];
         IntegerVector loci_lastt = loci[last_t];
         IntegerVector loci_currt = loci[t];
         int old_state;
-        Rcout << t << "\t" << last_t << "\n";
+        Rcout << last_t << "\n";
         Rcout << "overlapped: " << overlapped_t << "\n";
         Rcout << "loci_lastt: " << loci_lastt << "\n";
         Rcout << "loci_currt: " << loci_currt << "\n";
-        
+        int flag = 0;
         if(loci_lastt[0] <= loci_currt[0] && loci_lastt[loci_lastt.size() - 1] >= loci_currt[loci_currt.size() - 1]) {
           if(loci_lastt.size() > loci_currt.size()) { // if current is in its overlap
             // get the unique overlapped combination from the last t
-            if(last_t == start_t) {
-              exclude_last = IntegerVector(exclude.size());
-              exclude_last = exclude;
-              old_state = num_states[last_t];
-              comb_in = combination;
-            }
-            else {
+            for(st = 0; st < n_start; ++st)
+              if(last_t == start_t[st]) {
+                flag = 1;
+                IntegerVector exclude = exclude_t(st);
+                IntegerMatrix combination = combination_t(st);
+                exclude_last = IntegerVector(exclude.size());
+                exclude_last = exclude;
+                old_state = num_states[last_t];
+                comb_in = IntegerMatrix(combination.nrow(), combination.ncol());
+                comb_in = combination;
+                break;
+              }
+            if(!flag) {
               exclude_last = IntegerVector(new_num_states[last_t]);
               for(m = 0; m < new_num_states[last_t]; ++m)
                 exclude_last[m] = 0;
@@ -510,34 +503,40 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
               IntegerMatrix haplotype = make_hap(hidden_states, hap, loci_currt, p_tmax[t], new_comb(m, _), time_pos[t], loci_currt.size(), hap_min_pos);
               full_hap_t(count++) = haplotype;
             }
-          } else if (loci_lastt.size() == loci_currt.size()) {
+          } else if (loci_lastt.size() == loci_currt.size()) {// if current is same as its overlap
             for(m = 0; m < loci_lastt.size(); ++m)
               if(loci_lastt[m] != loci_currt[m]) {
                 identical = 1;
                 break;
               }
-              if(!identical) {
-                Rcout << "same sites\n";
-                IntegerMatrix new_comb = comb[last_t];
-                comb[t] = new_comb;
-                new_num_states[t] = new_num_states[last_t];
-                full_hap_t = List(new_num_states[t]);
+            if(!identical) {
+              Rcout << "same sites\n";
+              IntegerMatrix new_comb = comb[last_t];
+              comb[t] = new_comb;
+              new_num_states[t] = new_num_states[last_t];
+              full_hap_t = List(new_num_states[t]);
                 // haps are still different since the entire covered sites are different
-                for(m = 0; m < new_num_states[t]; ++m) {
-                  IntegerMatrix haplotype = make_hap(hidden_states, hap, loci_currt, p_tmax[t], new_comb(m, _), time_pos[t], loci_currt.size(), hap_min_pos);
-                  full_hap_t(count++) = haplotype;
-                }
+              for(m = 0; m < new_num_states[t]; ++m) {
+                IntegerMatrix haplotype = make_hap(hidden_states, hap, loci_currt, p_tmax[t], new_comb(m, _), time_pos[t], loci_currt.size(), hap_min_pos);
+                full_hap_t(count++) = haplotype;
               }
+            }
           }
         } 
         else {
-          if(last_t == start_t) {
-            exclude_last = IntegerVector(exclude.size());
-            exclude_last = exclude;
-            old_state = num_states[last_t];
-            comb_in = combination;
-          }
-          else {
+          for(st = 0; st < n_start; ++st)
+            if(last_t == start_t[st]) {
+              flag = 1;
+              IntegerVector exclude = exclude_t(st);
+              IntegerMatrix combination = combination_t(st);
+              exclude_last = IntegerVector(exclude.size());
+              exclude_last = exclude;
+              old_state = num_states[last_t];
+              comb_in = IntegerMatrix(combination.nrow(), combination.ncol());
+              comb_in = combination;
+              break;
+            }
+          if(!flag) {
             exclude_last = IntegerVector(new_num_states[last_t]);
             for(m = 0; m < new_num_states[last_t]; ++m)
               exclude_last[m] = 0;
@@ -556,9 +555,8 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
             full_hap_t(count++) = haplotype;
           }
         }
-      }
     } 
-    else {
+    else if(num_states[t] == 1) {
       full_hap_t = List(1);
       full_hap_t[0] = hap(_, Range(time_pos[t] - hap_min_pos, time_pos[t] + p_tmax[t] - hap_min_pos - 1));
       new_num_states[t] = 1;

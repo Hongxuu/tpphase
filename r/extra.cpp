@@ -36,6 +36,258 @@ List hash_mat(IntegerMatrix x) {
   return List::create(  _["idx"] = idx );
 
 }
+// [[Rcpp::export]]
+List read_data(std::string path, unsigned int old_v) {
+  int j, k, l;
+  unsigned int i, m, count = 0, count_del = 0;
+  char c;
+  char str[100];
+  int n_observation = 0;
+  
+  FILE* fp = fopen(path.c_str(), "r");
+  if(!fp) {
+    Rcpp::stop("File opening failed");
+  }
+  int temp_n = -1;
+  while (fgets(str, sizeof(str), fp)) {
+    std::sscanf(str, "%d %d %d %d %c", &i, &j, &k, &l, &c);
+    /* exclude -1 in ref_pos and qua */
+    if (l == -1)
+      count_del++;
+    else {
+      if (temp_n != i) {
+        temp_n = i;
+        n_observation++;
+      }
+      count++;
+    }
+  }
+  
+  unsigned int del_num = 0;
+  IntegerVector del_obs_index;
+  IntegerVector del_ref_pos;
+  IntegerVector del_read_pos;
+  IntegerVector del_id;
+  IntegerVector del_flag;
+  
+  if(count_del) {
+    del_obs_index = IntegerVector(count_del);
+    del_ref_pos = IntegerVector(count_del);
+    del_read_pos = IntegerVector(count_del);
+    del_id = IntegerVector(n_observation);
+    del_flag = IntegerVector(n_observation);
+  }
+  
+  // unsigned int ins_num = 0;
+  // IntegerVector ins_obs_index(count_ins);
+  // IntegerVector ins_id(n_observation);
+  // IntegerVector ins_read_pos(count_ins);
+  // IntegerVector ins_flag(n_observation);
+  
+  IntegerVector qua(count);
+  IntegerVector obs(count);
+  StringVector obs_str(count);
+  IntegerVector obs_index(count);
+  IntegerVector ref_pos(count);
+  IntegerVector read_pos(count);
+  int total;
+  
+  rewind(fp);
+  
+  count = 0;
+  count_del = 0;
+  // count_ins = 0;
+  while (fgets(str, sizeof(str), fp)) {
+    std::sscanf(str, "%d %d %d %d %c", &i, &j, &k, &l, &c);
+    /* exclude -1 in ref_pos and qua */
+    if (l == -1) {
+      del_obs_index[count_del] = i;
+      del_read_pos[count_del] = j;
+      del_ref_pos[count_del] = k;
+      del_flag[i-1] = 1;
+      count_del++;
+    }
+    else {
+      obs_index[count] = i;
+      read_pos[count] = j;
+      ref_pos[count] = k;
+      qua[count] = l;
+      obs[count] = c;
+      count++;
+    }
+  }
+  fclose(fp);
+  fp = NULL;
+  
+  total = count;
+  IntegerVector length(n_observation);
+  
+  //insertion
+  // for (m = 0; m < count_ins; ++m) 
+  //   if (m < count_ins - 1 && ins_obs_index[m] != ins_obs_index[m + 1])
+  //     ins_id[ins_num++] = ins_obs_index[m];
+  // if(ins_id[ins_num- 1] != ins_obs_index[count_ins - 1])
+  //   ins_id[ins_num++] = ins_obs_index[count_ins - 1];
+  //   
+  // IntegerVector ins_count(ins_num);
+  // for (m = 0; m < ins_num; ++m)
+  //   ins_count[m] = 1;
+  // i = 0;
+  // for (m = 0; m < count_ins; ++m) {
+  //   if (m < count_ins - 1 && ins_obs_index[m] == ins_obs_index[m + 1])
+  //     ins_count[i]++;
+  //   else
+  //     i++;
+  // }
+  // 
+  // IntegerVector ins_length_all(n_observation);
+  // for (m = 0; m < ins_num; ++m)
+  //       ins_length_all[ins_id[m] - 1] = ins_count[m];
+  
+  // deletion
+  IntegerVector del_count;
+  IntegerVector del_length_all(n_observation);
+  IntegerVector del_strat_id(n_observation);
+  if (count_del) {
+    for (m = 0; m < count_del; ++m)
+      if (m < count_del - 1 && del_obs_index[m] != del_obs_index[m + 1])
+        del_id[del_num++] = del_obs_index[m];
+      if (del_id[del_num - 1] != del_obs_index[count_del - 1])
+        del_id[del_num++] = del_obs_index[count_del - 1];
+      
+      del_count = IntegerVector(del_num);
+      for (m = 0; m < del_num; ++m)
+        del_count[m] = 1;
+      i = 0;
+      for (m = 0; m < count_del; ++m) {
+        if (m < count_del - 1 && del_obs_index[m] == del_obs_index[m + 1])
+          del_count[i]++;
+        else
+          i++;
+      }
+      
+      for (m = 0; m < del_num; ++m){
+        del_length_all[del_id[m] - 1] = del_count[m];}
+      
+      for (i = 1; i < n_observation; ++i) {
+        if(del_flag[i] == 1)
+          for (j = 0; j < i; ++j)
+            del_strat_id[i] += del_length_all[j];
+        else
+          del_strat_id[i] = -1;
+      }
+  }
+  
+  // non indel
+  for (m = 0; m < count; ++m) {
+    i = obs_index[m];
+    // if (!length[i-1]) {
+    //   n_observation++;
+    // }
+    ++length[i-1];
+    obs[m] = char_to_xy(obs[m]);
+  }
+  
+  /* index of read in non-indel loci */
+  IntegerVector index(n_observation);
+  for (m = 1; m < n_observation; ++m)
+    index[m] = index[m - 1] + length[m - 1];
+  
+  // true length (include insertion) and fake length (include deletion) (some reads' alignment does not start from 0, other one also count that in)
+  IntegerVector true_length(n_observation);
+  IntegerVector fake_length(n_observation);
+  for (i = 0; i < n_observation; ++i) {
+    true_length[i] = length[i];
+    fake_length[i] = length[i] + del_length_all[i];
+    //fake_length[i] = length[i] + del_length_all[i] + ref_pos[index[i]];
+  }
+  
+  int max_len = 0; // largest position of reference
+  int min_len = 0; // smallest position of reference
+  min_len = min(ref_pos);
+  int over_hapmax = 0; // indicate if the length of reads is more than the hap_max
+  if(old_v == 1) { // use the old version for genotyping targeted region not WGS [the starting aligned position has to be 0]
+    /* find the longest reference position && appears more than no. of classes (4) */
+    List uni_map = unique_map(ref_pos);
+    max_len = top_n_map(uni_map);
+    for(i = 0; i < total; ++i)
+      if (max_len < ref_pos[i]) {
+        over_hapmax = 1;
+        break;
+      }
+  } else { // for WGS
+    max_len = max(ref_pos);
+  }
+  max_len = max_len + 1;
+  
+  IntegerMatrix ref_index(n_observation, max_len - min_len); // start from the first aligned pos
+  for(i = 0; i < n_observation; ++i)
+    for(m = 0; m < max_len - min_len; ++m)
+      ref_index(i, m) = -1;
+  
+  /* Find the index of ref position under different read of every j, which ref pos aligned to which read pos */
+  for(i = 0; i < n_observation; ++i)
+    for(m = 0; m < max_len - min_len; ++m)
+      for(j = 0; j < length[i]; ++j)
+        if(ref_pos[index[i] + j] == m + min_len) {
+          ref_index(i, m) = j;
+          break;
+        }
+        
+        IntegerVector non_covered_site(max_len- min_len);
+        unsigned int num;
+        for (m = 0; m < max_len - min_len; ++m) {
+          num = 0;
+          for(i = 0; i < n_observation; ++i)
+            if (ref_index(i, m) == -1)
+              num++;
+            if (num == n_observation)
+              non_covered_site[m] = 1;
+        }
+        List del;
+        if (count_del) {
+          del = List::create(Named("del_id") = del_id[Range(0, del_num - 1)],
+                             Named("del_id_all") = del_obs_index,
+                             Named("del_flag") = del_flag,
+                             Named("del_read_pos") = del_read_pos,
+                             Named("del_ref_pos") = del_ref_pos,
+                             Named("del_length") = del_count, //no. of deletion in each read
+                             Named("del_num") = del_num,  //no. of reads have deletion
+                             Named("del_total") = count_del,
+                             Named("del_length_all") = del_length_all,
+                             Named("del_strat_id") = del_strat_id);
+        }
+        // 
+        // List ins = List::create(
+        //   Named("ins_id") = ins_id[Range(0, ins_num - 1)],
+        //   Named("ins_read_pos") = ins_read_pos,
+        //   Named("ins_length") = ins_count,
+        //   Named("ins_num") = ins_num,
+        //   Named("ins_flag") = ins_flag,
+        //   Named("ins_length_all") = ins_length_all);
+        
+        List ls = List::create(
+          Named("id") = obs_index,
+          Named("read_pos") = read_pos,
+          Named("ref_pos") = ref_pos,
+          Named("nuc") = obs,
+          Named("qua") = qua,
+          Named("n_observation") = n_observation,
+          Named("length") = length, 
+          Named("true_length") = true_length, 
+          Named("fake_length") = fake_length, 
+          Named("total") = total,
+          Named("start_id") = index,
+          Named("ref_start") = min_len,
+          Named("ref_length_max") = max_len, 
+          Named("ref_idx") = ref_index, 
+          Named("over_hapmax") = over_hapmax,
+          Named("non_covered_site") = non_covered_site,
+          Named("deletion") = del);
+        // Named("insertion") = ins); no insertion for now
+        
+        return ls;
+}
 // struct VectorHasher {
 //   int operator()(const vector<int> &V) const {
 //     int hash=0;

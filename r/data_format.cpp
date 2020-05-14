@@ -112,11 +112,19 @@ List read_data(std::string path, unsigned int old_v) {
   }
   
   unsigned int del_num = 0;
-  IntegerVector del_obs_index(count_del);
-  IntegerVector del_ref_pos(count_del);
-  IntegerVector del_read_pos(count_del);
-  IntegerVector del_id(n_observation);
-  IntegerVector del_flag(n_observation);
+  IntegerVector del_obs_index;
+  IntegerVector del_ref_pos;
+  IntegerVector del_read_pos;
+  IntegerVector del_id;
+  IntegerVector del_flag;
+  
+  if(count_del) {
+    del_obs_index = IntegerVector(count_del);
+    del_ref_pos = IntegerVector(count_del);
+    del_read_pos = IntegerVector(count_del);
+    del_id = IntegerVector(n_observation);
+    del_flag = IntegerVector(n_observation);
+  }
   
   // unsigned int ins_num = 0;
   // IntegerVector ins_obs_index(count_ins);
@@ -185,34 +193,38 @@ List read_data(std::string path, unsigned int old_v) {
   //       ins_length_all[ins_id[m] - 1] = ins_count[m];
         
   // deletion
-  for (m = 0; m < count_del; ++m)
-    if (m < count_del - 1 && del_obs_index[m] != del_obs_index[m + 1])
-      del_id[del_num++] = del_obs_index[m];
-  if (del_id[del_num - 1] != del_obs_index[count_del - 1])
-      del_id[del_num++] = del_obs_index[count_del - 1];
-  
-  IntegerVector del_count(del_num);
-  for (m = 0; m < del_num; ++m)
-    del_count[m] = 1;
-  i = 0;
-  for (m = 0; m < count_del; ++m) {
-    if (m < count_del - 1 && del_obs_index[m] == del_obs_index[m + 1])
-      del_count[i]++;
-    else
-      i++;
-  }
-  
+  IntegerVector del_count;
   IntegerVector del_length_all(n_observation);
-  for (m = 0; m < del_num; ++m)
-        del_length_all[del_id[m] - 1] = del_count[m];
-  
   IntegerVector del_strat_id(n_observation);
-  for (i = 1; i < n_observation; ++i)
-    if(del_flag[i] == 1)
-      for (j = 0; j < i; ++j)
-        del_strat_id[i] += del_length_all[j];
-    else
-      del_strat_id[i] = -1;
+  if (count_del) {
+    for (m = 0; m < count_del; ++m)
+      if (m < count_del - 1 && del_obs_index[m] != del_obs_index[m + 1])
+        del_id[del_num++] = del_obs_index[m];
+    if (del_id[del_num - 1] != del_obs_index[count_del - 1])
+      del_id[del_num++] = del_obs_index[count_del - 1];
+    
+    del_count = IntegerVector(del_num);
+    for (m = 0; m < del_num; ++m)
+      del_count[m] = 1;
+    i = 0;
+    for (m = 0; m < count_del; ++m) {
+      if (m < count_del - 1 && del_obs_index[m] == del_obs_index[m + 1])
+        del_count[i]++;
+      else
+        i++;
+    }
+    
+    for (m = 0; m < del_num; ++m)
+      del_length_all[del_id[m] - 1] = del_count[m];
+
+    for (i = 1; i < n_observation; ++i) {
+      if(del_flag[i] == 1)
+        for (j = 0; j < i; ++j)
+          del_strat_id[i] += del_length_all[j];
+      else
+        del_strat_id[i] = -1;
+    }
+  }
   
   // non indel
   for (m = 0; m < count; ++m) {
@@ -280,8 +292,9 @@ List read_data(std::string path, unsigned int old_v) {
       if (num == n_observation)
         non_covered_site[m] = 1;
   }
-        
-  List del = List::create(
+  List del(10); 
+  if(count_del) {
+    del = List::create(
     Named("del_id") = del_id[Range(0, del_num - 1)],
     Named("del_id_all") = del_obs_index,
     Named("del_flag") = del_flag,
@@ -291,7 +304,7 @@ List read_data(std::string path, unsigned int old_v) {
     Named("del_num") = del_num,  //no. of reads have deletion
     Named("del_total") = count_del,
     Named("del_length_all") = del_length_all,
-    Named("del_strat_id") = del_strat_id);
+    Named("del_strat_id") = del_strat_id);}
   // 
   // List ins = List::create(
   //   Named("ins_id") = ins_id[Range(0, ins_num - 1)],
@@ -448,8 +461,12 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
   
   // get the coverage of each site (including -)
   List deletion = dat_info["deletion"];
-  IntegerVector del_ref_pos = deletion["del_ref_pos"];
-  unsigned int del_total = deletion["del_total"];
+  IntegerVector del_ref_pos;
+  unsigned int del_total = 0;
+  if(deletion[0] != R_NilValue) {
+    del_ref_pos = deletion["del_ref_pos"];
+    del_total = deletion["del_total"];
+  }
   unsigned int enuma = total + del_total;
   IntegerVector pos(enuma);
   for(i = 0; i < total; ++i)
@@ -579,6 +596,35 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
   return ls;
 }
 
+// [[Rcpp::export]]
+IntegerMatrix linkage_info(List dat_info, IntegerVector undecided_pos) {
+  IntegerMatrix ref_index = dat_info["ref_idx"];
+  IntegerVector obs = dat_info["nuc"];
+  IntegerVector index = dat_info["start_id"];
+  IntegerVector ref_pos = dat_info["ref_pos"];
+  IntegerVector length = dat_info["length"];
+  int hap_min_pos = dat_info["ref_start"];
+  int n_observation = dat_info["n_observation"];
+  IntegerMatrix link(n_observation, undecided_pos.size());
+  unsigned int i, j;
+  int idx;
+  
+  for (j = 0; j < undecided_pos.size(); ++j) {
+    unsigned int ref_j = undecided_pos[j] + hap_min_pos;
+    for (i = 0; i < n_observation; i++) {
+      if (ref_pos[index[i]] <= ref_j && ref_j < ref_pos[index[i] + length[i] - 1]) {
+        idx = ref_index(i, ref_j - hap_min_pos); // read pos, start from 0
+        if (idx != -1)
+          link(i, j) = obs[index[i] + idx];
+        else 
+          link(i, j) = 4; // meaning deletion
+      } 
+      else 
+        link(i, j) = -1; // meaning not covered
+    }
+  }
+  return(link);
+}
 // 
 // IntegerMatrix len_hapGap(List dat_info, List hap_info) {
 //   IntegerVector length = dat_info["length"];
