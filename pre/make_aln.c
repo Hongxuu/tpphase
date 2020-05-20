@@ -50,6 +50,11 @@ int main(int argc, const char *argv[])
 	char *names = NULL;
 //	printf("%lu\n", strlen(opt.ref_names[0]));
 //	strlen has to be the same when comparing
+	fdr->n_lengths = malloc(fdr->n_reads * sizeof(*fdr->n_lengths));
+	if (fdr->n_max_length == fdr->n_min_length)
+		for (j = 0; j < fdr->n_reads; ++j)
+			fdr->n_lengths[j] = fdr->n_min_length;
+		
 	for (j = 0; j < fdr->n_reads; ++j) {
 		names = fdr->names;
 		for (i = 0; i < j; ++i)
@@ -120,11 +125,12 @@ int main(int argc, const char *argv[])
 		fclose(fp);
 	}
 	fp = NULL;
-	// pick the reads
+	// pick the reads, more reads could be picked
 	pickreads(rf_info, &opt_rf, sds);
 	
 	char *strand;
 	for (j = 0; j < N_FILES; ++j) {
+		printf("Genome %d\n", j);
 		/* find selected references index in sam files */
 		size_t rchar = 0;
 		unsigned char found = 0;
@@ -156,9 +162,11 @@ int main(int argc, const char *argv[])
 				sprintf(se->name_s, "%s%s", se->name, strand);
 				my_refs[j] = se->which_ref; // this my_refs index should be adjusted
 				found = 1;
+				printf("%s\t", se->name_s);
 			}
 			rchar += strlen(se->ref_name) + 1;
 		}
+		printf("\n");
 		if (!found)
 			exit(mmessage(ERROR_MSG, INVALID_USER_INPUT, "no "
 				      "reference '%s' in fasta file '%s'",
@@ -178,38 +186,35 @@ int main(int argc, const char *argv[])
 	merge_hash *mh = NULL;
 	size_t total_read = hash_merge(&mh, N_FILES, sds, my_refs);
 	printf("total picked reads %lu\n", total_read);
-//	// load the universal genome
-//	rf_info->info[my_refs[0]].read->seq = uni_genome;
-//	rf_info->info[my_refs[0]].read->len = fdr->n_lengths[A_id];
-	
+
 	// oh well, this is 0-based, so plus 1 to match with what the rest related code designed for
-	rf_info->info[my_refs[0]].start_B++;
-	rf_info->info[my_refs[0]].end_B++;
-	rf_info->info[my_refs[0]].start_A++;
-	rf_info->info[my_refs[0]].end_A++;
-	// store aligned index used in the real genome
 	sam_entry *fse = &rf_info->ref_sam->se[my_refs[0]];
+	ref_entry *re = &rf_info->info[my_refs[0]];
+	re->start_B++;
+//	re->end_B;
+	re->start_A++;
+//	re->end_A;
+	// store aligned index used in the real genome
 	
 	long *real_id_A = malloc(fdr->n_lengths[A_id] * sizeof(*real_id_A));
 	long *real_id_B = malloc(fdr->n_lengths[A_id] * sizeof(*real_id_B));
 	
-	real_id_A[0] = rf_info->info[my_refs[0]].start_A + fse->pos - 1; // A start index
-	if (rf_info->info[my_refs[0]].strand_B) { // if B reversed
+	real_id_A[0] = re->start_A + fse->pos - 1; // A start index, 1 based
+	if (re->strand_B) { // if B reversed
 		printf("Genome B is reverse complemented\n");
-		real_id_B[0] = rf_info->info[my_refs[0]].end_B;
+		real_id_B[0] = re->end_B;
 		if (fse->cig->ashes[fse->cig->n_ashes - 1].type == CIGAR_SOFT_CLIP || fse->cig->ashes[fse->cig->n_ashes - 1].type == CIGAR_HARD_CLIP)
 			real_id_B[0] -= fse->cig->ashes[fse->cig->n_ashes - 1].len;
 	} else {
-		real_id_B[0] = rf_info->info[my_refs[0]].start_B;
+		real_id_B[0] = re->start_B;
 		if (fse->cig->ashes[0].type == CIGAR_SOFT_CLIP || fse->cig->ashes[0].type == CIGAR_HARD_CLIP)
 			real_id_B[0] += fse->cig->ashes[0].len; // length of unaligned in B
 	}
 	
 	for (j = 1; j < fdr->n_lengths[A_id]; ++j) {
-		
 		if (id_A[j] == -1) {
 			real_id_A[j] = -1;
-			if (rf_info->info[my_refs[0]].strand_B) // if B is reversed
+			if (re->strand_B) // if B is reversed
 				real_id_B[j] = real_id_B[0] - id_B[j];
 			else
 				real_id_B[j] = real_id_B[0] + id_B[j];
@@ -219,18 +224,22 @@ int main(int argc, const char *argv[])
 			real_id_A[j] = real_id_A[0] + id_A[j];
 		} else {
 			real_id_A[j] = real_id_A[0] + id_A[j];
-			if (rf_info->info[my_refs[0]].strand_B) // if B is reversed
+			if (re->strand_B) // if B is reversed
 				real_id_B[j] = real_id_B[0] - id_B[j];
 			else
 				real_id_B[j] = real_id_B[0] + id_B[j];
 		}
 	}
+	for (j = 1; j < fdr->n_lengths[A_id]; ++j)
+		printf("%ld: %c\t\t\t", real_id_A[j], iupac_to_char[fdr->reads[rptr + j]]);
+	for (j = 1; j < fdr->n_lengths[A_id]; ++j)
+		printf("%ld: %c\t", real_id_B[j], iupac_to_char[fdr->reads[rptr_b + j]]);
 	printf("\nreal start-end in genome A %ld-%ld B %ld-%ld\n", real_id_A[0], real_id_A[fdr->n_lengths[A_id] - 1], real_id_B[0], real_id_B[fdr->n_lengths[A_id] - 1]);
-//	PRINT_VECTOR(real_id_A, fdr->n_lengths[A_id]);
-//	printf("B\n");
-//	PRINT_VECTOR(real_id_B, fdr->n_lengths[A_id]);
+	PRINT_VECTOR(real_id_A, fdr->n_lengths[A_id]);
+	printf("B\n");
+	PRINT_VECTOR(real_id_B, fdr->n_lengths[A_id]);
+	
 	unsigned int strand_genome;
-	ref_entry *re = &rf_info->info[my_refs[0]];
 	int *id_uni = NULL;
 //	size_t uni_len;
 	long *real_id = NULL;
@@ -244,6 +253,7 @@ int main(int argc, const char *argv[])
 //		printf("%d:%d:%c:%ld\t", i, id_B[i], iupac_to_char[fdr->reads[i + rptr_b]], real_id_B[i]);
 //	}
 //	printf("\n");
+	printf("start!\n");
 	if (opt.out_file) {
 		fp = fopen(opt.out_file, "w");
 		if (!fp)
@@ -317,6 +327,5 @@ int main(int argc, const char *argv[])
 		n_read++;
 	}
 	printf("read: %d\n", n_read);
-	fprintf(fp, "\n");
 	fclose(fp);
 }

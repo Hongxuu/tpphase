@@ -68,4 +68,5 @@ typedef struct mlogit_stuff {
 
 int default_options(options *opt);
 int parse_options(options *opt, int argc, const char **argv);
+void fprint_usage(FILE *fp, const char *cmdname, void *obj);
 #endif

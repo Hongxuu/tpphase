@@ -115,6 +115,27 @@ int make_targets_info(options_rf opt, ref_info **ref_in)
 		re[i].end_A = atoi(ptr_A_pos);
 		debug_msg(fxn_debug >= DEBUG_I, fxn_debug,
 			  "name: %s start %zu end %zu\n", re[i].name_A, re[i].start_A, re[i].end_A);
+		re[i].real_sA = re[i].start_A + se->pos - 1;
+		re[i].real_eA = re[i].real_sA + se->cig->length_rf;
+		
+		size_t length = 0;
+		for (unsigned int m = 0; m < se->cig->n_ashes; ++m)
+			if (se->cig->ashes[m].type == CIGAR_INSERTION
+			    || se->cig->ashes[m].type == CIGAR_MATCH
+			    || se->cig->ashes[m].type == CIGAR_MMATCH
+			    || se->cig->ashes[m].type == CIGAR_MISMATCH)
+				length += se->cig->ashes[m].len;
+		if (re[i].strand_B) { // if B reversed
+			re[i].real_eB = re[i].end_B;
+			if (se->cig->ashes[se->cig->n_ashes - 1].type == CIGAR_SOFT_CLIP || se->cig->ashes[se->cig->n_ashes - 1].type == CIGAR_HARD_CLIP)
+				re[i].real_eB -= se->cig->ashes[se->cig->n_ashes - 1].len;
+			re[i].real_sB = re[i].real_eB - length;
+		} else {
+			re[i].real_sB = re[i].start_B;
+			if (se->cig->ashes[0].type == CIGAR_SOFT_CLIP || se->cig->ashes[0].type == CIGAR_HARD_CLIP)
+				re[i].real_sB += se->cig->ashes[0].len; // length of unaligned in B
+			re[i].real_eB = re[i].real_sB + length;
+		}
 	}
 	rf_info->info = re;
 	rf_info->ref_sam = sd_ref;
@@ -161,9 +182,13 @@ int pickreads(ref_info *ref_info, options_rf *opt, sam **sds) {
 			cigar *cig = se->cig;
 			for (i = 0; i < ref_info->ref_sam->n_se; ++i) {
 				ref_entry *re = &ref_info->info[i];
+				sam_entry *rse = &ref_info->ref_sam->se[i];
+				if (rse->flag >> 11 & 1) //skip secondary
+					continue;
+				rse->cig->length_rf;
 				char *ref_names[N_FILES] = {re->name_A, re->name_B};
-				size_t start_pos[N_FILES] = {re->start_A, re->start_B};
-				size_t end_pos[N_FILES] = {re->end_A, re->end_B};
+				size_t start_pos[N_FILES] = {re->start_A, re->start_B}; // 0 based
+				size_t end_pos[N_FILES] = {re->end_A, re->end_B};// 1 based
 //				printf("%s %s\n ", ref_names[j], &sds[j]->ref_names[rchar[j][se->ref]]);
 				if (!strcmp(&sds[j]->ref_names[rchar[j][se->ref]], ref_names[j])) {
 					size_t len_ref = end_pos[j] - start_pos[j];
@@ -172,9 +197,13 @@ int pickreads(ref_info *ref_info, options_rf *opt, sam **sds) {
 //					printf("%zu %zu || %zu %zu\n", rf_index_s, rf_index_e, start_pos[j], end_pos[j]);
 					if(cig->length_rf < len_ref) {
 						if ((rf_index_s >= start_pos[j] && rf_index_e <= end_pos[j]) ||
-						    (rf_index_s < start_pos[j] && rf_index_e >= start_pos[j]) ||
-						    (rf_index_s < end_pos[j] && rf_index_e >= end_pos[j])) {
-							size_t length = strlen(ref_names[j]) + strlen(opt->delim_len) + strlen(opt->delim_ref) + (int)(log10(start_pos[j]) + 1) + (int)(log10(end_pos[j]) + 1) + 1;
+						    (rf_index_s < start_pos[j] && rf_index_e >= start_pos[j] + 1) ||
+						    (rf_index_s + 1 < end_pos[j] && rf_index_e >= end_pos[j])) {
+							size_t length = strlen(ref_names[j]) + strlen(opt->delim_len) + strlen(opt->delim_ref) + (int)(log10(end_pos[j]) + 1) + 1;
+							if (start_pos[j] != 0) {
+								length += (int)(log10(start_pos[j]) + 1);
+							} else
+								length += 1;
 							se->ref_name = malloc(length);
 							sprintf(se->ref_name, "%s%s%zu%s%zu", ref_names[j], opt->delim_ref, start_pos[j], opt->delim_len, end_pos[j]);
 							se->which_ref = i;
@@ -355,7 +384,7 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 		}
 	}
 	printf("old alignment index, start from %zu\n", se->pos);
-//	PRINT_VECTOR(rid_map, length);
+	
 	// adjust and trim the alignment (need to consider genome reverse c and read RC)
 	int len = 0;
 	se->rd_map = NULL;
@@ -364,9 +393,9 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 	int location = 0;
 	size_t new_len = 0;
 	if (!strand) { // if genome is forward
-//		printf("genome forward\n");
+		printf("genome forward\n");
 		if (se->pos < s_id) { // then rd_map is the read (covers the begining) index when aligned to picked region
-//			printf("align start before the real genome homo\n");
+			printf("align start before the real homo\n");
 			
 			len = s_id - se->pos; // length outside targeted genome
 			remain = malloc(uni_aln_len * sizeof(*remain));
@@ -400,7 +429,7 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 				flag = 0;
 			}
 		} else if (se->pos + length - 1 > e_id) {
-//			printf("align over the real homo\n");
+			printf("align over the real homo\n");
 			
 			// alignment start location relative to id_uni
 			for (unsigned int i = 0; i < uni_aln_len; ++i)
@@ -474,9 +503,9 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 			}
 		}
 	} else {// if genome is reversed
-//		printf("genome reversed\n");
+		printf("genome reversed\n");
 		if (se->pos < e_id) { // then se->rd_map is the read (covers the begining) index when aligned to picked region
-//			printf("align over the homo\t\t");
+			printf("align over the homo\t\t");
 			
 			len = e_id - se->pos; // length outside targeted genome
 			remain = malloc(uni_aln_len * sizeof(*remain));
@@ -491,7 +520,7 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 			}
 			int consumed = 0;
 //			printf("%d gaps meet in the uni genome, %d cut length, new aligned length %lu\n", gaps, len, length - len + gaps);
-			new_len = length - len + gaps;
+			new_len = length - len + gaps - 1; // temporary - 1
 			se->rd_map = malloc(new_len * sizeof(*se->rd_map));
 			int flag = 0;
 			for (unsigned int i = 0; i < new_len; ++i) {
@@ -512,7 +541,7 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 			}
 			location = uni_aln_len - new_len;
 		}  else if (se->pos + length - 1 > s_id) {
-//			printf("align before the homo\n");
+			printf("align before the homo\n");
 			gaps = 0;
 			// alignment start location relative to id_uni
 			for (unsigned int i = 0; i < uni_aln_len; ++i)
@@ -527,7 +556,7 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 					remain[gaps++] = location; // record the position that are gaps in uni
 			}
 			int consumed = 0;
-			new_len = s_id - se->pos + gaps + 1;
+			new_len = s_id - (se->pos - 1) + gaps + 1;
 			se->rd_map = malloc(new_len * sizeof(*se->rd_map));
 //			printf("%d gaps meet in the uni genome, new aligned length %lu\n", gaps, s_id - se->pos + gaps + 1);
 			
@@ -544,7 +573,7 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 				}
 				if (!flag) {
 //					printf("%d %lu\t", i, s_id - se->pos - (i - consumed));
-					se->rd_map[i] = rid_map[s_id - se->pos - (i - consumed)];
+					se->rd_map[i] = rid_map[s_id - se->pos - (i - consumed) + 1];
 				}
 				flag = 0;
 			}
@@ -588,7 +617,7 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 				}
 				flag = 0;
 			}
-			location = location - new_len + 1;
+			location = location - new_len + 1 + 1;
 		}
 	}
 	
@@ -621,13 +650,15 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 				se->uni_aln[j] = read[se->rd_map[j]];
 		}
 	}
+	
+	se->aln_len = new_len;
+	PRINT_VECTOR(se->rd_map, length);
 	printf("alignment of read to universal, start from %zu, length %zu\n", se->new_pos, se->aln_len);
 	PRINT_VECTOR(se->uni_aln, new_len);
 	printf("alignment of ref\n");
 	for (size_t j = 0; j < new_len; ++j) {
-		printf("%d\t", iupac_to_xy[ref[se->new_pos + j]]);
+		printf("%d\t", iupac_to_xy[ref[se->new_pos + j]]); // se->new_pos is 0 based
 	}
-	se->aln_len = new_len;
 	// compute the alignment probability, if, ther is a gap in the read alignment but not in uni genome, then add a penalty
 	se->ll_aln = 0;
 	unsigned int gap_in = 0;
