@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "baumwelch.h"
+#include "hmm_state.h"
 
 using namespace RcppArmadillo;
 using namespace std;
@@ -119,8 +120,3 @@ List sample_hap2(List hmm_info, unsigned int hap_length, int hap_min_pos)
     Named("gap_in") = gap_in);
   return(ls);
 }
-
-
-
-
-

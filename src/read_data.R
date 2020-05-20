@@ -3,7 +3,8 @@
 read_fasta <- function(datafile = NULL)
 {
   checkmate::expect_file_exists(datafile, access = "r")
-  if ((utils::tail(unlist(strsplit(datafile, "[.]")), 1) != "fasta") & 
+  if ((utils::tail(unlist(strsplit(datafile, "[.]")), 1) != "fasta") && 
+      (utils::tail(unlist(strsplit(datafile, "[.]")), 1) != "fsa") &&
       (utils::tail(unlist(strsplit(datafile, "[.]")), 1) != "fa"))
     stop("The input datafile has to be fasta file!")
   
@@ -13,12 +14,10 @@ read_fasta <- function(datafile = NULL)
   res <- .Call("r_read_fasta", datafile)
   
   names(res) <- c("reads", "dim")
-  if (length(res$dim[2]) == res$dim[1]) {
-    reads <- matrix(res$reads, ncol = res$dim[2], byrow = TRUE)
-    return(reads)
-  } else {
-    return(res)
-  }
+  if (length(res$reads) == res$dim[1] * res$dim[2])
+    res$reads <- matrix(res$reads, ncol = res$dim[2], byrow = TRUE)
+  
+  return(res)
 } #read_fasta(datafile = FastaFile)
 
 read_sam <- function(samfile = NULL, ref_name = NULL, 
@@ -62,7 +61,8 @@ read_fastq <- function(datafile = NULL)
 call_ampliclust <- function(ampliclust_command = NULL, fastq_file = NULL, ac_outfile = NULL) {
   checkmate::expect_file_exists(fastq_file, access = "r")
   checkmate::expect_file_exists(ampliclust_command, access = "r")
-  if (utils::tail(unlist(strsplit(fastq_file, "[.]")), 1) != "fastq")
+  if (utils::tail(unlist(strsplit(fastq_file, "[.]")), 1) != "fastq" |
+      utils::tail(unlist(strsplit(fastq_file, "[.]")), 1) != "fq")
     stop("The input datafile has to be fastq file!")
   if (tail(unlist(strsplit(ampliclust_command, "/")), 1) != "run_ampliclust")
     stop("Ampliclust usage is wrong!")

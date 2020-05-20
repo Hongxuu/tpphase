@@ -26,13 +26,10 @@ sourceCpp("./r/viterbi.cpp")
 
 ## read the data, reference has to indicate which pair of reference it is processing (change this to only input the paried fasta file)
 samfile = "../../data/tpphase_res_consensus/WGS/test.sam"
-ref_name = "target.66"
-fastq_file = "./res.fastq"
-datafile = "./res.txt"
-alignment = "../../data/tpphase_res_consensus/WGS/new.fasta"
-
-datafile = "../../data/tpphase_res_consensus/WGS/out_chr06_104680449.txt"
+alignment = "../../data/tpphase/WGS/simu/ref.fasta"
+datafile = "../../data/tpphase/WGS/simu/low_cov/data_low.txt"
 #######
+
 formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc
 n_class = 4
 num_cat = 4
@@ -53,14 +50,15 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   
   ## make universial reference
   align <- read_fasta(alignment)
-  ref_in <- strsplit(ref_name, ref_delim, fixed = TRUE) %>% unlist()
-  if(length(align$dim) == 2) { #only read in one reference
+  if(nrow(align$reads) != 1) { #only read in one reference pair
     universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = 0)
+    universial <- universial %>% unlist()
   } else { ## read in many reference, take the one we want
+    ref_in <- strsplit(ref_name, ref_delim, fixed = TRUE) %>% unlist()
     ref_index <- ref_in[2] %>% as.integer() - 1 ## index in C
     universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = ref_index)
+    universial <- Filter(Negate(is.null), universial) %>% unlist()
   }
-  universial <- Filter(Negate(is.null), universial) %>% unlist()
   rm(align)
   
   ## prepare data
