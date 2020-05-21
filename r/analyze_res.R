@@ -26,6 +26,12 @@ path = "../../data/tpphase_res_consensus/308TAN/308TAN_p46.txt"
 hap46 <- extract_hap(resultfile = path, select = T, n_class = 4)
 
 hap46[, find_snp(hap = hap38) + 1]
-
-
+"../../data/tpphase/WGS/simu/L_SNP/sim0.fsa"
+true_hap <- function(true_path, start_id, end_id) {
+  t <- read_fasta(true_path)
+  t_hap <- t$reads
+  t_hap[, c(start_id:end_id)]
+}
+t_hap <- true_hap(true_path = "../../data/tpphase/WGS/simu/L_SNP/sim0.fsa", 
+          start_id = dat_info$ref_start + 1, end_id = dat_info$ref_length_max + 1)
 

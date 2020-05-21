@@ -27,7 +27,7 @@ sourceCpp("./r/viterbi.cpp")
 ## read the data, reference has to indicate which pair of reference it is processing (change this to only input the paried fasta file)
 samfile = "../../data/tpphase_res_consensus/WGS/test.sam"
 alignment = "../../data/tpphase/WGS/simu/ref.fasta"
-datafile = "../../data/tpphase/WGS/simu/low_cov/data_low.txt"
+datafile = "../../data/tpphase/WGS/simu/L_SNP/low_cov/out.txt"
 #######
 
 formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc
@@ -39,8 +39,9 @@ tol = 1e-06
 ncores = 2
 ref_delim = "."
 old_version = 0
+cut_off = 0.1
 altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref_delim = ".",
-                          fastq_file = "./res.fastq", datafile = "./res.txt", output = NULL, 
+                          fastq_file = "./res.fastq", datafile = "./res.txt", output = NULL, cut_off = 0.125,
                           formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 1,
                           n_class = 4, num_cat = 4, seed = 0, max = 20, tol = 1e-06, ncores = 2, old_version = 0)  {
   registerDoParallel(cores = ncores)  
@@ -63,7 +64,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   
   ## prepare data
   dat_info <- read_data(datafile, old_v = old_version)
-  HMM <- hmm_info(dat_info = dat_info, cut_off = 0.15, uni_alignment = universial)
+  HMM <- hmm_info(dat_info = dat_info, cut_off = cut_off, uni_alignment = universial)
   
   ########################## baum-welch (iterate until converge)
   
@@ -118,7 +119,6 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   init <- list()
   for (m in (1:max_iter)) {
     cat(m, "\n");
-    m = m + 1
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
     tmp <- m_beta(res = bw$par_aux, id = id, weight_id = weight_id, data = data, formula = formula, 
@@ -128,9 +128,9 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
     bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
                           beta = tmp$par$beta, PD_LENGTH = nrow(par$beta), hash_idx = data_new$idx)
     
-    if (abs(bw$par_hmm$phi - phi_old) < tol && 
-       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", tol) &&
-       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", tol))
+    if (abs(bw$par_hmm$phi - phi_old) < -log(tol))
+      if(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", -log(tol)) &&
+       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", -log(tol)))
       break;
   }
   
@@ -142,6 +142,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   derepliacte_h <- haplotypes[!idx, ]
   snp_location <- HMM$undecided_pos + 1
   snps <- derepliacte_h[, snp_location]
+  snp_location <- snp_location + dat_info$ref_start
   
   res$no_reads_t <- HMM$n_t
   res$time_pos <- HMM$time_pos

@@ -80,19 +80,33 @@ List aux_noN_S2(IntegerVector sum_site, IntegerVector hap_site) {
   if (sum_site[0]/sum <= 0.38) { //1st one appears 3 times
     temp = call_permute({hap_site[0], hap_site[1], hap_site[1], hap_site[1]});
     temp2 = Twopossible(hap_site);
-    arma::mat m1 = as<arma::mat>(temp);
-    arma::mat m2 = as<arma::mat>(temp2);
-    arma::mat out = join_cols(m1, m2);
-    temp = wrap(out);
-    n_row = 6;
+    arma::Mat<int> m1 = as<arma::Mat<int>>(temp);
+    arma::Mat<int> m2 = as<arma::Mat<int>>(temp2);
+    arma::Mat<int> m3 = join_cols(m1, m2);
+    if(sum_site[0] == 1 && sum > 5.0) { // 0 is too few
+      arma::Mat<int> m4 = {hap_site[1], hap_site[1], hap_site[1], hap_site[1]};
+      arma::Mat<int> out = join_cols(m4, m3);
+      temp = wrap(out);
+      n_row = 7;
+    } else {
+      temp = wrap(m3);
+      n_row = 6;
+    }
   } else if (sum_site[0]/sum >= 0.62) {//2nd one appears 3 times
     temp = call_permute({hap_site[0], hap_site[0], hap_site[0], hap_site[1]});
     temp2 = Twopossible(hap_site);
-    arma::mat m1 = as<arma::mat>(temp);
-    arma::mat m2 = as<arma::mat>(temp2);
-    arma::mat out = join_cols(m1, m2);
-    temp = wrap(out);
-    n_row = 6;
+    arma::Mat<int> m1 = as<arma::Mat<int>>(temp);
+    arma::Mat<int> m2 = as<arma::Mat<int>>(temp2);
+    arma::Mat<int> m3 = join_cols(m1, m2);
+    if(sum_site[1] == 1 && sum > 5.0) {
+      arma::Mat<int> m4 = {hap_site[0], hap_site[0], hap_site[0], hap_site[0]};
+      arma::Mat<int> out = join_cols(m4, m3);
+      temp = wrap(out);
+      n_row = 7;
+    } else {
+      temp = wrap(m3);
+      n_row = 6;
+    }
   } else {
     temp = Twopossible(hap_site);
     n_row = 2;
@@ -156,14 +170,14 @@ List aux_noN_S3(IntegerVector sum_site, IntegerVector hap_site) {
   } else { //hopefully this won't happen, when three roughly equal happens
     small = {hap_site[1], hap_site[2]};
     temp = Fourpossible(small, hap_site[0]);
-    arma::mat m1 = as<arma::mat>(temp);
+    arma::Mat<int> m1 = as<arma::Mat<int>>(temp);
     small = {hap_site[1], hap_site[0]};
     temp = Fourpossible(small, hap_site[2]);
-    arma::mat m2 = as<arma::mat>(temp);
+    arma::Mat<int> m2 = as<arma::Mat<int>>(temp);
     small = {hap_site[2], hap_site[0]};
     temp = Fourpossible(small, hap_site[1]);
-    arma::mat m3 = as<arma::mat>(temp);
-    arma::mat out = join_cols(m1, m2, m3);
+    arma::Mat<int> m3 = as<arma::Mat<int>>(temp);
+    arma::Mat<int> out = join_cols(m1, m2, m3);
     temp = wrap(out);
     n_row = 12;
   }
@@ -183,9 +197,9 @@ List aux_noN_S3(IntegerVector sum_site, IntegerVector hap_site) {
   IntegerMatrix temp2 = list_2pos["temp"];
   int more_row = list_2pos["n_row"];
   n_row += more_row;
-  arma::mat m1 = as<arma::mat>(temp);
-  arma::mat m2 = as<arma::mat>(temp2);
-  arma::mat out = join_cols(m1, m2);
+  arma::Mat<int> m1 = as<arma::Mat<int>>(temp);
+  arma::Mat<int> m2 = as<arma::Mat<int>>(temp2);
+  arma::Mat<int> out = join_cols(m1, m2);
   temp = wrap(out);
   
   List ls = List::create(
@@ -261,7 +275,7 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
     sum = sum_site[3] + sum_site[2] + sum_site[1] + sum_site[0];
     if(hap_site[0] == -1) {
       if(sum_site[0]/sum >= 0.45) {
-        arma::mat temp;
+        arma::Mat<int> temp;
         IntegerMatrix inner_tmp(2, NUM_CLASS);
         for(l = 0; l < num; ++l)
           for(m = l + 1; m < num; ++m) {
@@ -269,7 +283,7 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
               inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 0);
             else if(uni_alignment[ref_j] == "J")
               inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 1);
-            temp = join_cols(temp, as<arma::mat>(inner_tmp));
+            temp = join_cols(temp, as<arma::Mat<int>>(inner_tmp));
           }
           haplotype[0] = wrap(temp);
         n_row = 2;
