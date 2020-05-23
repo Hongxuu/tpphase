@@ -108,7 +108,6 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
   for (t = t_max; t --> 0;) {
     NumericVector beta(num_states[t]);
     NumericVector beta_after;
-    
     if(t == t_max - 1) {
       for (w = 0; w < num_states[t]; ++w)
         beta(w) = 0;
@@ -1038,32 +1037,34 @@ List trans_permit(IntegerVector num_states, List combination, List loci, int t_m
       IntegerMatrix comb_t2 = combination[t + 1];
       IntegerVector location_t1 = loci[t];
       IntegerVector location_t2 = loci[t + 1];
-      // Rcout << location_t1 << "\n";
-      // Rcout << location_t2 << "\n";
-      // get the overlapped region, this moght be different from the overlapped states we had
+      Rcout << location_t1 << "\n";
+      Rcout << location_t2 << "\n";
+      // get the overlapped region, this might be different from the overlapped states we had
       int id = 0;
       for(j = 0; j < location_t1.size(); ++j) 
         if(location_t1[j] == location_t2[0]) {
           id = j;
           break;
         }
-        int end = 0;
-        for(j = id; j < location_t1.size(); ++j)
-          if(location_t1[j] == location_t2[j - id])
-            end = j;
-          
-          for(m = 0; m < num_states[t]; ++m) {
-            IntegerVector hap_t1 = comb_t1(m, _);
-            for(w = 0; w < num_states[t + 1]; ++w) {
-              IntegerVector hap_t2 = comb_t2(w, _);
-              for(j = id; j < end; ++j)
-                if (hap_t1(j) != hap_t2(j - id)) {
-                  trans(m, w) = 1; // represents m cannot transfer to w
-                  break;
-                }
+      int end = id;
+      for(j = id + 1; j < location_t1.size(); ++j)
+        if(location_t1[j] == location_t2[j - id])
+          end = j;
+      // 
+      // Rcout << "overlapped " << id << "\t" << end << "\n";
+      for(m = 0; m < num_states[t]; ++m) {
+        IntegerVector hap_t1 = comb_t1(m, _);
+        for(w = 0; w < num_states[t + 1]; ++w) {
+          IntegerVector hap_t2 = comb_t2(w, _);
+          for(j = id; j < end + 1; ++j) {
+            if (hap_t1[j] != hap_t2[j - id]) {
+              trans(m, w) = 1; // represents m cannot transfer to w
+              break;
             }
           }
-          trans_permits(t) = trans;
+        }
+      }
+      trans_permits(t) = trans;
     } else {
       IntegerMatrix temp(num_states[t], num_states[t + 1]);
       trans_permits(t) = temp;

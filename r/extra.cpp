@@ -7,7 +7,44 @@
 
 using namespace Rcpp;
 using namespace std;
-
+#define NUM_CLASS 4
+List unique_map(const Rcpp::IntegerVector & v)
+{
+  // Initialize a map
+  std::map<double, int> Elt;
+  Elt.clear();
+  
+  // Count each element
+  for (int i = 0; i != v.size(); ++i)
+    Elt[ v[i] ] += 1;
+  
+  // Find out how many unique elements exist... 
+  int n_obs = Elt.size();
+  // If the top number, n, is greater than the number of observations,
+  // then drop it.  
+  int n = n_obs;
+  
+  // Pop the last n elements as they are already sorted. 
+  // Make an iterator to access map info
+  std::map<double,int>::iterator itb = Elt.end();
+  // Advance the end of the iterator up to 5.
+  std::advance(itb, -n);
+  
+  // Recast for R
+  NumericVector result_vals(n);
+  NumericVector result_keys(n);
+  
+  unsigned int count = 0;
+  // Start at the nth element and move to the last element in the map.
+  for (std::map<double,int>::iterator it = itb; it != Elt.end(); ++it) {
+    // Move them into split vectors
+    result_keys(count) = it->first;
+    result_vals(count) = it->second;
+    count++;
+  }
+  return List::create(Named("lengths") = result_vals,
+                      Named("values") = result_keys);
+}
 // [[Rcpp::export]]
 List hash_mat(IntegerMatrix x) {
   int n = x.nrow() ;
@@ -37,254 +74,265 @@ List hash_mat(IntegerMatrix x) {
 
 }
 
-typedef unsigned char xy_t;
-/**
- * Convert char to xy.
- *
- * @param c	ASCII char
- * @return	xy_t
- */
-inline xy_t char_to_xy(char c)
-{
-  if (c == 'A' || c == 'a')
-    return 'A' >> 1 & 3L;
-  else if (c == 'C' || c == 'c')
-    return 'C' >> 1 & 3L;
-  else if (c == 'G' || c == 'g')
-    return 'G' >> 1 & 3L;
-  else if (c == 'T' || c == 't' || c == 'U' || c == 'u')
-    return 'T' >> 1 & 3L;
-  else
-    return 1 << 7;	/* non-nuc */
-} /* char_to_xy */
+vector<vector<int> > cart_product (const vector<vector<int> > &v) {
+  vector<vector<int> > s = {{}};
+  for (const auto& u : v) {
+    vector<vector<int> > r;
+    for (const auto& x : s) {
+      for (const auto y : u) {
+        r.push_back(x);
+        r.back().push_back(y);
+      }
+    }
+    s = move(r);
+  }
+  return s;
+}
+// [[Rcpp::export]]
+IntegerMatrix comb_element(List len, IntegerVector flag, unsigned int row) {
+  vector<vector<int> > vec(row);
+  unsigned int col, i, j, count = 0;
+  for (i = 0; i < flag.size(); i++) {
+    if(flag[i])
+      continue;
+    IntegerVector row_vec = len[i];
+    col = row_vec.size();
+    vec[count] = vector<int>(col);
+    for (j = 0; j < col; j++)
+      vec[count][j] = row_vec[j];
+    count++;
+  }
+  vector<vector<int> > res = cart_product(vec);
+  IntegerMatrix out(res.size(), row);
+  for(i = 0; i < res.size(); ++i)
+    for(j = 0; j < row; ++j)
+      out(i, j) = res[i][j];
+  return(out);
+}
+
+template <typename T>
+inline bool approx_equal_cpp(const T& lhs, const T& rhs, double tol = 0.00000001) {
+  return arma::approx_equal(lhs, rhs, "absdiff", tol);
+}
+// [[Rcpp::export]]
+arma::mat unique_rows(const arma::mat& m) {
+  arma::uvec ulmt = arma::zeros<arma::uvec>(m.n_rows);
+  for (arma::uword i = 0; i < m.n_rows; i++)
+    for (arma::uword j = i + 1; j < m.n_rows; j++)
+      if (approx_equal_cpp(m.row(i), m.row(j))) { ulmt(j) = 1; break; }
+      
+      return m.rows(find(ulmt == 0));
+}
+// [[Rcpp::export]]
+IntegerMatrix remake_linkage(IntegerMatrix sub_link, unsigned int num) {
+  unsigned int i, j, k, i1;
+  arma::mat sub_uni = unique_rows(as<arma::mat>(sub_link));
+  IntegerMatrix link_uni = wrap(sub_uni);
+  List new_link(link_uni.nrow());
+  unsigned int total_row = 0;
+  for (i = 0; i < link_uni.nrow(); ++i) {
+    List nuc_info = unique_map(link_uni(i, _));
+    IntegerVector nuc = nuc_info["values"];
+    IntegerVector nuc_count = nuc_info["lengths"];
+    if (nuc.size() == 1 && nuc[0] == -1) // skip the read does not cover any site
+      continue;
+    // if(nuc_count[0] == num - 1 || nuc_count[0] == 1) 
+    //   continue;
+    if(nuc[0] != -1) { // read covers all site
+      total_row++;
+      new_link[i] = link_uni(i, _);
+      continue;
+    }
+    IntegerVector idx(num);
+    for(j = 0; j < num; ++j)
+      if(link_uni(i, j) == -1)
+        idx(j) = 1; // indicate -1 is here
+   
+   int move_out = 0;
+    // if this read is contained in others
+    for (i1 = 0; i1 < link_uni.nrow(); ++i1) {
+      if (i1 == i)
+        continue;
+      int count = 0;
+      List nuc_info = unique_map(link_uni(i1, _));
+      IntegerVector nuc1 = nuc_info["values"];
+      IntegerVector nuc_count1 = nuc_info["lengths"];
+      if(nuc_count1[0] >= nuc_count[0])
+        continue;
+      for(j = 0; j < num; ++j)
+        if(!idx(j))
+          if(link_uni(i, j) == link_uni(i1, j))
+            count++;
+      if(count == num - nuc_count[0]) {
+        // Rcout << i << "move" << "\n";
+        move_out = 1;
+        break;
+      }
+    }
+    if(move_out)
+      continue;
+    List missing(num);
+    IntegerVector flag(num);
+    int in_row_num = 0;
+    for (j = 0; j < num; ++j) {
+      if (link_uni(i, j) == -1) {
+        List nuc_col = unique_map(link_uni(_, j));
+        IntegerVector nuc_unique = nuc_col["values"];
+        // Rcout << nuc_unique << "\n";
+        if(nuc_unique[0] == -1)
+          missing[j] = nuc_unique[Range(1, nuc_unique.size() - 1)];
+        else
+          missing[j] = nuc_unique;
+        in_row_num++;
+      } else
+        flag[j] = 1;
+    }
+   
+    int add_row = 0;
+    if(in_row_num != 1) {
+      IntegerMatrix missing_rows = comb_element(missing, flag, in_row_num);
+      add_row = missing_rows.nrow();
+      IntegerMatrix new_link_i(add_row, num);
+      int count = 0;
+        for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
+          if(flag[j] != 1)
+            new_link_i(_, j) = missing_rows(_, count++);
+          else
+            for (k = 0; k < add_row; ++k)
+              new_link_i(k, j) = link_uni(i, j); // repeat the non-missing ones
+        }
+        new_link[i] = new_link_i;
+    } else {
+      IntegerMatrix new_link_i;
+      IntegerVector tmp;
+      for (j = 0; j < num; ++j)
+        if(flag[j] != 1) {
+          tmp = missing[j];
+          add_row = tmp.size();
+          new_link_i = IntegerMatrix(add_row, num);
+        }
+      for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
+        if(flag[j] != 1) {
+          new_link_i(_, j) = tmp;
+        } else {
+          for (k = 0; k < add_row; ++k)
+            new_link_i(k, j) = link_uni(i, j);
+        }
+      }
+      new_link[i] = new_link_i;
+    }
+    total_row += add_row;
+  }
+  
+  IntegerMatrix new_link_out(total_row, num);
+  total_row = 0;
+  for(i = 0; i < link_uni.nrow(); ++i) {
+    if(new_link[i] == R_NilValue)
+      continue;
+    IntegerVector tmp = new_link[i];
+    tmp.attr("dim") = Dimension(tmp.size()/num, num);
+    IntegerMatrix new_link_i = as<IntegerMatrix>(tmp);
+    for (k = 0; k < tmp.size()/num; ++k)
+        new_link_out(total_row++, _) = new_link_i(k, _);
+  }
+  // finally, remove duplcated rows
+  arma::mat new_linkage = unique_rows(as<arma::mat>(new_link_out));
+  IntegerMatrix out = wrap(new_linkage);
+  return(out);
+}
+// [[Rcpp::export]]
+IntegerMatrix call_cart_product(IntegerVector len) {
+  unsigned int row = len.size();
+  vector<vector<int> > vec(row);
+  unsigned int col, count, i, j;
+  for (i = 0; i < row; i++) {
+    count = 1;
+    col = len[i];
+    vec[i] = vector<int>(col);
+    for (j = 0; j < col; j++)
+      vec[i][j] = count++;
+  }
+  vector<vector<int> > res = cart_product(vec);
+  IntegerMatrix out(res.size(), row);
+  for(i = 0; i < res.size(); ++i)
+    for(j = 0; j < row; ++j) 
+      out(i, j) = res[i][j] - 1; //minus 1 for the index in C
+  
+  return(out);
+}
+// [[Rcpp::export]]
+List find_combination(IntegerVector undecided_pos, IntegerVector pos_possibility, 
+                      unsigned int p_tmax, unsigned int time_pos, int hap_min_pos) {
+  //possible combination of the rest non-unique loci
+  IntegerVector location(pos_possibility.size());
+  IntegerVector location_len(pos_possibility.size());
+  unsigned int num = 0;
+  for(unsigned int i = 0; i < pos_possibility.size(); ++i)
+    if(time_pos - hap_min_pos <= undecided_pos[i] && undecided_pos[i] < time_pos + p_tmax - hap_min_pos) {
+      location(num) = undecided_pos[i];
+      location_len(num++) = pos_possibility[i];
+    }
+    IntegerMatrix combination = call_cart_product(location_len[Range(0, num - 1)]);
+    List ls = List::create(
+      Named("combination") = combination, // possible comb
+      Named("num") = num, // number of comb sites at time t
+      Named("location") = location[Range(0, num - 1)]); // undecided site at time t [here assume alignment starts from 0]
+    return(ls);
+}
+
 
 // [[Rcpp::export]]
-void read_d(std::string path, unsigned int old_v) {
-  int j, k, l;
-  unsigned int i, m, count = 0, count_del = 0;
-  char c;
-  char str[100];
-  int n_observation = 0;
+List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector location,
+                   IntegerMatrix linkage_info, unsigned int num, unsigned int start_idx, unsigned int num_states) {
+  unsigned int i, j, k, idx, m;
+  IntegerMatrix sub_hap(NUM_CLASS, num);
+  IntegerMatrix old_sub_link = linkage_info(_, Range(start_idx, start_idx + num - 1));
+  IntegerVector exclude(num_states);
+  int count, linkage_len, all_excluded;
+  linkage_len = num - 1; 
+  int cut_off;
+  // all_excluded = num_states;
+  //remake the linkage
+  IntegerMatrix sub_link = remake_linkage(old_sub_link, num);
+  unsigned int n_observation = sub_link.nrow();
   
-  FILE* fp = fopen(path.c_str(), "r");
-  if(!fp) {
-    Rcpp::stop("File opening failed");
-  }
-  int temp_n = -1;
-  while (fgets(str, sizeof(str), fp)) {
-    std::sscanf(str, "%d %d %d %d %c", &i, &j, &k, &l, &c);
-    /* exclude -1 in ref_pos and qua */
-    if (l == -1)
-      count_del++;
-    else {
-      if (temp_n != i) {
-        temp_n = i;
-        n_observation++;
+  all_excluded = 0;
+  for (m = 0; m < num_states; ++m) {
+    exclude(m) = 0;
+    IntegerVector comb = combination(m, _);
+    // Rcout << comb << "\t\t";
+    count = 0;
+    for (k = 0; k < NUM_CLASS; ++k) {
+      // Rcout << "k" << k << "\n";
+      for (j = 0; j < num; ++j) {
+        IntegerMatrix hidden = hidden_states[location[j]];
+        idx = comb[j];
+        sub_hap(k, j) = hidden(idx, k);
+        // Rcout << sub_hap(k, j) << "\t";
       }
-      count++;
+      // Rcout << "read" << "\n";
+      for (i = 0; i < n_observation; i++) {
+        int flag = 0;
+        for (j = 0; j < num - 1; ++j) {
+          if (sub_hap(k, j) == sub_link(i, j) && sub_hap(k, j + 1) == sub_link(i, j + 1))
+            flag++;
+        }
+        if (flag >= linkage_len) {
+          count++;
+          break;
+        }
+      }
+    }
+    if (count != NUM_CLASS) {
+      exclude(m) = 1;
+      all_excluded++;
     }
   }
-  
-  unsigned int del_num = 0;
-  IntegerVector del_obs_index;
-  IntegerVector del_ref_pos;
-  IntegerVector del_read_pos;
-  IntegerVector del_id;
-  IntegerVector del_flag;
-  
-  if(count_del) {
-    del_obs_index = IntegerVector(count_del);
-    del_ref_pos = IntegerVector(count_del);
-    del_read_pos = IntegerVector(count_del);
-    del_id = IntegerVector(n_observation);
-    del_flag = IntegerVector(n_observation);
-  }
-  
-  // unsigned int ins_num = 0;
-  // IntegerVector ins_obs_index(count_ins);
-  // IntegerVector ins_id(n_observation);
-  // IntegerVector ins_read_pos(count_ins);
-  // IntegerVector ins_flag(n_observation);
-  
-  IntegerVector qua(count);
-  IntegerVector obs(count);
-  StringVector obs_str(count);
-  IntegerVector obs_index(count);
-  IntegerVector ref_pos(count);
-  IntegerVector read_pos(count);
-  int total;
-  
-  rewind(fp);
-  
-  count = 0;
-  count_del = 0;
-  // count_ins = 0;
-  while (fgets(str, sizeof(str), fp)) {
-    std::sscanf(str, "%d %d %d %d %c", &i, &j, &k, &l, &c);
-    /* exclude -1 in ref_pos and qua */
-    if (l == -1) {
-      del_obs_index[count_del] = i;
-      del_read_pos[count_del] = j;
-      del_ref_pos[count_del] = k;
-      del_flag[i-1] = 1;
-      count_del++;
-    }
-    else {
-      obs_index[count] = i;
-      read_pos[count] = j;
-      ref_pos[count] = k;
-      qua[count] = l;
-      obs[count] = c;
-      count++;
-    }
-  }
-  fclose(fp);
-  fp = NULL;
-  
-  total = count;
-  IntegerVector length(n_observation);
-  
-  // deletion
-  IntegerVector del_count;
-  IntegerVector del_length_all(n_observation);
-  IntegerVector del_strat_id(n_observation);
  
-  if (count_del) {
-    del_id = unique(del_obs_index);
-    del_num = del_id.size();
-    del_count = IntegerVector(del_num);
-    for (m = 0; m < del_num; ++m)
-      del_count[m] = 1;
-      i = 0;
-      for (m = 0; m < count_del; ++m) {
-        if (m < count_del - 1 && del_obs_index[m] == del_obs_index[m + 1])
-          del_count[i]++;
-        else
-          i++;
-      }
-
-      for (m = 0; m < del_num; ++m)
-        del_length_all[del_id[m] - 1] = del_count[m];
-
-      for (i = 1; i < n_observation; ++i) {
-        if(del_flag[i] == 1)
-          for (j = 0; j < i; ++j)
-            del_strat_id[i] += del_length_all[j];
-        else
-          del_strat_id[i] = -1;
-      }
-  }
-  Rcout << del_count << "\n";
-  // non indel
-  for (m = 0; m < count; ++m) {
-    i = obs_index[m];
-    // if (!length[i-1]) {
-    //   n_observation++;
-    // }
-    ++length[i-1];
-    obs[m] = char_to_xy(obs[m]);
-  }
-  
-  Rcout << count << "\n";
-  // /* index of read in non-indel loci */
-  // IntegerVector index(n_observation);
-  // for (m = 1; m < n_observation; ++m)
-  //   index[m] = index[m - 1] + length[m - 1];
-  // 
-  // // true length (include insertion) and fake length (include deletion) (some reads' alignment does not start from 0, other one also count that in)
-  // IntegerVector true_length(n_observation);
-  // IntegerVector fake_length(n_observation);
-  // for (i = 0; i < n_observation; ++i) {
-  //   true_length[i] = length[i];
-  //   fake_length[i] = length[i] + del_length_all[i];
-  //   //fake_length[i] = length[i] + del_length_all[i] + ref_pos[index[i]];
-  // }
-  // 
-  // int max_len = 0; // largest position of reference
-  // int min_len = 0; // smallest position of reference
-  // min_len = min(ref_pos);
-  // int over_hapmax = 0; // indicate if the length of reads is more than the hap_max
-  // if(old_v == 1) { // use the old version for genotyping targeted region not WGS [the starting aligned position has to be 0]
-  //   /* find the longest reference position && appears more than no. of classes (4) */
-  //   List uni_map = unique_map(ref_pos);
-  //   max_len = top_n_map(uni_map);
-  //   for(i = 0; i < total; ++i)
-  //     if (max_len < ref_pos[i]) {
-  //       over_hapmax = 1;
-  //       break;
-  //     }
-  // } else { // for WGS
-  //   max_len = max(ref_pos);
-  // }
-  // max_len = max_len + 1;
-  // 
-  // IntegerMatrix ref_index(n_observation, max_len - min_len); // start from the first aligned pos
-  // for(i = 0; i < n_observation; ++i)
-  //   for(m = 0; m < max_len - min_len; ++m)
-  //     ref_index(i, m) = -1;
-  // 
-  // /* Find the index of ref position under different read of every j, which ref pos aligned to which read pos */
-  // for(i = 0; i < n_observation; ++i)
-  //   for(m = 0; m < max_len - min_len; ++m)
-  //     for(j = 0; j < length[i]; ++j)
-  //       if(ref_pos[index[i] + j] == m + min_len) {
-  //         ref_index(i, m) = j;
-  //         break;
-  //       }
-  //       
-  //       IntegerVector non_covered_site(max_len- min_len);
-  //       unsigned int num;
-  //       for (m = 0; m < max_len - min_len; ++m) {
-  //         num = 0;
-  //         for(i = 0; i < n_observation; ++i)
-  //           if (ref_index(i, m) == -1)
-  //             num++;
-  //           if (num == n_observation)
-  //             non_covered_site[m] = 1;
-  //       }
-  //       List del;
-  //       if (count_del) {
-  //         del = List::create(Named("del_id") = del_id[Range(0, del_num - 1)],
-  //                            Named("del_id_all") = del_obs_index,
-  //                            Named("del_flag") = del_flag,
-  //                            Named("del_read_pos") = del_read_pos,
-  //                            Named("del_ref_pos") = del_ref_pos,
-  //                            Named("del_length") = del_count, //no. of deletion in each read
-  //                            Named("del_num") = del_num,  //no. of reads have deletion
-  //                            Named("del_total") = count_del,
-  //                            Named("del_length_all") = del_length_all,
-  //                            Named("del_strat_id") = del_strat_id);
-  //       }
-  //       // 
-  //       // List ins = List::create(
-  //       //   Named("ins_id") = ins_id[Range(0, ins_num - 1)],
-  //       //   Named("ins_read_pos") = ins_read_pos,
-  //       //   Named("ins_length") = ins_count,
-  //       //   Named("ins_num") = ins_num,
-  //       //   Named("ins_flag") = ins_flag,
-  //       //   Named("ins_length_all") = ins_length_all);
-  //       
-  //       List ls = List::create(
-  //         Named("id") = obs_index,
-  //         Named("read_pos") = read_pos,
-  //         Named("ref_pos") = ref_pos,
-  //         Named("nuc") = obs,
-  //         Named("qua") = qua,
-  //         Named("n_observation") = n_observation,
-  //         Named("length") = length, 
-  //         Named("true_length") = true_length, 
-  //         Named("fake_length") = fake_length, 
-  //         Named("total") = total,
-  //         Named("start_id") = index,
-  //         Named("ref_start") = min_len,
-  //         Named("ref_length_max") = max_len, 
-  //         Named("ref_idx") = ref_index, 
-  //         Named("over_hapmax") = over_hapmax,
-  //         Named("non_covered_site") = non_covered_site,
-  //         Named("deletion") = del);
-        // Named("insertion") = ins); no insertion for now
-        
-        // return ls;
+  List out = List::create(
+    Named("num_states") = num_states - all_excluded,
+    Named("exclude") = exclude);
+  return(out);
 }
 // struct VectorHasher {
 //   int operator()(const vector<int> &V) const {

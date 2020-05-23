@@ -120,4 +120,16 @@ IntegerMatrix ss(IntegerMatrix X_, IntegerVector ind_) {
   return wrap(submat);
 }
 
+template <typename T>
+inline bool approx_equal_cpp(const T& lhs, const T& rhs, double tol = 0.00000001) {
+  return arma::approx_equal(lhs, rhs, "absdiff", tol);
+}
 
+arma::mat unique_rows(const arma::mat& m) {
+  arma::uvec ulmt = arma::zeros<arma::uvec>(m.n_rows);
+  for (arma::uword i = 0; i < m.n_rows; i++)
+    for (arma::uword j = i + 1; j < m.n_rows; j++)
+      if (approx_equal_cpp(m.row(i), m.row(j))) { ulmt(j) = 1; break; }
+      
+      return m.rows(find(ulmt == 0));
+}

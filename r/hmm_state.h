@@ -5,6 +5,7 @@
 
 using namespace Rcpp;
 IntegerMatrix call_cart_product(IntegerVector len);
+IntegerMatrix comb_element(List len, IntegerVector flag, unsigned int row);
 List prepare_ini_hmm (unsigned int t_max, IntegerVector num_states, List trans_indicator, List further_limit);
 List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, IntegerVector sum_site, 
                CharacterVector uni_alignment);

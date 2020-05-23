@@ -26,7 +26,7 @@ sourceCpp("./r/viterbi.cpp")
 
 ## read the data, reference has to indicate which pair of reference it is processing (change this to only input the paried fasta file)
 samfile = "../../data/tpphase_res_consensus/WGS/test.sam"
-alignment = "../../data/tpphase/WGS/simu/ref.fasta"
+alignment = "../../data/tpphase/WGS/simu/L_SNP/ref.fsa"
 datafile = "../../data/tpphase/WGS/simu/L_SNP/low_cov/out.txt"
 #######
 
@@ -96,7 +96,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   par <- ini_par(dat = data, n_observation = dat_info$n_observation, formula = formula, old_version = old_version,
                  n_class = n_class, num_cat = num_cat, ncores = ncores, weight_id = weight_id)
   # 
-  ###some transition could not happen, can be set to null
+  ###indicate which transfer could happen
   trans_indicator <- trans_permit(num_states = HMM$num_states, combination = hap_full_info$combination, 
                                   loci = overlap_info$location, t_max = HMM$t_max)
   ### start initializing
@@ -128,10 +128,10 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
     bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
                           beta = tmp$par$beta, PD_LENGTH = nrow(par$beta), hash_idx = data_new$idx)
     
-    if (abs(bw$par_hmm$phi - phi_old) < -log(tol))
-      if(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", -log(tol)) &&
-       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", -log(tol)))
-      break;
+    # if (abs(bw$par_hmm$phi - phi_old) < -log(tol))
+    #   if(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", -log(tol)) &&
+    #    compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", -log(tol)))
+    #   break;
   }
   
   ### viterbi decoding
@@ -151,8 +151,9 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   res$snp_location <- snp_location
   fnlist(res, fil = "./test.res")
 }
-
-
-
-
-
+sourceCpp("./r/extra.cpp")
+comb_info_t0 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[1], HMM$time_pos[1], dat_info$ref_start);
+t0l = remake_linkage(linkage_in[, 1:6], 6)
+t0 = limit_comb_t0(comb_info_t0$combination, HMM$hidden_states, comb_info_t0$location, linkage_in, comb_info_t0$num, 0, HMM$num_states[1]);
+comb_info_t11 <- call_cart_product(HMM$pos_possibility[])
+remake_linkage(a, 4) -> b

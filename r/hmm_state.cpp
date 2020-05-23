@@ -309,22 +309,141 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
   return(ls);
 }
 
-// limit combination based on linkage information
+IntegerMatrix remake_linkage(IntegerMatrix sub_link, unsigned int num) {
+  unsigned int i, j, k, i1;
+  arma::mat sub_uni = unique_rows(as<arma::mat>(sub_link));
+  IntegerMatrix link_uni = wrap(sub_uni);
+  List new_link(link_uni.nrow());
+  unsigned int total_row = 0;
+  for (i = 0; i < link_uni.nrow(); ++i) {
+    List nuc_info = unique_map(link_uni(i, _));
+    IntegerVector nuc = nuc_info["values"];
+    IntegerVector nuc_count = nuc_info["lengths"];
+    if (nuc.size() == 1 && nuc[0] == -1) // skip the read does not cover any site
+      continue;
+    // if(nuc_count[0] == num - 1 || nuc_count[0] == 1) 
+    //   continue;
+    if(nuc[0] != -1) { // read covers all site
+      total_row++;
+      new_link[i] = link_uni(i, _);
+      continue;
+    }
+    IntegerVector idx(num);
+    for(j = 0; j < num; ++j)
+      if(link_uni(i, j) == -1)
+        idx(j) = 1; // indicate -1 is here
+      
+      int move_out = 0;
+      // if this read is contained in others
+      for (i1 = 0; i1 < link_uni.nrow(); ++i1) {
+        if (i1 == i)
+          continue;
+        int count = 0;
+        List nuc_info = unique_map(link_uni(i1, _));
+        IntegerVector nuc1 = nuc_info["values"];
+        IntegerVector nuc_count1 = nuc_info["lengths"];
+        if(nuc_count1[0] >= nuc_count[0])
+          continue;
+        for(j = 0; j < num; ++j)
+          if(!idx(j))
+            if(link_uni(i, j) == link_uni(i1, j))
+              count++;
+            if(count == num - nuc_count[0]) {
+              // Rcout << i << "move" << "\n";
+              move_out = 1;
+              break;
+            }
+      }
+      if(move_out)
+        continue;
+      List missing(num);
+      IntegerVector flag(num);
+      int in_row_num = 0;
+      for (j = 0; j < num; ++j) {
+        if (link_uni(i, j) == -1) {
+          List nuc_col = unique_map(link_uni(_, j));
+          IntegerVector nuc_unique = nuc_col["values"];
+          // Rcout << nuc_unique << "\n";
+          if(nuc_unique[0] == -1)
+            missing[j] = nuc_unique[Range(1, nuc_unique.size() - 1)];
+          else
+            missing[j] = nuc_unique;
+          in_row_num++;
+        } else
+          flag[j] = 1;
+      }
+      
+      int add_row = 0;
+      if(in_row_num != 1) {
+        IntegerMatrix missing_rows = comb_element(missing, flag, in_row_num);
+        add_row = missing_rows.nrow();
+        IntegerMatrix new_link_i(add_row, num);
+        int count = 0;
+        for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
+          if(flag[j] != 1)
+            new_link_i(_, j) = missing_rows(_, count++);
+          else
+            for (k = 0; k < add_row; ++k)
+              new_link_i(k, j) = link_uni(i, j); // repeat the non-missing ones
+        }
+        new_link[i] = new_link_i;
+      } else {
+        IntegerMatrix new_link_i;
+        IntegerVector tmp;
+        for (j = 0; j < num; ++j)
+          if(flag[j] != 1) {
+            tmp = missing[j];
+            add_row = tmp.size();
+            new_link_i = IntegerMatrix(add_row, num);
+          }
+          for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
+            if(flag[j] != 1) {
+              new_link_i(_, j) = tmp;
+            } else {
+              for (k = 0; k < add_row; ++k)
+                new_link_i(k, j) = link_uni(i, j);
+            }
+          }
+          new_link[i] = new_link_i;
+      }
+      total_row += add_row;
+  }
+  
+  IntegerMatrix new_link_out(total_row, num);
+  total_row = 0;
+  for(i = 0; i < link_uni.nrow(); ++i) {
+    if(new_link[i] == R_NilValue)
+      continue;
+    IntegerVector tmp = new_link[i];
+    tmp.attr("dim") = Dimension(tmp.size()/num, num);
+    IntegerMatrix new_link_i = as<IntegerMatrix>(tmp);
+    for (k = 0; k < tmp.size()/num; ++k)
+      new_link_out(total_row++, _) = new_link_i(k, _);
+  }
+  // finally, remove duplcated rows
+  arma::mat new_linkage = unique_rows(as<arma::mat>(new_link_out));
+  IntegerMatrix out = wrap(new_linkage);
+  return(out);
+}
+// limit combination based on linkage information. For the states not start a new sequence(overlap, 
+// keep the last overlapped combination and then make the rest)
 List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector location,
                    IntegerMatrix linkage_info, unsigned int num, unsigned int start_idx, unsigned int num_states) {
   unsigned int i, j, k, idx, m;
-  unsigned int n_observation = linkage_info.nrow();
   IntegerMatrix sub_hap(NUM_CLASS, num);
-  IntegerMatrix sub_link = linkage_info(_, Range(start_idx, start_idx + num - 1));
+  IntegerMatrix old_sub_link = linkage_info(_, Range(start_idx, start_idx + num - 1));
   IntegerVector exclude(num_states);
   int count, linkage_len, all_excluded;
-  linkage_len = num/2; // change the linkage length to be the length appears in the read
+  linkage_len = num - 1; 
   int cut_off;
-  all_excluded = num_states;
-  while (all_excluded == num_states) {
-    cut_off = NUM_CLASS;
-    // Rcout << "linkage length " << linkage_len << "\n"; //actual linkage length + 1
-    while (cut_off >= 1 && all_excluded == num_states) {
+  // all_excluded = num_states;
+  //remake the linkage
+  IntegerMatrix sub_link = remake_linkage(old_sub_link, num);
+  unsigned int n_observation = sub_link.nrow();
+  // while (all_excluded == num_states) {
+  //   cut_off = NUM_CLASS;
+  //   // Rcout << "linkage length " << linkage_len << "\n"; //actual linkage length + 1
+  //   while (cut_off >= 2 && all_excluded == num_states) {
       all_excluded = 0;
       for (m = 0; m < num_states; ++m) {
         exclude(m) = 0;
@@ -356,15 +475,15 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
           }
         }
         // Rcout << "count "<< count << "\n";
-        if (count != cut_off) {
+        if (count != NUM_CLASS) {
           exclude(m) = 1;
           all_excluded++;
         }
       }
-      cut_off--;
-    }
-    linkage_len--;
-  }
+  //     cut_off--; //TODO:how to make sure include more relaiable possibles
+  //   }
+  //   linkage_len--;
+  // }
   // Rcout << exclude << "\n";
   List out = List::create(
     Named("num_states") = num_states - all_excluded,
@@ -395,20 +514,6 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
    }
    
    return(trans_new_ind);
- }
-
-template <typename T>
-inline bool approx_equal_cpp(const T& lhs, const T& rhs, double tol = 0.00000001) {
-  return arma::approx_equal(lhs, rhs, "absdiff", tol);
-}
-
-arma::mat unique_rows(const arma::mat& m) {
-  arma::uvec ulmt = arma::zeros<arma::uvec>(m.n_rows);
-  for (arma::uword i = 0; i < m.n_rows; i++)
-    for (arma::uword j = i + 1; j < m.n_rows; j++)
-      if (approx_equal_cpp(m.row(i), m.row(j))) { ulmt(j) = 1; break; }
-  
-  return m.rows(find(ulmt == 0));
 }
 
 // get the unique rows for overlapped region
@@ -517,16 +622,18 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
       start_idx = i;
       break;
     }
-    
-    // Rcout << allowed << "\n";
-  for(m = 0; m < exist.size(); ++m)
-    for(w = 0; w < allowed.size(); ++w)
-      if(exist[m] == allowed[w]) {
-        num++;
-      }
-  if(num != exist.size())
+  
+  Rcout << "exist: " << exist << "\n";
+  Rcout << "allowed: " << allowed << "\n";
+  Rcout << "num_comb: " << combination.nrow() << "\n";
+  // for(m = 0; m < exist.size(); ++m)
+  //   for(w = 0; w < allowed.size(); ++w)
+  //     if(exist[m] == allowed[w])
+  //       num++;
+  // if(num != exist.size())
+  //   flag = 1;
+  if(!setequal(exist, allowed))
     flag = 1;
-  num = 0;
       
   if(flag) {
     for(m = 0; m < combination.nrow(); ++m)
@@ -541,37 +648,58 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   // Now give the limited combination
   int num_states = exclude_info["num_states"];
   IntegerVector exclude = exclude_info["exclude"];
-  // Rcout << num_states << "\n";
-  
+  Rcout << "exclude "<< exclude << "\n";
   IntegerMatrix next_comb(num_states, combination.ncol());
   count = 0;
-        // Now combine first and second part
+  // Now combine first and second part[make sure the connection states appears(although i might be excluded at rhe second part) ]
   if(flag) {
-    for(m = 0; m < num; ++m) {
+    for(m = 0; m < num; ++m)
       if(!exclude[m])
           next_comb(count++, _) = new_combination(m, _);
-      }
   } else {
-      for(m = 0; m < combination.nrow(); ++m) {
+      for(m = 0; m < combination.nrow(); ++m)
         if(!exclude[m])
           next_comb(count++, _) = combination(m, _);
-      }
   }
-        
+  // if next_comb does not contain one of the states in allowed, add it back (use the one w/ smallest index)
+  // IntegerVector new_exist = next_comb[, 0];
+  // if(!setequal(new_exist, allowed)) {
+  //   IntegerVector diff = setdiff(new_exist, allowed);
+  //   IntegerMatrix extra(diff.size(), combination.ncol());
+  //   arma::Mat<int> m1 = as<arma::Mat<int>>(next_comb);
+  //   count = 0;
+  //   if(flag) {
+  //     for(w = 0; w < diff.size(); ++w)
+  //       for(m = 0; m < num; ++m)
+  //         if(new_combination(m, 0) == diff[w]) {
+  //           extra(count++, _) = new_combination(m, _);
+  //           break;
+  //         }
+  //   } else {
+  //     for(w = 0; w < diff.size(); ++w)
+  //       for(m = 0; m < num; ++m)
+  //         if(combination(m, 0) == diff[w]) {
+  //           extra(count++, _) = combination(m, _);
+  //           break;
+  //         }
+  //   }
+  //   arma::Mat<int> m2 = as<arma::Mat<int>>(extra);
+  //   m1.insert_rows(1, m2);
+  //   next_comb = wrap(m1);
+  // }
+ 
   IntegerVector new_col = next_comb(_, 0);
   List second_uni = unique_map(new_col); // start might not from 0 (e.g. ailgnment starts from 2)
   IntegerVector n2 = second_uni["lengths"];
-  IntegerVector possible = second_uni["values"];
+  // IntegerVector possible = second_uni["values"];
   int all = 0;
-  
   for(m = 0; m < n2.size(); ++m)
     all += n2[m] * n1[m];
   IntegerMatrix final_comb(all, location.size());
   
   all = 0;
-        
   for(k = 0; k < last_col.size(); ++k)
-    for(w = 0; w < count; ++w) {
+    for(w = 0; w < new_col.size(); ++w) {
       if(new_col(w) == last_col(k)) {
         for(j = 0; j < overlap_len; ++j)
           final_comb(all, j) = first_comb(k, j);
@@ -616,6 +744,26 @@ IntegerMatrix call_cart_product(IntegerVector len) {
     for(j = 0; j < row; ++j) 
       out(i, j) = res[i][j] - 1; //minus 1 for the index in C
   
+  return(out);
+}
+
+IntegerMatrix comb_element(List len, IntegerVector flag, unsigned int row) {
+  vector<vector<int> > vec(row);
+  unsigned int col, i, j;
+  for (i = 0; i < len.size(); i++) {
+    if(flag[i])
+      continue;
+    IntegerVector row_vec = len[i];
+    col = row_vec.size();
+    vec[i] = vector<int>(col);
+    for (j = 0; j < col; j++)
+      vec[i][j] = row_vec[j];
+  }
+  vector<vector<int> > res = cart_product(vec);
+  IntegerMatrix out(res.size(), row);
+  for(i = 0; i < res.size(); ++i)
+    for(j = 0; j < row; ++j) 
+      out(i, j) = res[i][j];
   return(out);
 }
 /*

@@ -509,7 +509,6 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
   for (j = 0; j < hap_length; ++j) {
     if(!non_covered[j]) {
       unsigned int ref_j = j + hap_min_pos;
-      
       count = 0;
       for (i = 0; i < n_observation; ++i)
         if((ref_j >= ref_pos[index[i]]) && (ref_j <= ref_pos[index[i] + length[i] - 1])) {
@@ -551,6 +550,14 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
           IntegerVector hap_site = nuc_unique[j];
           IntegerVector sum_site = nuc_count[j];
           if(sbs) {
+            if(sum_site[0] == sum_site[1] && sum_site[0] == 1 && sum_site.size() == 2) {
+              Rcout << "site " << j;
+              Rcout << " only covered by 2 reads and each has a different neucleotide, cannnot genotype \n";
+              n_row[j] = 1;
+              IntegerVector tmp = {nuc_unique[0], nuc_unique[0], nuc_unique[0], nuc_unique[0]};
+              haplotype(j) = tmp;
+              continue;
+            }// if each appears once
             List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment);
             n_row[j] = out["n_row"];
             List hap_temp = out["haplotype"];
@@ -561,7 +568,7 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
             }
           }
     } else {
-      Rcout << j;
+      Rcout << "site " << j;
       Rcout << " is non_covered, cannot genotype \n";
       n_row[j] = 1;
       IntegerVector tmp = {-1, -1, -1, -1};

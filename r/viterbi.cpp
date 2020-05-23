@@ -77,7 +77,7 @@ IntegerMatrix viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm)
     hidden_value(t) = path_t(max_id);
   }
   /*
-   * make the haplotype (for the overlap region: take the hidden state which hidden value is bigger) or simply choose the later one?
+   * make the haplotype (for the overlap region: choose the one that contains the linkage information)?
    */
   for(t = 0; t < t_max; ++t) {
     List full_hap_t = hap_info(t);
