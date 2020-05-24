@@ -295,40 +295,51 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
   //remake the linkage
   IntegerMatrix sub_link = remake_linkage(old_sub_link, num);
   unsigned int n_observation = sub_link.nrow();
-  
+  // while (all_excluded == num_states) {
+  //   cut_off = NUM_CLASS;
+  //   // Rcout << "linkage length " << linkage_len << "\n"; //actual linkage length + 1
+  //   while (cut_off >= 2 && all_excluded == num_states) {
   all_excluded = 0;
   for (m = 0; m < num_states; ++m) {
     exclude(m) = 0;
     IntegerVector comb = combination(m, _);
-    // Rcout << comb << "\t\t";
+    Rcout << comb << "\t\t";
     count = 0;
     for (k = 0; k < NUM_CLASS; ++k) {
-      // Rcout << "k" << k << "\n";
+      Rcout << "k" << k << "\n";
       for (j = 0; j < num; ++j) {
         IntegerMatrix hidden = hidden_states[location[j]];
         idx = comb[j];
         sub_hap(k, j) = hidden(idx, k);
-        // Rcout << sub_hap(k, j) << "\t";
+        Rcout << sub_hap(k, j) << "\t";
       }
-      // Rcout << "read" << "\n";
+      Rcout << "\n read " << "\n";
       for (i = 0; i < n_observation; i++) {
         int flag = 0;
         for (j = 0; j < num - 1; ++j) {
+          Rcout << sub_link(i, j) << "\t" << sub_link(i, j + 1);
+          // if (sub_link(i, j) != -1 && sub_link(i, j) != 4)
           if (sub_hap(k, j) == sub_link(i, j) && sub_hap(k, j + 1) == sub_link(i, j + 1))
             flag++;
         }
-        if (flag >= linkage_len) {
+        Rcout << "\n" << flag << "\n" ;
+        if (flag == linkage_len) {
           count++;
           break;
         }
       }
     }
+    Rcout << "count "<< count << "\n";
     if (count != NUM_CLASS) {
       exclude(m) = 1;
       all_excluded++;
     }
   }
- 
+  //     cut_off--; //TODO:how to make sure include more relaiable possibles
+  //   }
+  //   linkage_len--;
+  // }
+  // Rcout << exclude << "\n";
   List out = List::create(
     Named("num_states") = num_states - all_excluded,
     Named("exclude") = exclude);

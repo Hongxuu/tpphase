@@ -1037,8 +1037,8 @@ List trans_permit(IntegerVector num_states, List combination, List loci, int t_m
       IntegerMatrix comb_t2 = combination[t + 1];
       IntegerVector location_t1 = loci[t];
       IntegerVector location_t2 = loci[t + 1];
-      Rcout << location_t1 << "\n";
-      Rcout << location_t2 << "\n";
+      // Rcout << location_t1 << "\n";
+      // Rcout << location_t2 << "\n";
       // get the overlapped region, this might be different from the overlapped states we had
       int id = 0;
       for(j = 0; j < location_t1.size(); ++j) 

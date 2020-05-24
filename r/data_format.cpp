@@ -11,7 +11,8 @@ using namespace std;
 
 #define MLOGIT_CLASS 4
 #define NUM_CLASS 4
-
+#define QUA_MAX 106
+#define QUA_ERR 10
 // [[Rcpp::depends(RcppArmadillo)]]
 
 //https://stackoverflow.com/questions/51110244/in-rcpp-how-to-get-a-user-defined-structure-from-c-into-r
@@ -445,6 +446,7 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
   IntegerVector fake_length = dat_info["fake_length"];
   IntegerVector length = dat_info["length"];
   IntegerVector obs = dat_info["nuc"];
+  IntegerVector qua = dat_info["qua"];
   IntegerVector non_covered = dat_info["non_covered_site"];
   /* Find the number of reads with alignment start from each t (hash) */
   IntegerVector read_start(n_observation);
@@ -497,6 +499,7 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
   
   unsigned int count, num, more_than1 = 0;
   IntegerVector nuc_j(n_observation);
+  IntegerVector qua_ij(n_observation);
   List nuc_unique(hap_length);
   List nuc_count(hap_length);
   List nuc(2);
@@ -509,21 +512,43 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
   for (j = 0; j < hap_length; ++j) {
     if(!non_covered[j]) {
       unsigned int ref_j = j + hap_min_pos;
+      int qua_min = QUA_MAX;
       count = 0;
+      int non_del = 0;
       for (i = 0; i < n_observation; ++i)
         if((ref_j >= ref_pos[index[i]]) && (ref_j <= ref_pos[index[i] + length[i] - 1])) {
-          if(ref_index(i, j) == -1) {
+          if(ref_index(i, j) == -1) { // deletion appears
             nuc_j(count++) = -1;
-          } else {
+          } else { 
+            qua_ij(count) = qua[index[i] + ref_index(i, j)];
+            if(qua_ij[count] < qua_min)
+              qua_min = qua_ij[count];
             nuc_j(count++) = obs[index[i] + ref_index(i, j)];
+            non_del++;
           }
         }
-        
-        /* skip the noncovered site */
-        if(count == 0)
-          continue;
-        IntegerVector tmp_nuc = nuc_j[Range(0, count - 1)];
-        
+      
+      // Rcout << j << ":\t" << non_del<< ":" << count<<"\t" << qua_min<<  "\n";
+      IntegerVector tmp(count);
+      IntegerVector tmp_nuc;
+      // remove the ones with the lowest quality score
+        if(qua_min < QUA_ERR && non_del > 1) {
+          IntegerVector ind_que(count);
+          for(i = 0; i < count; ++i) 
+            if(qua_ij[i] == qua_min)
+              ind_que[i] = 1;
+            // Rcout << ind_que << "\n";
+            int enu = 0;
+          for(i = 0; i < count; ++i) 
+            if(!ind_que[i])
+              tmp[enu++] = nuc_j[i];
+          tmp_nuc = tmp[Range(0, enu - 1)];  
+      } else
+        tmp_nuc = nuc_j[Range(0, count - 1)];
+      // Rcout << tmp_nuc << "\n";
+        // /* skip the noncovered site */
+        // if(count == 0)
+        //   continue;
         /* get the nuc table at each site */
         nuc = unique_map(tmp_nuc);
         IntegerVector key = nuc["values"];
@@ -550,14 +575,6 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
           IntegerVector hap_site = nuc_unique[j];
           IntegerVector sum_site = nuc_count[j];
           if(sbs) {
-            if(sum_site[0] == sum_site[1] && sum_site[0] == 1 && sum_site.size() == 2) {
-              Rcout << "site " << j;
-              Rcout << " only covered by 2 reads and each has a different neucleotide, cannnot genotype \n";
-              n_row[j] = 1;
-              IntegerVector tmp = {nuc_unique[0], nuc_unique[0], nuc_unique[0], nuc_unique[0]};
-              haplotype(j) = tmp;
-              continue;
-            }// if each appears once
             List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment);
             n_row[j] = out["n_row"];
             List hap_temp = out["haplotype"];

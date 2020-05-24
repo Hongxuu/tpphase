@@ -123,15 +123,15 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
     phi_old <- bw$par_hmm$phi
     tmp <- m_beta(res = bw$par_aux, id = id, weight_id = weight_id, data = data, formula = formula, 
                   reads_lengths = read_length, ncores = ncores, old_version = 0, weight = bw$par_aux$weight)
-    init[[m]] <- bw
+    # init[[m]] <- bw
     ## estimation other parameters
     bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
                           beta = tmp$par$beta, PD_LENGTH = nrow(par$beta), hash_idx = data_new$idx)
     
-    # if (abs(bw$par_hmm$phi - phi_old) < -log(tol))
-    #   if(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", -log(tol)) &&
-    #    compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", -log(tol)))
-    #   break;
+    if (abs(bw$par_hmm$phi - phi_old) < -log(tol) &&
+        compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", -log(tol)) &&
+       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", -log(tol)))
+      break;
   }
   
   ### viterbi decoding
@@ -155,5 +155,4 @@ sourceCpp("./r/extra.cpp")
 comb_info_t0 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[1], HMM$time_pos[1], dat_info$ref_start);
 t0l = remake_linkage(linkage_in[, 1:6], 6)
 t0 = limit_comb_t0(comb_info_t0$combination, HMM$hidden_states, comb_info_t0$location, linkage_in, comb_info_t0$num, 0, HMM$num_states[1]);
-comb_info_t11 <- call_cart_product(HMM$pos_possibility[])
-remake_linkage(a, 4) -> b
+

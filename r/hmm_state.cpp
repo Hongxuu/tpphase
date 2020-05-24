@@ -435,7 +435,7 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
   IntegerVector exclude(num_states);
   int count, linkage_len, all_excluded;
   linkage_len = num - 1; 
-  int cut_off;
+  // int cut_off;
   // all_excluded = num_states;
   //remake the linkage
   IntegerMatrix sub_link = remake_linkage(old_sub_link, num);
@@ -448,26 +448,26 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
       for (m = 0; m < num_states; ++m) {
         exclude(m) = 0;
         IntegerVector comb = combination(m, _);
-        // Rcout << comb << "\t\t";
+        Rcout << comb << "\t\t";
         count = 0;
         for (k = 0; k < NUM_CLASS; ++k) {
-          // Rcout << "k" << k << "\n";
+          Rcout << "k" << k << "\n";
           for (j = 0; j < num; ++j) {
             IntegerMatrix hidden = hidden_states[location[j]];
             idx = comb[j];
             sub_hap(k, j) = hidden(idx, k);
-            // Rcout << sub_hap(k, j) << "\t";
+            Rcout << sub_hap(k, j) << "\t";
           }
-          // Rcout << "read" << "\n";
+          Rcout << "\n read " << "\n";
           for (i = 0; i < n_observation; i++) {
             int flag = 0;
             for (j = 0; j < num - 1; ++j) {
-              // Rcout << sub_link(i, j) << "\t" << sub_link(i, j + 1);
+              Rcout << sub_link(i, j) << "\t" << sub_link(i, j + 1);
               // if (sub_link(i, j) != -1 && sub_link(i, j) != 4)
               if (sub_hap(k, j) == sub_link(i, j) && sub_hap(k, j + 1) == sub_link(i, j + 1))
                 flag++;
             }
-            // Rcout << "\n" << flag << "\n" ;
+            Rcout << "\n" << flag << "\n" ;
             if (flag >= linkage_len) {
               count++;
               break;
@@ -635,7 +635,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   if(!setequal(exist, allowed))
     flag = 1;
       
-  if(flag) {
+  if(flag) {            
     for(m = 0; m < combination.nrow(); ++m)
       for(w = 0; w < allowed.size(); ++w)
         if(allowed(w) == combination(m, 0))
