@@ -106,12 +106,12 @@ call_aln <- function(ref_nameA = NULL, ref_nameB = NULL, ref_fsa = NULL, ref_sam
 #haps <- call_ampliclust(ampliclust_command, fastq_file, ac_outfile = "../init")
 #ampliclust_command = "../../amplici/run_ampliclust"
 #fastq_file = "res.fastq"
-call_aln(ref_nameA = "Genome_A:0-1373", ref_nameB = "Genome_B:0-1373",
-         ref_fsa = "../../data/tpphase/WGS/simu/L_SNP/ref.fsa",
-         ref_sam = "../../data/tpphase/WGS/simu/L_SNP/ref.sam",
-         alnA = "../../data/tpphase/WGS/simu/L_SNP/high_cov/alnA1.sam",
-         alnB = "../../data/tpphase/WGS/simu/L_SNP/high_cov/alnB1.sam",
-         out_file = "./out.txt")
+# call_aln(ref_nameA = "Genome_A:0-1373", ref_nameB = "Genome_B:0-1373",
+#          ref_fsa = "../../data/tpphase/WGS/simu/L_SNP/ref.fsa",
+#          ref_sam = "../../data/tpphase/WGS/simu/L_SNP/ref.sam",
+#          alnA = "../../data/tpphase/WGS/simu/L_SNP/high_cov/alnA1.sam",
+#          alnB = "../../data/tpphase/WGS/simu/L_SNP/high_cov/alnB1.sam",
+#          out_file = "./out.txt")
 
 
 

@@ -22,40 +22,17 @@ sourceCpp("./r/universal_alignment.cpp")
 sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
-##### targeted data
 
-## read the data, reference has to indicate which pair of reference it is processing (change this to only input the paried fasta file)
-samfile = "../../data/tpphase_res_consensus/WGS/test.sam"
-alignment = "../../data/tpphase/WGS/simu/L_SNP/ref.fsa"
-datafile = "../../data/tpphase/WGS/simu/L_SNP/low_cov/out.txt"
-#######
-
-formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc
-n_class = 4
-num_cat = 4
-seed = 0
-max = 20
-tol = 1e-06
-ncores = 2
-ref_delim = "."
-old_version = 0
-cut_off = 0.1
-max_iter = 20
-altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref_delim = ".",
-                          fastq_file = "./res.fastq", datafile = "./res.txt", output = NULL, cut_off = 0.125,
-                          formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 1,
-                          n_class = 4, num_cat = 4, seed = 0, max = 20, tol = 1e-06, ncores = 2, old_version = 0)  {
+altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", datafile = NULL, output = NULL, cut_off = 0.1,
+                          formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 50, res_file = NULL,
+                          n_class = 4, num_cat = 4, seed = 0, tol = 1e-06, ncores = 2, old_version = 0, eta = rep(0.25, 4))  {
   registerDoParallel(cores = ncores)  
-  ## read the data
-  if(is.null(samfile) == FALSE)
-    sam <- read_sam(samfile, ref_name, fastq_file, datafile)
-  
   ## make universial reference
   align <- read_fasta(alignment)
   if(nrow(align$reads) != 1) { #only read in one reference pair
     universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = 0)
     universial <- universial %>% unlist()
-  } else { ## read in many reference, take the one we want
+  } else { ## read in many references, take the one we want
     ref_in <- strsplit(ref_name, ref_delim, fixed = TRUE) %>% unlist()
     ref_index <- ref_in[2] %>% as.integer() - 1 ## index in C
     universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = ref_index)
@@ -103,7 +80,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   ### start initializing
   ###### estimate beta
   weight_id <- NULL
-  par$eta <- c(0.15, 0.25, 0.45, 0.15)
+  par$eta <- eta
   data_new <- format_data2(hmm_info = HMM, d_info = dat_info, hap_info = hap_full)
   data <- data_new$df_new
   bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, par = par, 
@@ -119,7 +96,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
   for (m in (1:max_iter)) {
-    cat(m, "\n");
+    cat("iter: ", m, "\n");
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
     tmp <- m_beta(res = bw$par_aux, id = id, weight_id = weight_id, data = data, formula = formula, 
@@ -150,6 +127,15 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   res$haplotypes <- haplotypes
   res$snps <- snps
   res$snp_location <- snp_location
-  fnlist(res, fil = "./test.res")
+  if(!is.null(res_file))
+    fnlist(res, fil = res_file)
+  return(res)
 }
+
+
+a<- altragenotype(datafile = "../../data/tpphase/WGS/simu/L_SNP/low_cov/out.txt",
+              alignment = "../../data/tpphase/WGS/simu/L_SNP/ref.fsa", max_iter = 1)
+
+
+
 
