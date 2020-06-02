@@ -101,6 +101,12 @@ void make_simu_opt(simu_options *opt)
 	opt->homo_rate = 0.001;
 	opt->substitution_rate = 0.3333333;
 	opt->num_ind = 1;
+	opt->ART_command = NULL;
+	opt->error_file1 = NULL;
+	opt->error_file2 = NULL;
+	opt->fq_file = "sim";
+	opt->coverage = 40;
+	opt->length = 150;
 } /* make_options */
 
 int make_data(simu_dat **dat) {
@@ -191,6 +197,27 @@ int parse_opt(simu_options *opt, int argc, const char **argv)
 				opt->num_ind = read_uint(argc, argv, ++i, (void *)opt);
 				mmessage(INFO_MSG, NO_ERROR, "No. of individuals:");
 				fprintf(stderr, " %d", opt->num_ind);
+				fprintf(stderr, "\n");
+				break;
+			case 'l':
+				opt->length = read_cmdline_double(argc, argv, ++i, (void *)opt);
+				break;
+			case 'i':
+				opt->coverage = read_cmdline_double(argc, argv, ++i, (void *)opt);
+				break;
+			case 'c':
+				opt->error_file1 = argv[++i];
+				break;
+			case 'd':
+				opt->error_file2 = argv[++i];
+				break;
+			case 'm':
+				opt->fq_file = argv[++i];
+				break;
+			case 't':
+				opt->ART_command = argv[++i];
+				mmessage(INFO_MSG, NO_ERROR, "ART command:");
+				fprintf(stderr, " %s", opt->ART_command);
 				fprintf(stderr, "\n");
 				break;
 			default:
@@ -426,10 +453,27 @@ int load_data(simu_dat *dat, simu_options *opt, fastq_data *fds) {
 		fprint_fsa(fp, dat->ind, PLOIDY, opt->len_N, "H");
 		fclose(fp);
 		fp = NULL;
+		if (opt->ART_command) {
+			length = strlen(opt->fq_file) + (int)log10(le) + 1 + 1;
+			char *fq_out = malloc(length);
+			sprintf(fq_out, "%s%u", opt->fq_file, m);
+			call_art(opt, fq_out, file);
+		}
 	}
 	return NO_ERROR;
 }
 
+void call_art(simu_options *opt, char *fq_out, char *fq_in) {
+	unsigned int cmd_len = strlen(opt->ART_command) + strlen(opt->error_file1) + strlen(opt->error_file2) + strlen(" -l -1 -2 -f -o -i ") + strlen(fq_out) + strlen(fq_in) + (int)(log10(opt->coverage) + 1) + (int)(log10(opt->length) + 1) + 8;
+	mmessage(INFO_MSG, NO_ERROR, "Length of command: %u\n", cmd_len);
+	char *command = malloc(cmd_len * sizeof *command);
+	sprintf(command, "%s -1 %s -2 %s -l %d -i %s -f %d -o %s",
+		opt->ART_command, opt->error_file1, opt->error_file2, opt->length, fq_in, opt->coverage, fq_out);
+	mmessage(INFO_MSG, NO_ERROR, "Running ART: '%s'\n",
+		 command);
+	system(command);
+	free(command);
+}
 
 void fprint_usage(FILE *fp, const char *cmdname, void *obj) {
 	simu_options *opt = (simu_options *) obj;
@@ -454,5 +498,11 @@ void fprint_usage(FILE *fp, const char *cmdname, void *obj) {
 	fprintf(fp, "\t-b <beta>\n\t\tSpecify the rate parameter in beta distribution\n");
 	fprintf(fp, "\t-s <seed>\n\t\tRandom number generator seed\n");
 	fprintf(fp, "\t-n <sample>\n\t\tNo. of individuals simulated\n");
+	fprintf(fp, "\t-l <length>\n\t\tSpecify length of simulated reads\n");
+	fprintf(fp, "\t-i <coverage>\n\t\tSpecify coverage of the individual genome\n");
+	fprintf(fp, "\t-c <error_file1>\n\t\tSpecify error file 1\n");
+	fprintf(fp, "\t-d <error_file2>\n\t\tSpecify error file 2\n");
+	fprintf(fp, "\t-m <fq_file>\n\t\tFastq file name (Default: %s)\n", opt->fq_file);
+	fprintf(fp, "\t-t <ART>\n\t\tART command\n");
 	fprintf(fp, "\t-h \n\t\tThis help\n");
 } /* fprint_usage */

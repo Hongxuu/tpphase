@@ -78,12 +78,40 @@ call_ampliclust <- function(ampliclust_command = NULL, fastq_file = NULL, ac_out
   reads <- matrix(res$reads, ncol = res$dim[2], byrow = TRUE)
   return(reads)
 }
+
+call_aln <- function(ref_nameA = NULL, ref_nameB = NULL, ref_fsa = NULL, ref_sam = NULL,
+                     alnA = NULL, alnB = NULL, out_file = NULL) {
+  checkmate::expect_file_exists(ref_fsa, access = "r")
+  checkmate::expect_file_exists(ref_sam, access = "r")
+  checkmate::expect_file_exists(alnA, access = "r")
+  checkmate::expect_file_exists(alnB, access = "r")
+  if (utils::tail(unlist(strsplit(ref_fsa, "[.]")), 1) != "fsa" &
+      utils::tail(unlist(strsplit(ref_fsa, "[.]")), 1) != "fa")
+    stop("The input ref_fsa has to be fasta file!")
+  if (utils::tail(unlist(strsplit(ref_sam, "[.]")), 1) != "sam" &
+      utils::tail(unlist(strsplit(alnA, "[.]")), 1) != "sam" &
+      utils::tail(unlist(strsplit(alnB, "[.]")), 1) != "sam")
+    stop("The input alnA, alnB, ref_sam must be sam file!")
+  if (!dir.exists(sub('/[^/]*$', '', out_file)))
+    stop("out_file path does not exist!")
+  
+  if (!is.loaded("r_make_aln", PACKAGE = "sync_data_r"))
+    dyn.load("./src/sync_data_r.so")
+  
+  .Call("r_make_aln", ref_nameA, ref_nameB, ref_fsa, ref_sam, alnA, alnB, out_file)
+}
 # samfile = "../../data/tetraploid/308-TAN-A.sam"
 # ref_name = "Adur420_2:199509_P2"
 # read_sam(samfile, ref_name, fastq_file = "res.fastq", datafile = "res.txt")
 #haps <- call_ampliclust(ampliclust_command, fastq_file, ac_outfile = "../init")
 #ampliclust_command = "../../amplici/run_ampliclust"
 #fastq_file = "res.fastq"
+call_aln(ref_nameA = "Genome_A:0-1373", ref_nameB = "Genome_B:0-1373",
+         ref_fsa = "../../data/tpphase/WGS/simu/L_SNP/ref.fsa",
+         ref_sam = "../../data/tpphase/WGS/simu/L_SNP/ref.sam",
+         alnA = "../../data/tpphase/WGS/simu/L_SNP/high_cov/alnA1.sam",
+         alnB = "../../data/tpphase/WGS/simu/L_SNP/high_cov/alnB1.sam",
+         out_file = "./out.txt")
 
 
 

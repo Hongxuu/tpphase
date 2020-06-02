@@ -44,6 +44,7 @@ struct _ash {
 };
 
 struct _cigar {
+	size_t length_rf; 		/* consumed reference length */
 	unsigned int n_ashes;
 	ash *ashes;
 };
@@ -57,7 +58,16 @@ struct _sam_entry {
 	uint32_t ref;
 	uint16_t flag;
 	unsigned char exclude;
-	unsigned int index;
+	long which_ref; 		/* which targeted region */
+	char *ref_name;
+	size_t length_rf; 		/* consumed reference length */
+	unsigned int index; 		/* index used to output data */
+	char *name_s; 			/* +:forward, -:reverse */
+	double ll_aln;			/* alignment likelihood */
+	int *rd_map; 			/* index of aligned read relative to the uni genome */
+	data_t *uni_aln;		/* alignment to the universal genome */
+	size_t aln_len;			/* alignment length */
+	size_t new_pos;			/* new alignment position */
 };
 
 struct _sam {
@@ -98,10 +108,10 @@ struct _merge_hash {
 int read_sam(FILE *fp, sam **s_in);
 
 /* processing */
-int hash_sam(sam *s, sam_hash **sh_in, int hash_on, size_t rindex, unsigned char drop_unmapped, unsigned char drop_second, unsigned char drop_soft_clipped, unsigned char drop_indel, unsigned int min_length, unsigned int max_length, double max_exp_err);
+int hash_sam(sam *s, sam_hash **sh_in, int hash_on, size_t rindex, unsigned int n_ref, unsigned char drop_unmapped, unsigned char drop_second, unsigned char drop_soft_clipped, unsigned char drop_indel, unsigned int min_length, unsigned int max_length, double max_exp_err);
 size_t hash_merge(merge_hash **mh, unsigned int nfiles, sam **sds, size_t *rindex);
 int match_soft_clipping(merge_hash *mh, unsigned int nalign, sam **sds, size_t *start_pos);
-
+int fill_hash(sam *s, sam_hash *sh, unsigned int n_ref);
 /* output */
 int output_error_data(FILE *fp, sam_entry *se, unsigned char *ref, double lprob);
 

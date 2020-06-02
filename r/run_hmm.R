@@ -40,6 +40,7 @@ ncores = 2
 ref_delim = "."
 old_version = 0
 cut_off = 0.1
+max_iter = 20
 altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref_delim = ".",
                           fastq_file = "./res.fastq", datafile = "./res.txt", output = NULL, cut_off = 0.125,
                           formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 1,
@@ -102,6 +103,7 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   ### start initializing
   ###### estimate beta
   weight_id <- NULL
+  par$eta <- c(0.15, 0.25, 0.45, 0.15)
   data_new <- format_data2(hmm_info = HMM, d_info = dat_info, hap_info = hap_full)
   data <- data_new$df_new
   bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, par = par, 
@@ -116,7 +118,6 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   data$nuc <- to_char_r(data$nuc)
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
-  init <- list()
   for (m in (1:max_iter)) {
     cat(m, "\n");
     par_hmm_old <- bw$par_hmm
@@ -128,9 +129,9 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
     bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
                           beta = tmp$par$beta, PD_LENGTH = nrow(par$beta), hash_idx = data_new$idx)
     
-    if (abs(bw$par_hmm$phi - phi_old) < -log(tol) &&
-        compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", -log(tol)) &&
-       compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", -log(tol)))
+    if ((all(abs(exp(bw$par_hmm$phi) - exp(phi_old)) < tol) == TRUE) &&
+        all(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", tol) == TRUE) &&
+        all(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", tol) == TRUE))
       break;
   }
   
@@ -138,21 +139,17 @@ altragenotype <- function(samfile = NULL, ref_name = NULL, alignment = NULL, ref
   res <- list()
   hap <- viterbi(hmm_info = HMM, dat_info = dat_info, hap_info = hap_full, par_hmm = bw$par_hmm)
   haplotypes <- matrix(to_char_r(hap), nrow = n_class)
-  idx <- duplicated(haplotypes)
-  derepliacte_h <- haplotypes[!idx, ]
+  # idx <- duplicated(haplotypes)
+  # derepliacte_h <- haplotypes[!idx, ]
   snp_location <- HMM$undecided_pos + 1
-  snps <- derepliacte_h[, snp_location]
+  snps <- haplotypes[, snp_location]
   snp_location <- snp_location + dat_info$ref_start
   
   res$no_reads_t <- HMM$n_t
   res$time_pos <- HMM$time_pos
-  res$haplotypes <- derepliacte_h
+  res$haplotypes <- haplotypes
   res$snps <- snps
   res$snp_location <- snp_location
   fnlist(res, fil = "./test.res")
 }
-sourceCpp("./r/extra.cpp")
-comb_info_t0 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[1], HMM$time_pos[1], dat_info$ref_start);
-t0l = remake_linkage(linkage_in[, 1:6], 6)
-t0 = limit_comb_t0(comb_info_t0$combination, HMM$hidden_states, comb_info_t0$location, linkage_in, comb_info_t0$num, 0, HMM$num_states[1]);
 

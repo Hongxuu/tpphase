@@ -19,7 +19,7 @@ typedef struct _simu_data simu_dat;
 
 struct _simu_options {
 	unsigned int len_N;		/*<! length of sequence sampled from fsa */
-	const char *out_file;		/*<! out_file */
+	const char *out_file;		/*<! out_file (individual fasta) */
 	const char *fsa_file;		/*<! fsa files */
 	const char *ref_name;		/*<! random sample ref name */
 	const char *out_sam;		/*<! alignment of A and B in a sam file */
@@ -34,6 +34,12 @@ struct _simu_options {
 	double substitution_rate;	/*<! snps substition rate */
 	double prop_allele;		/*<! HWE */
 	unsigned int num_ind;
+	const char *ART_command;	/*<! art command */
+	const char *error_file1;	/*<! error files */
+	const char *error_file2;
+	const char *fq_file;		/*<! simulated fastq file */
+	int length;
+	int coverage;
 };
 
 struct _simu_data {
@@ -54,4 +60,5 @@ void fprint_fsa(FILE *fp, char_t **data, size_t n, size_t p, char const * const 
 void fprint_seq(FILE *fp, char_t *data, size_t p, char const * const prefix);
 void fprint_usage(FILE *fp, const char *cmdname, void *obj);
 void write_sam(FILE *fp, char_t *B, size_t p, char *name_A, char *name_B);
+void call_art(simu_options *opt, char *fq_out, char *fq_in);
 #endif /* simulation_h */

@@ -98,7 +98,7 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
             max_penality = value;
         }
         for (m = 0; m < num_states[t - 1]; ++m)
-          alp(w) += exp(alp_last(m) + transition(m, w) - max_penality);
+          alp(w) += exp(alp_last(m) + transition(m, w) - max_penality); // Log-Sum-Exp Trick
         alp(w) = log(alp(w)) + emission(w) + max_penality;
       }
     }
@@ -123,7 +123,7 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
             max_penality = value;
         }
         for (m = 0; m < num_states[t + 1]; ++m)
-            beta(w) += exp(beta_after(m) + transition(w, m) + emission(m) - max_penality); // need further adjust if not work
+            beta(w) += exp(beta_after(m) + transition(w, m) + emission(m) - max_penality);
         beta(w) = log(beta(w)) + max_penality;
       }
     }
@@ -167,6 +167,13 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
           x(w, m) -= log(sum);
     xi(t) = x;
   }
+  // compute full likelihood
+  NumericVector alp = alpha[t_max - 1];
+  double full_llk = 0;
+  for (w = 0; w < num_states[t_max - 1]; ++w)
+    full_llk += exp(alp[w]);
+  Rcout << "full log likelihood: " << log(full_llk) << "\n";
+  
   List par_hmm_out = List::create(
     Named("phi") = phi,
     Named("trans") = trans,
@@ -698,7 +705,6 @@ List compute_emit(List hmm_info, List dat_info, List hap_info, NumericMatrix bet
 }
 
 NumericVector update_eta(List w_ic, List gamma, IntegerVector num_states, IntegerVector n_t, unsigned int t_max, unsigned int n_observation) {
-  // update eta where P(Ht|R, theta) = gamma
   double inner;
   unsigned int i, k, m, t;
   NumericVector eta_new(NUM_CLASS);
@@ -711,9 +717,8 @@ NumericVector update_eta(List w_ic, List gamma, IntegerVector num_states, Intege
       for(m = 0; m < num_states[t]; ++m) {
         NumericMatrix w_tic = w_icm(m);
         double sum_wic = 0;
-        for (i = 0; i < n_t[t]; ++i) {
+        for (i = 0; i < n_t[t]; ++i)
           sum_wic += w_tic(i, k);
-        }
         inner += exp(gam(m)) * sum_wic;
       }
       eta_new[k] += inner;
@@ -987,6 +992,7 @@ List baum_welch_iter(List hmm_info, List par_hmm, List data_info, List hap_info,
   unsigned int t_max = hmm_info["t_max"];
   unsigned int n_observation = data_info["n_observation"];
   List par_hmm_new;
+  
   /* update eta */
   NumericVector eta_new = update_eta(w_ic, gamma, num_states, n_t, t_max, n_observation);
   

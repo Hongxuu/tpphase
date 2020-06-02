@@ -354,7 +354,9 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 		    || se->cig->ashes[i].type == CIGAR_MMATCH
 		    || se->cig->ashes[i].type == CIGAR_MISMATCH)
 			length += se->cig->ashes[i].len;
+#ifdef STANDALONE
 	printf("reference length comsumed: %lu\n", length);
+#endif
 	// length of reference != length summed by using CIGAR
 	// length of reference = position - 1 (if alignment start with S/H) + M + D
 	int *rid_map = NULL; // read alignment index in the original alignment, -1 represent deletion
@@ -383,8 +385,9 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 			rd_idx += se->cig->ashes[i].len;
 		}
 	}
+#ifdef STANDALONE
 	printf("old alignment index, start from %zu\n", se->pos);
-	
+#endif
 	// adjust and trim the alignment (need to consider genome reverse c and read RC)
 	int len = 0;
 	se->rd_map = NULL;
@@ -393,10 +396,13 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 	int location = 0;
 	size_t new_len = 0;
 	if (!strand) { // if genome is forward
+#ifdef STANDALONE
 		printf("genome forward\n");
+#endif
 		if (se->pos < s_id) { // then rd_map is the read (covers the begining) index when aligned to picked region
+#ifdef STANDALONE
 			printf("align start before the real homo\n");
-			
+#endif
 			len = s_id - se->pos; // length outside targeted genome
 			remain = malloc(uni_aln_len * sizeof(*remain));
 			int tmp = length - (s_id - se->pos);
@@ -429,8 +435,9 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 				flag = 0;
 			}
 		} else if (se->pos + length - 1 > e_id) {
+#ifdef STANDALONE
 			printf("align over the real homo\n");
-			
+#endif
 			// alignment start location relative to id_uni
 			for (unsigned int i = 0; i < uni_aln_len; ++i)
 				if (se->pos == real_id[i]) {
@@ -503,10 +510,13 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 			}
 		}
 	} else {// if genome is reversed
+#ifdef STANDALONE
 		printf("genome reversed\n");
+#endif
 		if (se->pos < e_id) { // then se->rd_map is the read (covers the begining) index when aligned to picked region
+#ifdef STANDALONE
 			printf("align over the homo\t\t");
-			
+#endif
 			len = e_id - se->pos; // length outside targeted genome
 			remain = malloc(uni_aln_len * sizeof(*remain));
 			int tmp = length - len;
@@ -541,7 +551,9 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 			}
 			location = uni_aln_len - new_len;
 		}  else if (se->pos + length - 1 > s_id) {
+#ifdef STANDALONE
 			printf("align before the homo\n");
+#endif
 			gaps = 0;
 			// alignment start location relative to id_uni
 			for (unsigned int i = 0; i < uni_aln_len; ++i)
@@ -652,6 +664,7 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 	}
 	
 	se->aln_len = new_len;
+#ifdef STANDALONE
 	PRINT_VECTOR(se->rd_map, length);
 	printf("alignment of read to universal, start from %zu, length %zu\n", se->new_pos, se->aln_len);
 	PRINT_VECTOR(se->uni_aln, new_len);
@@ -659,6 +672,7 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 	for (size_t j = 0; j < new_len; ++j) {
 		printf("%d\t", iupac_to_xy[ref[se->new_pos + j]]); // se->new_pos is 0 based
 	}
+#endif
 	// compute the alignment probability, if, ther is a gap in the read alignment but not in uni genome, then add a penalty
 	se->ll_aln = 0;
 	unsigned int gap_in = 0;
@@ -679,8 +693,9 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
 //		printf("penalty %lf\n", penalty);
 		se->ll_aln += penalty;
 	}
-	
+#ifdef STANDALONE
 	printf("%lf\n", se->ll_aln);
+#endif
 	free(remain);
 	free(read);
 }
@@ -690,7 +705,11 @@ void output_data(FILE *fp, sam_entry *se, unsigned int id) {
 	for (unsigned int i = 0; i < se->aln_len; ++i) {
 		fprintf(fp, "%d ", id);
 		if (se->uni_aln[i] == 4 && i != 0) {
-			fprintf(fp, "%d ", se->rd_map[i - 1]);
+			unsigned int id = i - 1;
+			while (se->rd_map[id] == -1) {
+				id--;
+			}
+			fprintf(fp, "%d ", se->rd_map[id]);
 		} else
 			fprintf(fp, "%d ", se->rd_map[i]);
 		fprintf(fp, "%lu ", se->new_pos + i);
@@ -700,4 +719,5 @@ void output_data(FILE *fp, sam_entry *se, unsigned int id) {
 			fprintf(fp, "%d %c\n", get_qual(se->qual, se->rd_map[i]), xy_to_char[se->uni_aln[i]]);
 	}
 }
+
 

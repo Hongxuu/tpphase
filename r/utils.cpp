@@ -74,6 +74,20 @@ List hash_mat(IntegerMatrix x) {
   } 
   return List::create( _["all_id"] = all_id, _["idx"] = idx );
 }
+
+IntegerVector find_max(List ls, int n_obs) {
+  unsigned int i, j, k = 0;
+  IntegerVector max_id(n_obs);
+  for(i = 0; i < ls.size(); ++i) {
+    NumericMatrix mat = ls[i];
+    for(j = 0; j < mat.nrow(); ++j) {
+      NumericVector vec = mat(j, _);
+      int id = arma::index_max(as<arma::vec>(vec));
+      max_id[k++] = id;
+    }
+  }
+  return(max_id);
+}
 // maybe a slower version
 // List hash_mat(IntegerMatrix x) {
 //   int n = x.nrow() ;

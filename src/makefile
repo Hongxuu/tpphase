@@ -7,6 +7,11 @@ ifdef DBG
 	CFLAGS = -Wall -Wextra -pedantic -g -std=c11 -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=500 -DDEBUGGING_CODE		# debugging
 endif
 
+# -e DSTD=1
+ifdef DSTD
+	CFLAGS += -DSTANDALONE
+endif
+
 IFLAGS = 
 
 LDFLAGS = -lm -lncurses
@@ -23,10 +28,20 @@ hds = $(wildcard *.h)
 objs = $(srcs:.c=.o)
 deps = $(srcs:.c=.d)
 
-sam_objs = sync_data_r.o sam.o sequence.o nuc.o qual.o error.o fastq.o align.o io.o cmdline.o
+sam_objs = sync_data_r.o sam.o sequence.o nuc.o qual.o error.o fastq.o align.o io.o cmdline.o make_aln.o options.o pick_reads.o
+
+aln_objs = make_aln.o options.o sam.o sequence.o nuc.o qual.o error.o fastq.o align.o io.o cmdline.o pick_reads.o
+
+simu_objs = simulation.o sequence.o nuc.o qual.o error.o fastq.o align.o io.o cmdline.o
 
 Rlib: $(sam_objs)
 	R CMD SHLIB $(sam_objs) $(LDFLAGS)
+
+aln:	$(aln_objs)
+	$(CC) -o aln $(aln_objs) $(CFLAGS) $(LDFLAGS) -lz
+
+simu:	$(simu_objs)
+	$(CC) -o run_simu $(simu_objs) $(CFLAGS) $(LDFLAGS) -lRmath
 
 include $(deps)
 
@@ -40,7 +55,7 @@ archive:
 	tar czvf haplotype.tar.gz $(srcs) $(hds) makefile
 
 clean:	
-	-rm $(objs) $(deps) Rlib 2>/dev/null
+	-rm $(objs) $(deps) Rlib aln simu 2>/dev/null
 
 clear:
 	rm $(objs)

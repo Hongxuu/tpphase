@@ -8,6 +8,12 @@
 using namespace Rcpp;
 using namespace std;
 #define NUM_CLASS 4
+
+// # sourceCpp("./r/extra.cpp")
+// # comb_info_t0 = find_combination(HMM$undecided_pos, HMM$pos_possibility, HMM$p_tmax[1], HMM$time_pos[1], dat_info$ref_start);
+// # t0l = remake_linkage(linkage_in[, 1:6], 6)
+// # t0 = limit_comb_t0(comb_info_t0$combination, HMM$hidden_states, comb_info_t0$location, linkage_in, comb_info_t0$num, 0, HMM$num_states[1]);
+
 List unique_map(const Rcpp::IntegerVector & v)
 {
   // Initialize a map

@@ -705,7 +705,7 @@ int read_read(FILE *fp, fastq_data *fqd, fastq_options *fqo, unsigned int *len,
 
 		v_iupac = valid_iupac(&c);
 		v_nuc = v_iupac ? valid_nucleotide(&c) : 0;
-
+		
 		/* record valid iupac */
 		if (rptr && v_iupac && fqd->read_encoding == IUPAC_ENCODING) {
 			*rptr = nuc_to_iupac[c - 'A'];

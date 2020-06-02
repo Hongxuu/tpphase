@@ -1,6 +1,6 @@
-sync_data_r.o sync_data_r.d : sync_data_r.c make_aln.h sam.h sequence.h uthash.h fastq.h \
-  nuc.h error.h qual.h constants.h io.h array.h pick_reads.h options.h \
-  myfun.h /usr/local/Cellar/r/3.6.0/include/Rinternals.h \
+make_aln.o make_aln.d : make_aln.c make_aln.h sam.h sequence.h uthash.h fastq.h nuc.h \
+  error.h qual.h constants.h io.h array.h pick_reads.h options.h myfun.h \
+  /usr/local/Cellar/r/3.6.0/include/Rinternals.h \
   /usr/local/Cellar/r/3.6.0/include/R_ext/Arith.h \
   /usr/local/Cellar/r/3.6.0/include/R_ext/libextern.h \
   /usr/local/Cellar/r/3.6.0/include/R_ext/Boolean.h \

@@ -7,13 +7,7 @@
 #include <limits.h>
 #include <unistd.h>
 
-#include "sam.h"
-#include "fastq.h"
-#include "nuc.h"
-#include "qual.h"
-#include "uthash.h"
-#include "io.h"
-#include "array.h"
+#include "make_aln.h"
 
 #ifndef STANDALONE
 #include <Rinternals.h>
@@ -23,7 +17,6 @@
 #define PRINTF(str, ...) fprintf(stdout, (str), __VA_ARGS__)
 #define EPRINTF(str, ...) fprintf(stderr, (str), __VA_ARGS__)
 #endif
-
 
 SEXP r_read_sam (SEXP samfile_r, SEXP ref_name_r, SEXP fastq_file_r, SEXP datafile_r)
 {
@@ -271,9 +264,27 @@ SEXP r_read_fastq(SEXP datafile_r)
 }
 
 
-
-
-
+SEXP r_make_aln (SEXP ref_nameA,
+		   SEXP ref_nameB,
+		   SEXP ref_fsa,
+		   SEXP ref_sam,
+		   SEXP alnA,
+		   SEXP alnB,
+		   SEXP out_file
+		   )
+{
+	options opt;
+	default_options(&opt);
+	opt.sbam_files[0] = CHAR(STRING_ELT(alnA, 0));
+	opt.sbam_files[1] = CHAR(STRING_ELT(alnB, 0));
+	opt.ref_names[0] = CHAR(STRING_ELT(ref_nameA, 0));
+	opt.ref_names[1] = CHAR(STRING_ELT(ref_nameB, 0));
+	opt.out_file = CHAR(STRING_ELT(out_file, 0));
+	opt.uni_genome = CHAR(STRING_ELT(ref_fsa, 0));
+	opt.sam_file = CHAR(STRING_ELT(ref_sam, 0));
+	make_alignment(opt);
+	return R_NilValue;
+}
 
 
 
