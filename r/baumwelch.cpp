@@ -137,12 +137,16 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
     NumericVector alp = alpha(t);
     sum = 0;
     NumericVector gam(num_states[t]);
+    max_penality = R_NegInf;
     for (w = 0; w < num_states[t]; ++w) {
       gam(w) = alp(w) + beta(w);
-      sum += exp(gam(w));
+      if (gam(w) > max_penality)
+        max_penality = gam(w);
     }
     for (w = 0; w < num_states[t]; ++w)
-      gam(w) -= log(sum);
+      sum += exp(gam(w) - max_penality); // log sum exp trick
+    for (w = 0; w < num_states[t]; ++w)
+      gam(w) = gam(w) - (log(sum) + max_penality);
     gamma(t) = gam;
   }
   
@@ -155,24 +159,28 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
     NumericVector alp = alpha(t);
     NumericMatrix x(num_states[t], num_states[t + 1]);
     sum = 0;
+    max_penality = R_NegInf;
     for (w = 0; w < num_states[t]; ++w)
       for (m = 0; m < num_states[t + 1]; ++m) {
-        // x(w, m) = log(alp(w)) + log(transition(w, m)) + log(beta(m)) + log(emission(m)); // avoid underflow?
-        // x(w, m) = exp(x(w, m));
-        x(w, m) = alp(w) + transition(w, m) + beta(m) + emission(m); // not logging it since some transition are 0
-        sum += exp(x(w, m));
+        x(w, m) = alp(w) + transition(w, m) + beta(m) + emission(m);
+        if (x(w, m) > max_penality)
+          max_penality = x(w, m);
       }
-      for (w = 0; w < num_states[t]; ++w)
-        for (m = 0; m < num_states[t + 1]; ++m)
-          x(w, m) -= log(sum);
+    for (w = 0; w < num_states[t]; ++w)
+      for (m = 0; m < num_states[t + 1]; ++m)
+        sum += exp(x(w, m) - max_penality);
+    for (w = 0; w < num_states[t]; ++w)
+      for (m = 0; m < num_states[t + 1]; ++m)
+        x(w, m) = x(w, m) - (log(sum) + max_penality);
     xi(t) = x;
   }
   // compute full likelihood
   NumericVector alp = alpha[t_max - 1];
   double full_llk = 0;
+  max_penality = max(alp);
   for (w = 0; w < num_states[t_max - 1]; ++w)
-    full_llk += exp(alp[w]);
-  Rcout << "full log likelihood: " << log(full_llk) << "\n";
+    full_llk += exp(alp[w] - max_penality);
+  Rcout << "full log likelihood: " << log(full_llk) + max_penality << "\n";
   
   List par_hmm_out = List::create(
     Named("phi") = phi,

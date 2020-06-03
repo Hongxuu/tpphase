@@ -198,19 +198,10 @@ List read_data(std::string path, unsigned int old_v) {
   IntegerVector del_length_all(n_observation);
   IntegerVector del_strat_id(n_observation);
   if (count_del) {
-    del_id = unique(del_obs_index);
+    List tmp = unique_map(del_obs_index);
+    del_id = tmp["values"];
     del_num = del_id.size();
-    del_count = IntegerVector(del_num);
-    for (m = 0; m < del_num; ++m)
-      del_count[m] = 1;
-    i = 0;
-    for (m = 0; m < count_del; ++m) {
-      if (m < count_del - 1 && del_obs_index[m] == del_obs_index[m + 1])
-        del_count[i]++;
-      else
-        i++;
-    }
-    
+    del_count = tmp["lengths"];
     for (m = 0; m < del_num; ++m)
       del_length_all[del_id[m] - 1] = del_count[m];
 

@@ -21,8 +21,14 @@ sourceCpp("./r/baumwelch.cpp")
 sourceCpp("./r/universal_alignment.cpp")
 sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
-
-
+cut_off = 0.1
+formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc
+n_class = 4
+num_cat = 4
+seed = 0
+tol = 1e-06
+ncores = 2
+old_version = 0
 altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", datafile = NULL, output = NULL, cut_off = 0.1,
                           formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 50, res_file = NULL,
                           n_class = 4, num_cat = 4, seed = 0, tol = 1e-06, ncores = 2, old_version = 0, eta = rep(0.25, 4))  {
@@ -81,6 +87,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   ###### estimate beta
   weight_id <- NULL
   par$eta <- eta
+  cat("initialization: \n");
   data_new <- format_data2(hmm_info = HMM, d_info = dat_info, hap_info = hap_full)
   data <- data_new$df_new
   bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, par = par, 
@@ -103,7 +110,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
                   reads_lengths = read_length, ncores = ncores, old_version = 0, weight = bw$par_aux$weight)
     # init[[m]] <- bw
     ## estimation other parameters
-    bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
+    bw1 <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
                           beta = tmp$par$beta, PD_LENGTH = nrow(par$beta), hash_idx = data_new$idx)
     
     if ((all(abs(exp(bw$par_hmm$phi) - exp(phi_old)) < tol) == TRUE) &&
@@ -113,6 +120,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   }
   
   ### viterbi decoding
+  cat("viterbi decoding\n");
   res <- list()
   hap <- viterbi(hmm_info = HMM, dat_info = dat_info, hap_info = hap_full, par_hmm = bw$par_hmm)
   haplotypes <- matrix(to_char_r(hap), nrow = n_class)
@@ -133,9 +141,6 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
 }
 
 
-a<- altragenotype(datafile = "../../data/tpphase/WGS/simu/L_SNP/low_cov/out.txt",
+a<- altragenotype(datafile = "../../data/tpphase/WGS/simu/L_SNP/high_cov/out1.txt",
               alignment = "../../data/tpphase/WGS/simu/L_SNP/ref.fsa", max_iter = 1)
-
-
-
 
