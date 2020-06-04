@@ -83,7 +83,7 @@ List aux_noN_S2(IntegerVector sum_site, IntegerVector hap_site) {
     arma::Mat<int> m1 = as<arma::Mat<int>>(temp);
     arma::Mat<int> m2 = as<arma::Mat<int>>(temp2);
     arma::Mat<int> m3 = join_cols(m1, m2);
-    if(sum_site[0] == 1 && sum > 5.0) { // 0 is too few
+    if(sum_site[0] == 1 && sum >= 4.0) { // 0 is too few
       arma::Mat<int> m4 = {hap_site[1], hap_site[1], hap_site[1], hap_site[1]};
       arma::Mat<int> out = join_cols(m4, m3);
       temp = wrap(out);
@@ -98,7 +98,7 @@ List aux_noN_S2(IntegerVector sum_site, IntegerVector hap_site) {
     arma::Mat<int> m1 = as<arma::Mat<int>>(temp);
     arma::Mat<int> m2 = as<arma::Mat<int>>(temp2);
     arma::Mat<int> m3 = join_cols(m1, m2);
-    if(sum_site[1] == 1 && sum > 5.0) {
+    if(sum_site[1] == 1 && sum >= 4.0) {
       arma::Mat<int> m4 = {hap_site[0], hap_site[0], hap_site[0], hap_site[0]};
       arma::Mat<int> out = join_cols(m4, m3);
       temp = wrap(out);
@@ -339,11 +339,11 @@ IntegerMatrix remake_linkage(IntegerMatrix sub_link, unsigned int num) {
         if (i1 == i)
           continue;
         int count = 0;
-        List nuc_info = unique_map(link_uni(i1, _));
-        IntegerVector nuc1 = nuc_info["values"];
-        IntegerVector nuc_count1 = nuc_info["lengths"];
-        if(nuc_count1[0] >= nuc_count[0])
-          continue;
+        // List nuc_info = unique_map(link_uni(i1, _));
+        // IntegerVector nuc1 = nuc_info["values"];
+        // IntegerVector nuc_count1 = nuc_info["lengths"];
+        // if(nuc_count1[0] >= nuc_count[0])
+        //   continue;
         for(j = 0; j < num; ++j)
           if(!idx(j))
             if(link_uni(i, j) == link_uni(i1, j))
@@ -448,26 +448,26 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
       for (m = 0; m < num_states; ++m) {
         exclude(m) = 0;
         IntegerVector comb = combination(m, _);
-        Rcout << comb << "\t\t";
+        // Rcout << comb << "\t\t";
         count = 0;
         for (k = 0; k < NUM_CLASS; ++k) {
-          Rcout << "k" << k << "\n";
+          // Rcout << "k" << k << "\n";
           for (j = 0; j < num; ++j) {
             IntegerMatrix hidden = hidden_states[location[j]];
             idx = comb[j];
             sub_hap(k, j) = hidden(idx, k);
-            Rcout << sub_hap(k, j) << "\t";
+            // Rcout << sub_hap(k, j) << "\t";
           }
-          Rcout << "\n read " << "\n";
+          // Rcout << "\n read " << "\n";
           for (i = 0; i < n_observation; i++) {
             int flag = 0;
             for (j = 0; j < num - 1; ++j) {
-              Rcout << sub_link(i, j) << "\t" << sub_link(i, j + 1);
+              // Rcout << sub_link(i, j) << "\t" << sub_link(i, j + 1);
               // if (sub_link(i, j) != -1 && sub_link(i, j) != 4)
               if (sub_hap(k, j) == sub_link(i, j) && sub_hap(k, j + 1) == sub_link(i, j + 1))
                 flag++;
             }
-            Rcout << "\n" << flag << "\n" ;
+            // Rcout << "\n" << flag << "\n" ;
             if (flag >= linkage_len) {
               count++;
               break;
@@ -586,7 +586,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   
   IntegerMatrix first_comb = unique_overlap(overlapped, exclude_last, overlap_comb, overlap_loci, 
                                             overlap_new_states, overlap_num_states);
-  //find combinatio of the rest position(include 1 overlap to make sure the linkage)
+  //find combination of the rest position(include 1 overlap to make sure the linkage)
   List hidden_states = hmm_info["hidden_states"];
   IntegerVector pos_possibility = hmm_info["pos_possibility"];
   IntegerVector undecided_pos = hmm_info["undecided_pos"];
@@ -623,19 +623,13 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
       break;
     }
   
-  Rcout << "exist: " << exist << "\n";
-  Rcout << "allowed: " << allowed << "\n";
-  Rcout << "num_comb: " << combination.nrow() << "\n";
-  // for(m = 0; m < exist.size(); ++m)
-  //   for(w = 0; w < allowed.size(); ++w)
-  //     if(exist[m] == allowed[w])
-  //       num++;
-  // if(num != exist.size())
-  //   flag = 1;
+  // Rcout << "exist: " << exist << "\n";
+  // Rcout << "allowed: " << allowed << "\n";
+  // Rcout << "num_comb: " << combination.nrow() << "\n";
   if(!setequal(exist, allowed))
     flag = 1;
       
-  if(flag) {            
+  if(flag) {  // if the exist contains more possibility than allowed, only keeps the allowed          
     for(m = 0; m < combination.nrow(); ++m)
       for(w = 0; w < allowed.size(); ++w)
         if(allowed(w) == combination(m, 0))
@@ -648,10 +642,10 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   // Now give the limited combination
   int num_states = exclude_info["num_states"];
   IntegerVector exclude = exclude_info["exclude"];
-  Rcout << "exclude "<< exclude << "\n";
+  // Rcout << "exclude "<< exclude << "\n";
   IntegerMatrix next_comb(num_states, combination.ncol());
   count = 0;
-  // Now combine first and second part[make sure the connection states appears(although i might be excluded at rhe second part) ]
+  // Now combine first and second part[make sure the connection states appear]
   if(flag) {
     for(m = 0; m < num; ++m)
       if(!exclude[m])
@@ -662,31 +656,36 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
           next_comb(count++, _) = combination(m, _);
   }
   // if next_comb does not contain one of the states in allowed, add it back (use the one w/ smallest index)
-  // IntegerVector new_exist = next_comb[, 0];
-  // if(!setequal(new_exist, allowed)) {
-  //   IntegerVector diff = setdiff(new_exist, allowed);
-  //   IntegerMatrix extra(diff.size(), combination.ncol());
-  //   arma::Mat<int> m1 = as<arma::Mat<int>>(next_comb);
-  //   count = 0;
-  //   if(flag) {
-  //     for(w = 0; w < diff.size(); ++w)
-  //       for(m = 0; m < num; ++m)
-  //         if(new_combination(m, 0) == diff[w]) {
-  //           extra(count++, _) = new_combination(m, _);
-  //           break;
-  //         }
-  //   } else {
-  //     for(w = 0; w < diff.size(); ++w)
-  //       for(m = 0; m < num; ++m)
-  //         if(combination(m, 0) == diff[w]) {
-  //           extra(count++, _) = combination(m, _);
-  //           break;
-  //         }
-  //   }
-  //   arma::Mat<int> m2 = as<arma::Mat<int>>(extra);
-  //   m1.insert_rows(1, m2);
-  //   next_comb = wrap(m1);
-  // }
+  // this will introduce more states not shown in the reads linkage, but to keep the trans works, have to...
+  IntegerVector new_exist = next_comb(_, 0);
+  if(!setequal(new_exist, allowed)) {
+    IntegerVector diff = setdiff(allowed, new_exist);
+    Rcout << "add more possibilities " << diff << "\n";;
+    IntegerMatrix extra(diff.size(), combination.ncol());
+    arma::Mat<int> m1 = as<arma::Mat<int>>(next_comb);
+    next_comb = IntegerMatrix(num_states + diff.size(), combination.ncol());
+    count = 0;
+    if(flag) {
+      for(w = 0; w < diff.size(); ++w)
+        for(m = 0; m < new_combination.nrow(); ++m)
+          IntegerVector tmp = new_combination(m, _);
+          if(new_combination(m, 0) == diff[w]) {
+            extra(count++, _) = new_combination(m, _);
+            break;
+          }
+    } else {
+      for(w = 0; w < diff.size(); ++w)
+        for(m = 0; m < combination.nrow(); ++m)
+          IntegerVector tmp = combination(m, _);
+          if(combination(m, 0) == diff[w]) {
+            extra(count++, _) = combination(m, _);
+            break;
+          }
+    }
+    arma::Mat<int> m2 = as<arma::Mat<int>>(extra);
+    m1.insert_rows(1, m2);
+    next_comb = wrap(m1);
+  }
  
   IntegerVector new_col = next_comb(_, 0);
   List second_uni = unique_map(new_col); // start might not from 0 (e.g. ailgnment starts from 2)

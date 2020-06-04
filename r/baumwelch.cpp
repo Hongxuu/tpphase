@@ -180,7 +180,8 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
   max_penality = max(alp);
   for (w = 0; w < num_states[t_max - 1]; ++w)
     full_llk += exp(alp[w] - max_penality);
-  Rcout << "full log likelihood: " << log(full_llk) + max_penality << "\n";
+  full_llk = log(full_llk) + max_penality;
+  Rcout << "full log likelihood: " << full_llk << "\n";
   
   List par_hmm_out = List::create(
     Named("phi") = phi,
@@ -189,7 +190,8 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
     Named("alpha") = alpha,
     Named("beta_wt") = beta_wt,
     Named("gamma") = gamma,
-    Named("xi") = xi);
+    Named("xi") = xi,
+    Named("full_llk") = full_llk);
   return(par_hmm_out);
 }
 
@@ -430,7 +432,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
   List comb(t_max);
   IntegerMatrix hap = fill_all_hap(hidden_states, hap_length, n_row);
   IntegerVector new_num_states(t_max);
-  Rcout << "overlap" << "\n";
+  // Rcout << "overlap" << "\n";
   // List overlap_info = get_overlap(p_tmax, time_pos, num_states, undecided_pos, t_max, hap_min_pos);
   List overlapped = overlap_info["overlapped"];
   IntegerVector overlapped_id = overlap_info["overlapped_id"];
@@ -474,17 +476,17 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
   for(t = 0; t < t_max; ++t) {
     if(num_states[t] != 1 && overlapped_id[t] != -1) {
       int count = 0;
-      Rcout << t << "\t";
+      // Rcout << t << "\t";
         int identical = 0;
         int last_t = overlapped_id[t];
         IntegerVector overlapped_t = overlapped[t];
         IntegerVector loci_lastt = loci[last_t];
         IntegerVector loci_currt = loci[t];
         int old_state;
-        Rcout << last_t << "\n";
-        Rcout << "overlapped: " << overlapped_t << "\n";
-        Rcout << "loci_lastt: " << loci_lastt << "\n";
-        Rcout << "loci_currt: " << loci_currt << "\n";
+        // Rcout << last_t << "\n";
+        // Rcout << "overlapped: " << overlapped_t << "\n";
+        // Rcout << "loci_lastt: " << loci_lastt << "\n";
+        // Rcout << "loci_currt: " << loci_currt << "\n";
         int flag = 0;
         if(loci_lastt[0] <= loci_currt[0] && loci_lastt[loci_lastt.size() - 1] >= loci_currt[loci_currt.size() - 1]) {
           if(loci_lastt.size() > loci_currt.size()) { // if current is in its overlap
@@ -510,7 +512,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
               comb_in = IntegerMatrix(tmp.nrow(), tmp.ncol());
               comb_in = tmp;
             }
-            Rcout << "last t:\t" << new_num_states[last_t] << "\told\t" << old_state << "\n";
+            // Rcout << "last t:\t" << new_num_states[last_t] << "\told\t" << old_state << "\n";
             IntegerMatrix new_comb = unique_overlap(overlapped_t, exclude_last, comb_in, loci_lastt, new_num_states[last_t], old_state);
             new_num_states[t] = new_comb.nrow();
             comb[t] = new_comb;
@@ -526,7 +528,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
                 break;
               }
             if(!identical) {
-              Rcout << "same sites\n";
+              // Rcout << "same sites\n";
               IntegerMatrix new_comb = comb[last_t];
               comb[t] = new_comb;
               new_num_states[t] = new_num_states[last_t];
@@ -540,6 +542,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
           }
         } 
         else {
+          // new variable site in this t, need to get the new combination while making sure it can be transferred to the next t
           for(st = 0; st < n_start; ++st)
             if(last_t == start_t[st]) {
               flag = 1;
@@ -578,10 +581,10 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
       new_num_states[t] = 1;
       comb[t] = -1;
     }
-    Rcout << "new no. states: " << new_num_states[t] << "\n";
+    // Rcout << "new no. states: " << new_num_states[t] << "\n";
     full_hap[t] = full_hap_t;
   }
-  // I don't understand why directly give values would be overwritted, it doesn't work!!!!
+  // I don't understand why directly give values would be overwritted, it doesn't work!
   for(t = 0; t < n_start; ++t)
     full_hap[start_t[t]] = full_hap_ns[t];
   
