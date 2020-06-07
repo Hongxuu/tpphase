@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <RcppArmadillo.h>
 
+#include "utils.h"
 // [[Rcpp::depends(RcppArmadillo)]]
 using namespace Rcpp;
 using namespace std;
@@ -46,7 +47,7 @@ List unique_map(const Rcpp::IntegerVector & v)
                       Named("values") = result_keys);
 }
 
-// hash a matrix by row
+// hash a matrix by row, output the index of unique and the same rows
 List hash_mat(IntegerMatrix x) {
   int n = x.nrow() ;
   int nc = x.ncol() ;
@@ -123,6 +124,27 @@ IntegerVector find_max(List ls, int n_obs) {
 //   return List::create( _["all_id"] = all_id, _["idx"] = idx );
 // }
 
+// order hased mat by the second column
+// IntegerMatrix subset(idx.size(), 2);
+// IntegerMatrix ordered_read(idx.size(), 2);
+// IntegerVector order(idx.size());
+// int summ = 0;
+// 
+// for(k = 0; k < nuc1.size(); ++k)
+//   for(i = 0; i < idx.size(); ++i) {
+//     int pre_read = link(idx[i], j + 1);
+//     if(pre_read == nuc1[k])
+//       order[i] = summ++;
+//   }
+// 
+// Rcout << order<< "\n";
+// for(i = 0; i < idx.size(); ++i) {
+//   IntegerVector tmp = link(idx[i], _);
+//   subset(i, _) = tmp[Range(j, j + 1)];
+// }
+// for(i = 0; i < idx.size(); ++i)
+//   ordered_read(order[i], _) = subset(i, _);
+
 // subset matrix by row index
 IntegerMatrix ss(IntegerMatrix X_, IntegerVector ind_) {
   
@@ -146,4 +168,70 @@ arma::mat unique_rows(const arma::mat& m) {
       if (approx_equal_cpp(m.row(i), m.row(j))) { ulmt(j) = 1; break; }
       
       return m.rows(find(ulmt == 0));
+}
+
+vector<vector<int> > cart_product (const vector<vector<int> > &v) {
+  vector<vector<int> > s = {{}};
+  for (const auto& u : v) {
+    vector<vector<int> > r;
+    for (const auto& x : s) {
+      for (const auto y : u) {
+        r.push_back(x);
+        r.back().push_back(y);
+      }
+    }
+    s = move(r);
+  }
+  return s;
+}
+
+IntegerMatrix call_cart_product(IntegerVector len) {
+  unsigned int row = len.size();
+  vector<vector<int> > vec(row);
+  unsigned int col, count, i, j;
+  for (i = 0; i < row; i++) {
+    count = 1;
+    col = len[i];
+    vec[i] = vector<int>(col);
+    for (j = 0; j < col; j++)
+      vec[i][j] = count++;
+  }
+  vector<vector<int> > res = cart_product(vec);
+  IntegerMatrix out(res.size(), row);
+  for(i = 0; i < res.size(); ++i)
+    for(j = 0; j < row; ++j) 
+      out(i, j) = res[i][j] - 1; //minus 1 for the index in C
+  
+  return(out);
+}
+
+IntegerMatrix comb_element(List len, IntegerVector flag, unsigned int row) {
+  vector<vector<int> > vec(row);
+  unsigned int col, i, j;
+  for (i = 0; i < len.size(); i++) {
+    if(flag[i])
+      continue;
+    IntegerVector row_vec = len[i];
+    col = row_vec.size();
+    vec[i] = vector<int>(col);
+    for (j = 0; j < col; j++)
+      vec[i][j] = row_vec[j];
+  }
+  vector<vector<int> > res = cart_product(vec);
+  IntegerMatrix out(res.size(), row);
+  for(i = 0; i < res.size(); ++i)
+    for(j = 0; j < row; ++j) 
+      out(i, j) = res[i][j];
+  return(out);
+}
+
+IntegerMatrix call_permute(vector<int> a) {
+  Permutation per;
+  vector<vector<int> > res =  per.permuteUnique(a);
+  IntegerMatrix permutation(res.size(), res[0].size());
+  for (int i = 0; i < res.size(); i++)
+    for (int j = 0; j < res[i].size(); j++) 
+      permutation(i, j) = res[i][j];
+  
+  return(permutation);
 }

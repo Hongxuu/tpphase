@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string>
 #include <unordered_map>
+#include "utils.h"
 
 using namespace Rcpp;
 using namespace std;
@@ -14,71 +15,6 @@ using namespace std;
 // # t0l = remake_linkage(linkage_in[, 1:6], 6)
 // # t0 = limit_comb_t0(comb_info_t0$combination, HMM$hidden_states, comb_info_t0$location, linkage_in, comb_info_t0$num, 0, HMM$num_states[1]);
 
-List unique_map(const Rcpp::IntegerVector & v)
-{
-  // Initialize a map
-  std::map<double, int> Elt;
-  Elt.clear();
-  
-  // Count each element
-  for (int i = 0; i != v.size(); ++i)
-    Elt[ v[i] ] += 1;
-  
-  // Find out how many unique elements exist... 
-  int n_obs = Elt.size();
-  // If the top number, n, is greater than the number of observations,
-  // then drop it.  
-  int n = n_obs;
-  
-  // Pop the last n elements as they are already sorted. 
-  // Make an iterator to access map info
-  std::map<double,int>::iterator itb = Elt.end();
-  // Advance the end of the iterator up to 5.
-  std::advance(itb, -n);
-  
-  // Recast for R
-  NumericVector result_vals(n);
-  NumericVector result_keys(n);
-  
-  unsigned int count = 0;
-  // Start at the nth element and move to the last element in the map.
-  for (std::map<double,int>::iterator it = itb; it != Elt.end(); ++it) {
-    // Move them into split vectors
-    result_keys(count) = it->first;
-    result_vals(count) = it->second;
-    count++;
-  }
-  return List::create(Named("lengths") = result_vals,
-                      Named("values") = result_keys);
-}
-// [[Rcpp::export]]
-List hash_mat(IntegerMatrix x) {
-  int n = x.nrow() ;
-  int nc = x.ncol() ;
-  std::vector<string> hashes(n) ;
-  // arma::Mat<int> X = as<arma::Mat<int>>(x);
-  for (int i = 0; i < n; i++) {
-    string s = "";  
-    for(int j = 0; j < nc; j++)  
-      s += to_string(x(i,j));  
-    hashes[i] = s;
-  }
-  
-  std::unordered_map<string, int> map;
-  for (int i = 0; i < n; i++)
-    map[hashes[i]];
-
-  int nres = map.size();
-  IntegerVector idx(nres);
-  
-  int i = 0; 
-  for (auto itr = map.begin(); itr != map.end(); ++itr) { 
-    idx[i] = itr->second;
-  } 
- 
-  return List::create(  _["idx"] = idx );
-
-}
 
 vector<vector<int> > cart_product (const vector<vector<int> > &v) {
   vector<vector<int> > s = {{}};
@@ -94,7 +30,46 @@ vector<vector<int> > cart_product (const vector<vector<int> > &v) {
   }
   return s;
 }
+
+vector<vector<double> > cart_product_dbl (const vector<vector<double> > &v) {
+  vector<vector<double> > s = {{}};
+  for (const auto& u : v) {
+    vector<vector<double> > r;
+    for (const auto& x : s) {
+      for (const auto y : u) {
+        r.push_back(x);
+        r.back().push_back(y);
+      }
+    }
+    s = move(r);
+  }
+  return s;
+}
+
+NumericMatrix comb_element_dbl(List len, IntegerVector flag, unsigned int row) {
+  vector<vector<double> > vec(row);
+  unsigned int col, i, j, count = 0;
+  for (i = 0; i < flag.size(); i++) {
+    if(flag[i])
+      continue;
+    NumericVector row_vec = len[i];
+    col = row_vec.size();
+    vec[count] = vector<double>(col);
+    for (j = 0; j < col; j++)
+      vec[count][j] = row_vec[j];
+    count++;
+  }
+  vector<vector<double> > res = cart_product_dbl(vec);
+  NumericMatrix out(res.size(), row);
+  for(i = 0; i < res.size(); ++i)
+    for(j = 0; j < row; ++j)
+      out(i, j) = res[i][j];
+  return(out);
+}
+
 // [[Rcpp::export]]
+// flag indicate which element to be kept
+// row is the number of elements of list len
 IntegerMatrix comb_element(List len, IntegerVector flag, unsigned int row) {
   vector<vector<int> > vec(row);
   unsigned int col, i, j, count = 0;
@@ -116,19 +91,323 @@ IntegerMatrix comb_element(List len, IntegerVector flag, unsigned int row) {
   return(out);
 }
 
-template <typename T>
-inline bool approx_equal_cpp(const T& lhs, const T& rhs, double tol = 0.00000001) {
-  return arma::approx_equal(lhs, rhs, "absdiff", tol);
-}
 // [[Rcpp::export]]
-arma::mat unique_rows(const arma::mat& m) {
-  arma::uvec ulmt = arma::zeros<arma::uvec>(m.n_rows);
-  for (arma::uword i = 0; i < m.n_rows; i++)
-    for (arma::uword j = i + 1; j < m.n_rows; j++)
-      if (approx_equal_cpp(m.row(i), m.row(j))) { ulmt(j) = 1; break; }
-      
-      return m.rows(find(ulmt == 0));
+IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector initial, 
+                          List possi_nuc, int i) {
+  unsigned int j, k, l, m , w;
+  List comb_in(link.ncol());
+  List llk_in(link.ncol());
+  int id = 0;
+  for(j = 0; j < link.ncol(); ++j) {
+    IntegerVector nuc = possi_nuc[j];
+    if(link(i, j) != -1) {
+      for(l = 0 ; l < nuc.size(); ++l)
+        if(link(i, j) == nuc[l]) {
+          id = l;
+          break;
+        }
+      comb_in(j) = link(i, j);
+    } else {
+      comb_in(j) = nuc;
+    }
+  }
+  IntegerVector flag(link.ncol());
+  // IntegerMatrix poss_reads = comb_element(comb_in, flag, link.ncol());
+  
+  for(j = 0; j < link.ncol(); ++j) {
+    IntegerVector nuc = possi_nuc[j];
+    if(link(i, j) != -1) {
+      for(l = 0 ; l < nuc.size(); ++l)
+        if(link(i, j) == nuc[l]) {
+          id = l;
+          break;
+        }
+      if(j == 0) {
+        llk_in(j) = initial[id];
+      } else {
+        NumericMatrix trans = transition[j - 1];
+        IntegerVector nuc2 = possi_nuc[j - 1];
+        int id1 = 0;
+        if(link(i, j - 1) != -1) {
+          for(l = 0 ; l < nuc2.size(); ++l)
+            if(link(i, j - 1) == nuc2[l]) {
+              id1 = l;
+              break;
+            }
+            llk_in(j) = trans(id1, id);
+        } else{
+          llk_in(j) = trans(_, id);
+        }
+      }
+    } else {
+      if(j == 0)
+        llk_in[j] = initial;
+      else {
+        NumericMatrix trans = transition[j - 1];
+        IntegerVector nuc2 = possi_nuc[j - 1];
+        if(link(i, j - 1) != -1) {
+          for(l = 0 ; l < nuc2.size(); ++l)
+            if(link(i, j) == nuc2[l]) {
+              id = l;
+              break;
+            }
+          llk_in(j) = trans(id, _);
+        } else {
+          llk_in(j) = trans;
+        }
+      }
+    }
+  }
+  List path(llk_in.size());
+  for(k = 0; k < llk_in.size(); ++k) {
+    IntegerVector nuc = comb_in(k);
+    NumericVector path_t(nuc.size());
+    if(k == 0) {
+      for(l = 0; l < nuc.size(); ++l) {
+        NumericVector trans = llk_in(k);
+        path_t(l) = trans(l);
+      }
+    Rcout << path_t << "\n";
+    } else {
+      NumericVector tran = llk_in(k);
+      int len = tran.size();
+      int nrow = len/nuc.size();
+      tran.attr("dim") = Dimension(nrow, nuc.size());
+      NumericMatrix trans = as<NumericMatrix>(tran);
+      for(m = 0; m < trans.ncol(); ++m) {
+        NumericVector path_last = path[k - 1];
+        double max = -INFINITY;
+        for(w = 0; w < trans.nrow(); ++w) {
+          double max_prob = path_last(w) + trans(w, m);
+          if (max_prob > max)
+            max = max_prob;
+        }
+        path_t(m) = max;
+      }
+      Rcout << path_t << "\n";
+    }
+    path(k) = path_t;
+  }
+  IntegerVector hidden_state(llk_in.size());
+  for (k = llk_in.size(); k --> 0;) {
+    IntegerVector nuc = comb_in(k);
+    double max = -INFINITY;
+    int max_id = 0;
+    NumericVector path_t = path(k);
+    for(m = 0; m < nuc.size(); ++m) {
+      if (path_t(m) > max) {
+        max_id = m;
+        max = path_t(m);
+      }
+    }
+    hidden_state(k) = nuc[max_id];
+  }
+
+  // get the combination of reads and corresponding transition matrix
+  // List ls = List::create( // possible comb
+  //   Named("poss_reads") = poss_reads,
+  //   Named("comb_in") = comb_in,
+  //   Named("llk_in") = llk_in, 
+  //   Named("read") = hidden_state);
+  
+  return(hidden_state);
 }
+
+// [[Rcpp::export]]
+IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
+  unsigned int i, j, k, l;
+  //remove non-covered reads
+  NumericVector initial;
+  IntegerMatrix link_pre(sub_link.nrow(), sub_link.ncol());
+  int count = 0;
+  for(i = 0; i < sub_link.nrow(); ++i) {
+    IntegerVector read = sub_link(i, _);
+    int rowsum = sum(read);
+    if(rowsum == -num)
+      continue;
+    link_pre(count++, _) = sub_link(i, _);
+  }
+  IntegerMatrix link = link_pre(Range(0, count - 1), _);
+  List transition(link.ncol() - 1);
+  List possi_nuc(link.ncol());
+  for(j = 0 ; j < link.ncol() - 1; ++j) {
+    List nuc_info = unique_map(link(_, j));
+    IntegerVector nuc = nuc_info["values"];
+    IntegerVector nuc_count = nuc_info["lengths"];
+    // Rcout << j << "\t" << nuc << "\t" << nuc_count << "\n";
+    int state1 = nuc.size();
+    int start = 0;
+    possi_nuc[j] = nuc;
+    if(nuc[0] == -1) {
+      state1 = nuc.size() - 1;
+      start = 1;
+      possi_nuc[j] = nuc[Range(1, nuc.size() - 1)];
+    }
+    if(j == 0) {
+      double total = count;
+      initial = IntegerVector(state1);
+      if(nuc[0] == -1) {
+        for(k = 1; k < nuc.size(); ++k)
+          initial[k - 1] = log(nuc_count[k]/(total - nuc_count[0])); // in the ascending order
+      }
+      else {
+        for(k = 0; k < nuc.size(); ++k)
+          initial[k] = log(nuc_count[k]/total);
+      }
+    }
+    // unique rows and the count
+    List nuc1_info = unique_map(link(_, j + 1));
+    IntegerVector nuc1 = nuc1_info["values"];
+    int state2 = nuc1.size();
+    possi_nuc[j + 1] = nuc1;
+    if(nuc1[0] == -1) {
+      possi_nuc[j + 1] = nuc1[Range(1, nuc1.size() - 1)];
+      state2 = nuc1.size() - 1;
+    }
+    
+    List unique_row = hash_mat(link(_, Range(j, j + 1)));
+    List all_id = unique_row["all_id"];
+    IntegerVector idx = unique_row["idx"];
+    NumericMatrix trans(state1, state2);
+    for(k = 0; k < state1; ++k)
+      for(i = 0; i < state2; ++i)
+        trans(k, i) = R_NegInf;
+    // Rcout << state1 << "\t" << state2 << "\n";
+    
+    for(k = start; k < nuc.size(); ++k) {
+      // Rcout<< "\n" << nuc[k] << "\n";
+      for(i = 0; i < idx.size(); ++i) {
+        IntegerVector tmp = link(idx[i], _);
+        IntegerVector sub_read = tmp[Range(j, j + 1)];
+        // IntegerVector sub_read = ordered_read(i, _);
+        if(sub_read[0] == -1 || sub_read[1] == -1)
+          continue;
+        // Rcout << sub_read << "\n";
+        IntegerVector sub_id = all_id[i];
+        double nu = sub_id.size();
+        double de = 0;
+        int col_id = 0;
+        int flag = 0;
+        if(state2 < nuc1.size())
+          flag = 1;
+        for(l = 0; l < nuc1.size(); ++l)
+          if(nuc1[l] != -1 && nuc1[l] == sub_read[1])
+            col_id = l - flag;
+          // Rcout <<  col_id << "\n" ;
+          if(nuc[k] == sub_read[0]) {
+            de = nuc_count[k];
+            trans(k - start, col_id) = log(nu/de); // log likelihood
+          }
+      }
+    }
+    transition[j] = trans;
+  }
+  
+  // now use MC to impute the missing nuc
+  arma::mat uniqu_link = unique_rows(as<arma::mat>(link));
+  IntegerMatrix sub_uni_link = wrap(uniqu_link);
+  IntegerMatrix mc_reads(sub_uni_link.nrow(), sub_uni_link.ncol());
+  for(i = 0; i < sub_uni_link.nrow(); ++i) {
+    int flag = 0;
+    for(j = 0; j < sub_uni_link.ncol(); ++j) {
+      if(sub_uni_link(i, j) == -1) {
+        flag = 1;
+        break;
+      }
+    }
+    if(!flag) {
+      mc_reads(i, _) = sub_uni_link(i, _);
+      continue;
+    }
+    mc_reads(i, _) = best_branch(sub_uni_link, transition, initial, possi_nuc, i);
+  }
+  
+  arma::mat uniqu = unique_rows(as<arma::mat>(mc_reads));
+  IntegerMatrix uni = wrap(uniqu);
+  // List ls = List::create(
+  //   Named("transition") = transition, // possible comb
+  //   Named("initial") = initial,
+  //   Named("possi_nuc") = possi_nuc,
+  //   Named("link") = sub_uni_link,
+  //   Named("reads") = uni);
+  // 
+  return(uni);
+}
+/*
+ Given a binary tree, print out all of its root-to-leaf
+ paths, one per line. Uses a recursive helper to do the work.
+ */
+// void printPaths(struct node* node) {
+//   int path[1000];
+//   printPathsRecur(node, path, 0);
+// }
+
+// /*
+//  Recursive helper function -- given a node, and an array containing
+//  the path from the root node up to but not including this node,
+//  print out all the root-leaf paths.
+//  */
+// void printPathsRecur(struct node* node, int path[], int pathLen) {
+//   if (node==NULL) return;
+//   
+//   // append this node to the path array
+//   path[pathLen] = node->data;
+//   pathLen++;
+//   
+//   // it's a leaf, so print the path that led to here
+//   if (node->left==NULL && node->right==NULL) {
+//     printArray(path, pathLen);
+//   }
+//   else {
+//     // otherwise try both subtrees
+//     printPathsRecur(node->left, path, pathLen);
+//     printPathsRecur(node->right, path, pathLen);
+//   }
+// }
+// 
+// // Utility that prints out an array on a line.
+// void printArray(int ints[], int len) {
+//   int i;
+//   for (i=0; i<len; i++) {
+//     Rcout << ints[i] << "\t";
+//   }
+//   Rcout << "\n";
+// }
+
+
+
+
+
+// List hash_mat(IntegerMatrix x) {
+//   int n = x.nrow() ;
+//   int nc = x.ncol() ;
+//   std::vector<string> hashes(n) ;
+//   // arma::Mat<int> X = as<arma::Mat<int>>(x);
+//   for (int i = 0; i < n; i++) {
+//     string s = "";  
+//     for(int j = 0; j < nc; j++)  
+//       s += to_string(x(i,j));  
+//     hashes[i] = s;
+//   }
+//   
+//   std::unordered_map<string, int> map;
+//   for (int i = 0; i < n; i++)
+//     map[hashes[i]];
+// 
+//   int nres = map.size();
+//   IntegerVector idx(nres);
+//   
+//   int i = 0; 
+//   for (auto itr = map.begin(); itr != map.end(); ++itr) { 
+//     idx[i] = itr->second;
+//   } 
+//  
+//   return List::create(  _["idx"] = idx );
+// 
+// }
+
+
+
 // [[Rcpp::export]]
 IntegerMatrix remake_linkage(IntegerMatrix sub_link, unsigned int num) {
   unsigned int i, j, k, i1;

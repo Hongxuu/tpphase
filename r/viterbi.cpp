@@ -61,8 +61,7 @@ IntegerMatrix viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm)
  /*
   * find the path (backtrace)
   */
- IntegerVector hidden_state(t_max);
- NumericVector hidden_value(t_max);
+  IntegerVector hidden_state(t_max);
   for (t = t_max; t --> 0;) {
     max = -INFINITY;
     max_id = 0;
@@ -72,12 +71,11 @@ IntegerMatrix viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm)
         max_id = m;
         max = path_t(m);
       }
-      hidden_state(t) = max_id;
     }
-    hidden_value(t) = path_t(max_id);
+    hidden_state(t) = max_id;
   }
   /*
-   * make the haplotype (for the overlap region: choose the one that contains the linkage information)?
+   * make the haplotype
    */
   for(t = 0; t < t_max; ++t) {
     List full_hap_t = hap_info(t);

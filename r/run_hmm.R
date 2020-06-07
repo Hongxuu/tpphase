@@ -34,7 +34,7 @@ call_aln(ref_nameA = "Genome_A:0-1000", ref_nameB = "Genome_B:0-1000",
 
 altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", datafile = NULL, output = NULL, cut_off = 0.1,
                           formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 50, res_file = NULL,
-                          n_class = 4, num_cat = 4, seed = 0, tol = 1e-06, ncores = 2, old_version = 0, eta = rep(0.25, 4))  {
+                          n_class = 4, num_cat = 4, seed = 0, tol = 1e-05, ncores = 2, old_version = 0, eta = rep(0.25, 4))  {
   registerDoParallel(cores = ncores)  
   ## make universial reference
   cat("preparing data: \n");
@@ -61,7 +61,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   hap_length <- dat_info$ref_length_max - dat_info$ref_start
   linkage_in <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
   overlap_info <- get_overlap(HMM$p_tmax, HMM$time_pos, HMM$num_states, HMM$undecided_pos, HMM$t_max, dat_info$ref_start)
-  hap_full_info <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start)
+  hap_full_info <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start, use_MC = 1)
   hap_full <- hap_full_info$full_hap
   HMM$num_states <- hap_full_info$new_num_states
   
@@ -105,7 +105,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   data$nuc <- to_char_r(data$nuc)
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
-  for (m in (1:5)) {
+  for (m in (1:max_iter)) {
     cat("iter: ", m, "\n");
     full_llk <- bw$par_hmm_bf$full_llk
     par_hmm_old <- bw$par_hmm
@@ -116,7 +116,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
     ## estimation other parameters
     bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
                           beta = tmp$par$beta, PD_LENGTH = nrow(par$beta), hash_idx = data_new$idx)
-    
+    cat(bw$par_aux$eta)
     if (((all(abs(exp(bw$par_hmm$phi) - exp(phi_old)) < tol) == TRUE) &&
         all(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", tol) == TRUE) &&
         all(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", tol) == TRUE)) ||
@@ -139,22 +139,17 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   snps <- haplotypes[, snp_location]
   snp_location <- snp_location + dat_info$ref_start
   
-  res$no_reads_t <- HMM$n_t
-  res$time_pos <- HMM$time_pos
+  res$full_llk <- bw$par_hmm_bf$full_llk
   res$haplotypes <- haplotypes
   res$snps <- snps
   res$snp_location <- snp_location
+  res$par <- bw
   if(!is.null(res_file))
     fnlist(res, fil = res_file)
   return(res)
 }
 
 
-a <- altragenotype(datafile = datafile, alignment = alignment, max_iter = 20)
--1501.96
-b <- altragenotype(datafile = datafile, alignment = alignment, max_iter = 20, 
-                  eta = c(0.15, 0.25, 0.35, 0.15))
-0.2388382 0.2617519 0.2663126 0.2330973
-0.2250768 0.2593007 0.2747776 0.2408448
--1500.76
+
+
 

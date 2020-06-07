@@ -12,18 +12,6 @@ using namespace std;
 #define LINKAGE_LEN 2
 
 // [[Rcpp::depends(RcppArmadillo)]]
-class Permutation {
-public:
-  vector<vector<int> > permuteUnique(vector<int>& nums) {
-    vector<vector<int> > res;
-    sort(nums.begin(), nums.end());
-    res.push_back(nums);
-    while (next_permutation(nums.begin(), nums.end())) {
-      res.push_back(nums);
-    }
-    return res;
-  }
-};
 
 IntegerMatrix Twopossible(IntegerVector a) {
   IntegerVector temp = {a[0], a[1], a[0], a[1], a[1], a[0], a[1], a[0]};
@@ -36,17 +24,6 @@ IntegerMatrix Fourpossible(IntegerVector small, int big) {
                         big, big, small[0], small[1], big, big, small[1], small[0]};
   temp.attr("dim") = Dimension(4, 4);
   return(as<IntegerMatrix>(temp));
-}
-
-IntegerMatrix call_permute(vector<int> a) {
-  Permutation per;
-  vector<vector<int> > res =  per.permuteUnique(a);
-  IntegerMatrix permutation(res.size(), res[0].size());
-  for (int i = 0; i < res.size(); i++)
-    for (int j = 0; j < res[i].size(); j++) 
-      permutation(i, j) = res[i][j];
-  
-  return(permutation);
 }
 
 IntegerMatrix call_permute_N(vector<int> a, unsigned int genome_A) {
@@ -309,6 +286,7 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
   return(ls);
 }
 
+// use guess to make linkage (based on observed data)
 IntegerMatrix remake_linkage(IntegerMatrix sub_link, unsigned int num) {
   unsigned int i, j, k, i1;
   arma::mat sub_uni = unique_rows(as<arma::mat>(sub_link));
@@ -425,10 +403,253 @@ IntegerMatrix remake_linkage(IntegerMatrix sub_link, unsigned int num) {
   IntegerMatrix out = wrap(new_linkage);
   return(out);
 }
+
+IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector initial, 
+                          List possi_nuc, int i) {
+  unsigned int j, k, l, m , w;
+  List comb_in(link.ncol());
+  List llk_in(link.ncol());
+  int id = 0;
+  for(j = 0; j < link.ncol(); ++j) {
+    IntegerVector nuc = possi_nuc[j];
+    if(link(i, j) != -1) {
+      for(l = 0 ; l < nuc.size(); ++l)
+        if(link(i, j) == nuc[l]) {
+          id = l;
+          break;
+        }
+        comb_in(j) = link(i, j);
+    } else {
+      comb_in(j) = nuc;
+    }
+  }
+  IntegerVector flag(link.ncol());
+  // IntegerMatrix poss_reads = comb_element(comb_in, flag, link.ncol());
+  
+  for(j = 0; j < link.ncol(); ++j) {
+    IntegerVector nuc = possi_nuc[j];
+    if(link(i, j) != -1) {
+      for(l = 0 ; l < nuc.size(); ++l)
+        if(link(i, j) == nuc[l]) {
+          id = l;
+          break;
+        }
+        if(j == 0) {
+          llk_in(j) = initial[id];
+        } else {
+          NumericMatrix trans = transition[j - 1];
+          IntegerVector nuc2 = possi_nuc[j - 1];
+          int id1 = 0;
+          if(link(i, j - 1) != -1) {
+            for(l = 0 ; l < nuc2.size(); ++l)
+              if(link(i, j - 1) == nuc2[l]) {
+                id1 = l;
+                break;
+              }
+              llk_in(j) = trans(id1, id);
+          } else{
+            llk_in(j) = trans(_, id);
+          }
+        }
+    } else {
+      if(j == 0)
+        llk_in[j] = initial;
+      else {
+        NumericMatrix trans = transition[j - 1];
+        IntegerVector nuc2 = possi_nuc[j - 1];
+        if(link(i, j - 1) != -1) {
+          for(l = 0 ; l < nuc2.size(); ++l)
+            if(link(i, j) == nuc2[l]) {
+              id = l;
+              break;
+            }
+            llk_in(j) = trans(id, _);
+        } else {
+          llk_in(j) = trans;
+        }
+      }
+    }
+  }
+  List path(llk_in.size());
+  for(k = 0; k < llk_in.size(); ++k) {
+    IntegerVector nuc = comb_in(k);
+    NumericVector path_t(nuc.size());
+    if(k == 0) {
+      for(l = 0; l < nuc.size(); ++l) {
+        NumericVector trans = llk_in(k);
+        path_t(l) = trans(l);
+      }
+      Rcout << path_t << "\n";
+    } else {
+      NumericVector tran = llk_in(k);
+      int len = tran.size();
+      int nrow = len/nuc.size();
+      tran.attr("dim") = Dimension(nrow, nuc.size());
+      NumericMatrix trans = as<NumericMatrix>(tran);
+      for(m = 0; m < trans.ncol(); ++m) {
+        NumericVector path_last = path[k - 1];
+        double max = -INFINITY;
+        for(w = 0; w < trans.nrow(); ++w) {
+          double max_prob = path_last(w) + trans(w, m);
+          if (max_prob > max)
+            max = max_prob;
+        }
+        path_t(m) = max;
+      }
+      Rcout << path_t << "\n";
+    }
+    path(k) = path_t;
+  }
+  IntegerVector hidden_state(llk_in.size());
+  for (k = llk_in.size(); k --> 0;) {
+    IntegerVector nuc = comb_in(k);
+    double max = -INFINITY;
+    int max_id = 0;
+    NumericVector path_t = path(k);
+    for(m = 0; m < nuc.size(); ++m) {
+      if (path_t(m) > max) {
+        max_id = m;
+        max = path_t(m);
+      }
+    }
+    hidden_state(k) = nuc[max_id];
+  }
+  
+  // get the combination of reads and corresponding transition matrix
+  // List ls = List::create( // possible comb
+  //   Named("poss_reads") = poss_reads,
+  //   Named("comb_in") = comb_in,
+  //   Named("llk_in") = llk_in, 
+  //   Named("read") = hidden_state);
+  
+  return(hidden_state);
+}
+
+// use markov chain to make the linkage
+IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
+  unsigned int i, j, k, l;
+  //remove non-covered reads
+  NumericVector initial;
+  IntegerMatrix link_pre(sub_link.nrow(), sub_link.ncol());
+  int count = 0;
+  for(i = 0; i < sub_link.nrow(); ++i) {
+    IntegerVector read = sub_link(i, _);
+    int rowsum = sum(read);
+    if(rowsum == -num)
+      continue;
+    link_pre(count++, _) = sub_link(i, _);
+  }
+  IntegerMatrix link = link_pre(Range(0, count - 1), _);
+  List transition(link.ncol() - 1);
+  List possi_nuc(link.ncol());
+  for(j = 0 ; j < link.ncol() - 1; ++j) {
+    List nuc_info = unique_map(link(_, j));
+    IntegerVector nuc = nuc_info["values"];
+    IntegerVector nuc_count = nuc_info["lengths"];
+    // Rcout << j << "\t" << nuc << "\t" << nuc_count << "\n";
+    int state1 = nuc.size();
+    int start = 0;
+    possi_nuc[j] = nuc;
+    if(nuc[0] == -1) {
+      state1 = nuc.size() - 1;
+      start = 1;
+      possi_nuc[j] = nuc[Range(1, nuc.size() - 1)];
+    }
+    if(j == 0) {
+      double total = count;
+      initial = IntegerVector(state1);
+      if(nuc[0] == -1) {
+        for(k = 1; k < nuc.size(); ++k)
+          initial[k - 1] = log(nuc_count[k]/(total - nuc_count[0])); // in the ascending order
+      }
+      else {
+        for(k = 0; k < nuc.size(); ++k)
+          initial[k] = log(nuc_count[k]/total);
+      }
+    }
+    // unique rows and the count
+    List nuc1_info = unique_map(link(_, j + 1));
+    IntegerVector nuc1 = nuc1_info["values"];
+    int state2 = nuc1.size();
+    possi_nuc[j + 1] = nuc1;
+    if(nuc1[0] == -1) {
+      possi_nuc[j + 1] = nuc1[Range(1, nuc1.size() - 1)];
+      state2 = nuc1.size() - 1;
+    }
+    
+    List unique_row = hash_mat(link(_, Range(j, j + 1)));
+    List all_id = unique_row["all_id"];
+    IntegerVector idx = unique_row["idx"];
+    NumericMatrix trans(state1, state2);
+    for(k = 0; k < state1; ++k)
+      for(i = 0; i < state2; ++i)
+        trans(k, i) = R_NegInf;
+    // Rcout << state1 << "\t" << state2 << "\n";
+    
+    for(k = start; k < nuc.size(); ++k) {
+      // Rcout<< "\n" << nuc[k] << "\n";
+      for(i = 0; i < idx.size(); ++i) {
+        IntegerVector tmp = link(idx[i], _);
+        IntegerVector sub_read = tmp[Range(j, j + 1)];
+        // IntegerVector sub_read = ordered_read(i, _);
+        if(sub_read[0] == -1 || sub_read[1] == -1)
+          continue;
+        // Rcout << sub_read << "\n";
+        IntegerVector sub_id = all_id[i];
+        double nu = sub_id.size();
+        double de = 0;
+        int col_id = 0;
+        int flag = 0;
+        if(state2 < nuc1.size())
+          flag = 1;
+        for(l = 0; l < nuc1.size(); ++l)
+          if(nuc1[l] != -1 && nuc1[l] == sub_read[1])
+            col_id = l - flag;
+          // Rcout <<  col_id << "\n" ;
+          if(nuc[k] == sub_read[0]) {
+            de = nuc_count[k];
+            trans(k - start, col_id) = log(nu/de); // log likelihood
+          }
+      }
+    }
+    transition[j] = trans;
+  }
+  
+  // now use MC to impute the missing nuc
+  arma::mat uniqu_link = unique_rows(as<arma::mat>(link));
+  IntegerMatrix sub_uni_link = wrap(uniqu_link);
+  IntegerMatrix mc_reads(sub_uni_link.nrow(), sub_uni_link.ncol());
+  for(i = 0; i < sub_uni_link.nrow(); ++i) {
+    int flag = 0;
+    for(j = 0; j < sub_uni_link.ncol(); ++j) {
+      if(sub_uni_link(i, j) == -1) {
+        flag = 1;
+        break;
+      }
+    }
+    if(!flag) {
+      mc_reads(i, _) = sub_uni_link(i, _);
+      continue;
+    }
+    mc_reads(i, _) = best_branch(sub_uni_link, transition, initial, possi_nuc, i);
+  }
+  
+  arma::mat uniqu = unique_rows(as<arma::mat>(mc_reads));
+  IntegerMatrix uni = wrap(uniqu);
+  // List ls = List::create(
+  //   Named("transition") = transition, // possible comb
+  //   Named("initial") = initial,
+  //   Named("possi_nuc") = possi_nuc,
+  //   Named("link") = sub_uni_link,
+  //   Named("reads") = uni);
+  // 
+  return(uni);
+}
 // limit combination based on linkage information. For the states not start a new sequence(overlap, 
 // keep the last overlapped combination and then make the rest)
 List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector location,
-                   IntegerMatrix linkage_info, unsigned int num, unsigned int start_idx, unsigned int num_states) {
+                   IntegerMatrix linkage_info, unsigned int num, unsigned int start_idx, 
+                   unsigned int num_states, unsigned int use_MC) {
   unsigned int i, j, k, idx, m;
   IntegerMatrix sub_hap(NUM_CLASS, num);
   IntegerMatrix old_sub_link = linkage_info(_, Range(start_idx, start_idx + num - 1));
@@ -438,7 +659,11 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
   // int cut_off;
   // all_excluded = num_states;
   //remake the linkage
-  IntegerMatrix sub_link = remake_linkage(old_sub_link, num);
+  IntegerMatrix sub_link;
+  if(!use_MC)
+    sub_link = remake_linkage(old_sub_link, num);
+  else
+    sub_link = mc_linkage(old_sub_link, num);
   unsigned int n_observation = sub_link.nrow();
   // while (all_excluded == num_states) {
   //   cut_off = NUM_CLASS;
@@ -582,7 +807,8 @@ List find_combination(IntegerVector undecided_pos, IntegerVector pos_possibility
 }
 
 IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVector overlapped, IntegerVector exclude_last, IntegerMatrix overlap_comb, 
-                              IntegerVector overlap_loci, IntegerMatrix linkage_info, unsigned int overlap_new_states, unsigned int overlap_num_states) {
+                              IntegerVector overlap_loci, IntegerMatrix linkage_info, unsigned int overlap_new_states, unsigned int overlap_num_states,
+                              unsigned int use_MC) {
   
   IntegerMatrix first_comb = unique_overlap(overlapped, exclude_last, overlap_comb, overlap_loci, 
                                             overlap_new_states, overlap_num_states);
@@ -634,9 +860,9 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
       for(w = 0; w < allowed.size(); ++w)
         if(allowed(w) == combination(m, 0))
           new_combination(num++, _) = combination(m, _);
-    exclude_info = limit_comb_t0(new_combination(Range(0, num - 1), _), hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, num);
+    exclude_info = limit_comb_t0(new_combination(Range(0, num - 1), _), hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, num, use_MC);
   } else {
-    exclude_info = limit_comb_t0(combination, hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, combination.nrow());
+    exclude_info = limit_comb_t0(combination, hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, combination.nrow(), use_MC);
   }
         
   // Now give the limited combination
@@ -667,20 +893,22 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
     count = 0;
     if(flag) {
       for(w = 0; w < diff.size(); ++w)
-        for(m = 0; m < new_combination.nrow(); ++m)
+        for(m = 0; m < new_combination.nrow(); ++m) {
           IntegerVector tmp = new_combination(m, _);
           if(new_combination(m, 0) == diff[w]) {
             extra(count++, _) = new_combination(m, _);
             break;
           }
+        }
     } else {
       for(w = 0; w < diff.size(); ++w)
-        for(m = 0; m < combination.nrow(); ++m)
+        for(m = 0; m < combination.nrow(); ++m) {
           IntegerVector tmp = combination(m, _);
           if(combination(m, 0) == diff[w]) {
             extra(count++, _) = combination(m, _);
             break;
           }
+        }
     }
     arma::Mat<int> m2 = as<arma::Mat<int>>(extra);
     m1.insert_rows(1, m2);
@@ -711,60 +939,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   return(final_comb);
 }
 
-vector<vector<int> > cart_product (const vector<vector<int> > &v) {
-  vector<vector<int> > s = {{}};
-  for (const auto& u : v) {
-    vector<vector<int> > r;
-    for (const auto& x : s) {
-      for (const auto y : u) {
-        r.push_back(x);
-        r.back().push_back(y);
-      }
-    }
-    s = move(r);
-  }
-  return s;
-}
 
-IntegerMatrix call_cart_product(IntegerVector len) {
-  unsigned int row = len.size();
-  vector<vector<int> > vec(row);
-  unsigned int col, count, i, j;
-  for (i = 0; i < row; i++) {
-    count = 1;
-    col = len[i];
-    vec[i] = vector<int>(col);
-    for (j = 0; j < col; j++)
-      vec[i][j] = count++;
-  }
-  vector<vector<int> > res = cart_product(vec);
-  IntegerMatrix out(res.size(), row);
-  for(i = 0; i < res.size(); ++i)
-    for(j = 0; j < row; ++j) 
-      out(i, j) = res[i][j] - 1; //minus 1 for the index in C
-  
-  return(out);
-}
-
-IntegerMatrix comb_element(List len, IntegerVector flag, unsigned int row) {
-  vector<vector<int> > vec(row);
-  unsigned int col, i, j;
-  for (i = 0; i < len.size(); i++) {
-    if(flag[i])
-      continue;
-    IntegerVector row_vec = len[i];
-    col = row_vec.size();
-    vec[i] = vector<int>(col);
-    for (j = 0; j < col; j++)
-      vec[i][j] = row_vec[j];
-  }
-  vector<vector<int> > res = cart_product(vec);
-  IntegerMatrix out(res.size(), row);
-  for(i = 0; i < res.size(); ++i)
-    for(j = 0; j < row; ++j) 
-      out(i, j) = res[i][j];
-  return(out);
-}
 /*
  * determine the hidden state by each time t, only use this on the first time t, then, the rest non_overlapped still use site by site
  */

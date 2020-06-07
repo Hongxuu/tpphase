@@ -418,7 +418,8 @@ List get_overlap(IntegerVector p_tmax, IntegerVector time_pos, IntegerVector num
 }
 
 // [[Rcpp::export]]
-List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info, unsigned int hap_length, int hap_min_pos) {
+List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info, unsigned int hap_length, 
+                   int hap_min_pos, unsigned int use_MC = 0) {
   List hidden_states = hmm_info["hidden_states"];
   IntegerVector num_states = hmm_info["num_states"];
   IntegerVector time_pos = hmm_info["time_pos"];
@@ -453,7 +454,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
     IntegerMatrix combination = comb_info_t0["combination"];
     combination_t[t] = combination;
     unsigned int num = comb_info_t0["num"];
-    List t0 = limit_comb_t0(combination, hidden_states, location, linkage_info, num, 0, num_states[start_t[t]]);
+    List t0 = limit_comb_t0(combination, hidden_states, location, linkage_info, num, 0, num_states[start_t[t]], use_MC);
     IntegerVector exclude = t0["exclude"];
     exclude_t[t] = exclude;
     new_num_states[start_t[t]] = t0["num_states"];
@@ -565,7 +566,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
             comb_in = tmp;
           }
           IntegerMatrix new_comb = new_combination(hmm_info, loci_currt, overlapped_t, exclude_last, comb_in,
-                                                   loci_lastt, linkage_info, new_num_states[last_t], old_state);
+                                                   loci_lastt, linkage_info, new_num_states[last_t], old_state, use_MC);
           new_num_states[t] = new_comb.nrow();
           comb[t] = new_comb;
           full_hap_t = List(new_num_states[t]);
