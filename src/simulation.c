@@ -86,8 +86,6 @@ void fprint_seq(FILE *fp, char_t *data, size_t p, char const * const prefix) {
 
 void make_simu_opt(simu_options *opt)
 {
-	//	opt->delim_ref = ":";
-	//	opt->delim_len = "-";
 	opt->out_sam = NULL;
 	opt->extracted_rf = NULL;
 	opt->fsa_file = NULL;
@@ -101,12 +99,16 @@ void make_simu_opt(simu_options *opt)
 	opt->homo_rate = 0.001;
 	opt->substitution_rate = 0.3333333;
 	opt->num_ind = 1;
+	
 	opt->ART_command = NULL;
 	opt->error_file1 = NULL;
 	opt->error_file2 = NULL;
 	opt->fq_file = "sim";
 	opt->coverage = 40;
 	opt->length = 150;
+	
+	opt->bwa_command = NULL;
+	opt->samAB = NULL;
 } /* make_options */
 
 int make_data(simu_dat **dat) {
@@ -220,6 +222,15 @@ int parse_opt(simu_options *opt, int argc, const char **argv)
 				fprintf(stderr, " %s", opt->ART_command);
 				fprintf(stderr, "\n");
 				break;
+			case 'w':
+				opt->bwa_command = argv[++i];
+				mmessage(INFO_MSG, NO_ERROR, "bwa command:");
+				fprintf(stderr, " %s", opt->bwa_command);
+				fprintf(stderr, "\n");
+				break;
+			case 'k':
+				opt->samAB = argv[++i];
+				break;
 			default:
 				err = INVALID_CMD_OPTION;
 				goto CMDLINE_ERROR;
@@ -281,7 +292,7 @@ int load_data(simu_dat *dat, simu_options *opt, fastq_data *fds) {
 	}
 	// ref A nad B in the same file for HMM method to use
 	FILE *fp = NULL;
-	size_t len = strlen(opt->fsa_file) + 5 + 1;
+	size_t len = strlen(opt->fsa_file) + 4 + 1;
 	char *fsa_file = malloc(len);
 	sprintf(fsa_file, "%s.fsa", opt->fsa_file);
 	if (fsa_file) {
@@ -307,18 +318,22 @@ int load_data(simu_dat *dat, simu_options *opt, fastq_data *fds) {
 	write_sam(fp, dat->seq_B, opt->len_N, name_A, name_B);
 	fclose(fp);
 	fp = NULL;
+	len = len + 1;
+	char *fsaA_file = malloc(len);
+	char *fsaB_file = malloc(len);
 	// ref A nad B in the seperate files for alignment of reads
-	sprintf(fsa_file, "%sA.fsa", opt->fsa_file);
-	fp = fopen(fsa_file, "w");
+	sprintf(fsaA_file, "%sA.fsa", opt->fsa_file);
+	fp = fopen(fsaA_file, "w");
 	fprint_seq(fp, dat->seq_A, opt->len_N, "Genome_A");
 	fclose(fp);
 	fp = NULL;
-	sprintf(fsa_file, "%sB.fsa", opt->fsa_file);
-	fp = fopen(fsa_file, "w");
+	sprintf(fsaB_file, "%sB.fsa", opt->fsa_file);
+	fp = fopen(fsaB_file, "w");
 	fprint_seq(fp, dat->seq_B, opt->len_N, "Genome_B");
 	fclose(fp);
 	fp = NULL;
-	
+	call_bwa(opt, fsaA_file, NULL, NULL, NULL);
+	call_bwa(opt, fsaB_file, NULL, NULL, NULL);
 	// make heter loci
 	for (j = 0; j < opt->len_N; ++j) {
 		if (dat->homo_loci[j]) {
@@ -415,11 +430,14 @@ int load_data(simu_dat *dat, simu_options *opt, fastq_data *fds) {
 						fprintf(stderr, "** ");
 						dat->ind[0][j] = dat->seq_A[j];
 						dat->ind[1][j] = dat->seq_A2[j];
+						fprintf(stderr, "%d: %c%c|%c%c\n", j, xy_to_char[dat->ind[0][j]],xy_to_char[dat->ind[1][j]], xy_to_char[dat->ind[2][j]], xy_to_char[dat->ind[3][j]]);
 					} else {
 						for (i = 0; i < 2; ++i)
 							dat->ind[i][j] = dat->seq_A2[j];
 					}
-					fprintf(stderr, "%d: %c%c|%c%c\n", j,xy_to_char[dat->ind[0][j]],xy_to_char[dat->ind[1][j]], xy_to_char[dat->ind[2][j]], xy_to_char[dat->ind[3][j]]);
+					if (dat->seq_B[j] != dat->ind[0][j] && hwe != 1) {
+						fprintf(stderr, "++ %d: %c%c|%c%c\n", j, xy_to_char[dat->ind[0][j]],xy_to_char[dat->ind[1][j]], xy_to_char[dat->ind[2][j]], xy_to_char[dat->ind[3][j]]);
+					}	
 				} else {
 					for (i = 0; i < 2; ++i)
 						dat->ind[i][j] = dat->seq_A[j];
@@ -430,11 +448,14 @@ int load_data(simu_dat *dat, simu_options *opt, fastq_data *fds) {
 						fprintf(stderr, "** ");
 						dat->ind[2][j] = dat->seq_B[j];
 						dat->ind[3][j] = dat->seq_B2[j];
+						fprintf(stderr, "%d: %c%c|%c%c\n", j,xy_to_char[dat->ind[0][j]],xy_to_char[dat->ind[1][j]], xy_to_char[dat->ind[2][j]], xy_to_char[dat->ind[3][j]]);
 					} else {
 						for (i = 2; i < 4; ++i)
 							dat->ind[i][j] = dat->seq_B2[j];
 					}
-					fprintf(stderr, "%d: %c%c|%c%c\n", j,xy_to_char[dat->ind[0][j]],xy_to_char[dat->ind[1][j]], xy_to_char[dat->ind[2][j]], xy_to_char[dat->ind[3][j]]);
+					if (dat->seq_A[j] != dat->ind[2][j] && hwe != 1) {
+						fprintf(stderr, "++ %d: %c%c|%c%c\n", j, xy_to_char[dat->ind[0][j]],xy_to_char[dat->ind[1][j]], xy_to_char[dat->ind[2][j]], xy_to_char[dat->ind[3][j]]);
+					}
 				}
 			}
 		}
@@ -458,22 +479,92 @@ int load_data(simu_dat *dat, simu_options *opt, fastq_data *fds) {
 			char *fq_out = malloc(length);
 			sprintf(fq_out, "%s%u", opt->fq_file, m);
 			call_art(opt, fq_out, file);
+			if (opt->bwa_command) {
+				size_t l = strlen(opt->samAB) + (int)log10(le) + 6 + 1;
+				char *sam_out = malloc(l);
+				char *fq1 = malloc(length + 3 + 1);
+				char *fq2 = malloc(length + 3 + 1);
+				if (opt->error_file2) {
+					sprintf(fq1, "%s1.fq", fq_out);
+					sprintf(fq2, "%s2.fq", fq_out);
+					sprintf(sam_out, "%s%uA.sam", opt->samAB, m);
+					call_bwa(opt, fsaA_file, fq1, fq2, sam_out);
+					sprintf(sam_out, "%s%uB.sam", opt->samAB, m);
+					call_bwa(opt, fsaB_file, fq1, fq2, sam_out);
+				} else {
+					sprintf(fq1, "%s.fq", fq_out);
+					sprintf(sam_out, "%s%uA.sam", opt->samAB, m);
+					call_bwa(opt, fsaA_file, fq1, NULL, sam_out);
+					sprintf(sam_out, "%s%uB.sam", opt->samAB, m);
+					call_bwa(opt, fsaB_file, fq1, NULL, sam_out);
+				}
+			}
 		}
 	}
 	return NO_ERROR;
 }
 
 void call_art(simu_options *opt, char *fq_out, char *fq_in) {
-	unsigned int cmd_len = strlen(opt->ART_command) + strlen(opt->error_file1) + strlen(opt->error_file2) + strlen(" -l -1 -2 -f -o -i ") + strlen(fq_out) + strlen(fq_in) + (int)(log10(opt->coverage) + 1) + (int)(log10(opt->length) + 1) + 8;
-	mmessage(INFO_MSG, NO_ERROR, "Length of command: %u\n", cmd_len);
-	char *command = malloc(cmd_len * sizeof *command);
-	sprintf(command, "%s -1 %s -2 %s -l %d -i %s -f %d -o %s",
-		opt->ART_command, opt->error_file1, opt->error_file2, opt->length, fq_in, opt->coverage, fq_out);
-	mmessage(INFO_MSG, NO_ERROR, "Running ART: '%s'\n",
-		 command);
-	system(command);
-	free(command);
+	if (opt->error_file2) {
+		unsigned int cmd_len = strlen(opt->ART_command) + strlen(opt->error_file1) + strlen(opt->error_file2) + strlen(" -l -1 -2 -f -o -i -p -m 150 -s 10") + strlen(fq_out) + strlen(fq_in) + (int)(log10(opt->coverage) + 1) + (int)(log10(opt->length) + 1) + 8;
+		mmessage(INFO_MSG, NO_ERROR, "Length of command: %u\n", cmd_len);
+		char *command = malloc(cmd_len * sizeof *command);
+		sprintf(command, "%s -1 %s -2 %s -l %d -i %s -f %d -o %s -p -m 150 -s 10",
+			opt->ART_command, opt->error_file1, opt->error_file2, opt->length, fq_in, opt->coverage, fq_out);
+		mmessage(INFO_MSG, NO_ERROR, "Running ART: '%s'\n",
+			 command);
+		system(command);
+		free(command);
+	} else {
+		unsigned int cmd_len = strlen(opt->ART_command) + strlen(opt->error_file1) + strlen(" -l -1 -f -o -i ") + strlen(fq_out) + strlen(fq_in) + (int)(log10(opt->coverage) + 1) + (int)(log10(opt->length) + 1) + 8;
+		mmessage(INFO_MSG, NO_ERROR, "Length of command: %u\n", cmd_len);
+		char *command = malloc(cmd_len * sizeof *command);
+		sprintf(command, "%s -1 %s -l %d -i %s -f %d -o %s",
+			opt->ART_command, opt->error_file1, opt->length, fq_in, opt->coverage, fq_out);
+		mmessage(INFO_MSG, NO_ERROR, "Running ART: '%s'\n",
+			 command);
+		system(command);
+		free(command);
+	}
+	
 }
+
+void call_bwa(simu_options *opt, char *ref_in, char *reads1, char *reads2, char *sam) {
+	if(!sam) {
+		unsigned int cmd_len = strlen(opt->bwa_command) + strlen(" index ") + strlen(ref_in) + 8;
+		mmessage(INFO_MSG, NO_ERROR, "Length of command: %u\n", cmd_len);
+		char *command = malloc(cmd_len * sizeof *command);
+		sprintf(command, "%s index %s",
+			opt->bwa_command, ref_in);
+		system(command);
+		free(command);
+	} else {
+		if (opt->error_file2) {
+			unsigned int cmd_len = strlen(opt->bwa_command) + strlen(" mem ") + strlen(ref_in) + strlen(reads1)
+			+ strlen(reads2) + strlen(" > ") + strlen(" ") + strlen(sam) + 8;
+			char *command = malloc(cmd_len * sizeof *command);
+			sprintf(command, "%s mem %s %s %s > %s",
+				opt->bwa_command, ref_in, reads1, reads2, sam);
+			mmessage(INFO_MSG, NO_ERROR, "Running bwa: '%s'\n",
+				 command);
+			system(command);
+			free(command);
+		} else {
+			unsigned int cmd_len = strlen(opt->bwa_command) + strlen(" mem ") + strlen(ref_in) + strlen(reads1)
+			+ strlen(" > ") + strlen(" ") + strlen(sam) + 8;
+			char *command = malloc(cmd_len * sizeof *command);
+			sprintf(command, "%s mem %s %s > %s",
+				opt->bwa_command, ref_in, reads1, sam);
+			mmessage(INFO_MSG, NO_ERROR, "Running bwa: '%s'\n",
+				 command);
+			system(command);
+			free(command);
+		}
+		
+	}
+	
+}
+
 
 void fprint_usage(FILE *fp, const char *cmdname, void *obj) {
 	simu_options *opt = (simu_options *) obj;
@@ -504,5 +595,8 @@ void fprint_usage(FILE *fp, const char *cmdname, void *obj) {
 	fprintf(fp, "\t-d <error_file2>\n\t\tSpecify error file 2\n");
 	fprintf(fp, "\t-m <fq_file>\n\t\tFastq file name (Default: %s)\n", opt->fq_file);
 	fprintf(fp, "\t-t <ART>\n\t\tART command\n");
+	fprintf(fp, "\t-w <bwa>\n\t\tBWA command\n");
+	fprintf(fp, "\t-k <rsam>\n\t\tRead aligned to reference name\n");
 	fprintf(fp, "\t-h \n\t\tThis help\n");
 } /* fprint_usage */
+

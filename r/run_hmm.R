@@ -34,7 +34,7 @@ call_aln(ref_nameA = "Genome_A:0-1000", ref_nameB = "Genome_B:0-1000",
 
 altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", datafile = NULL, output = NULL, cut_off = 0.1,
                           formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 50, res_file = NULL,
-                          n_class = 4, num_cat = 4, seed = 0, tol = 1e-05, ncores = 2, old_version = 0, eta = rep(0.25, 4))  {
+                          n_class = 4, num_cat = 4, seed = 0, tol = 1e-05, ncores = 2, genotype_target = 0, eta = rep(0.25, 4))  {
   registerDoParallel(cores = ncores)  
   ## make universial reference
   cat("preparing data: \n");
@@ -51,7 +51,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   rm(align)
   
   ## prepare data
-  dat_info <- read_data(datafile, old_v = old_version)
+  dat_info <- read_data(datafile, old_v = genotype_target)
   HMM <- hmm_info(dat_info = dat_info, cut_off = cut_off, uni_alignment = universial)
   
   ########################## baum-welch (iterate until converge)
@@ -81,7 +81,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   id <- data["id"]
   data <- data[, !names(data) %in% c("id")]
   par <- list()
-  par <- ini_par(dat = data, n_observation = dat_info$n_observation, formula = formula, old_version = old_version,
+  par <- ini_par(dat = data, n_observation = dat_info$n_observation, formula = formula, old_version = genotype_target,
                  n_class = n_class, num_cat = num_cat, ncores = ncores, weight_id = weight_id)
   # 
   ###indicate which transfer could happen
@@ -105,13 +105,13 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   data$nuc <- to_char_r(data$nuc)
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
-  for (m in (1:max_iter)) {
+  for (m in (1:20)) {
     cat("iter: ", m, "\n");
     full_llk <- bw$par_hmm_bf$full_llk
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
     tmp <- m_beta(res = bw$par_aux, id = id, weight_id = weight_id, data = data, formula = formula, 
-                  reads_lengths = read_length, ncores = ncores, old_version = 0, weight = bw$par_aux$weight)
+                  reads_lengths = read_length, ncores = ncores, old_version = genotype_target, weight = bw$par_aux$weight)
     # init[[m]] <- bw
     ## estimation other parameters
     bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
