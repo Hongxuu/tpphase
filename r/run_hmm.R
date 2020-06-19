@@ -68,7 +68,6 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   linkage_in <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
   overlap_info <- get_overlap(HMM$p_tmax, HMM$time_pos, HMM$num_states, HMM$undecided_pos, HMM$t_max, dat_info$ref_start)
   hap_full_info <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start, use_MC = use_MC)
-  hap_full_info2 <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start, use_MC = 1)
   hap_full <- hap_full_info$full_hap
   HMM$num_states <- hap_full_info$new_num_states
   
@@ -90,7 +89,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   par <- list()
   par <- ini_par(dat = data, n_observation = dat_info$n_observation, formula = formula, old_version = genotype_target,
                  n_class = n_class, num_cat = num_cat, ncores = ncores, weight_id = weight_id)
-  # 
+  
   ###indicate which transfer could happen
   trans_indicator <- trans_permit(num_states = HMM$num_states, combination = hap_full_info$combination, 
                                   loci = overlap_info$location, t_max = HMM$t_max)
@@ -117,11 +116,17 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
     full_llk <- bw$par_hmm_bf$full_llk
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
+    start.time <- Sys.time()
     tmp <- m_beta(res = bw$par_aux, id = id, weight_id = weight_id, data = data, formula = formula, 
                   reads_lengths = read_length, ncores = ncores, old_version = genotype_target, weight = bw$par_aux$weight)
+    end.time <- Sys.time()
+    cat("mnlogit time: ", end.time - start.time, "\n")
     ## estimation other parameters
+    start.time <- Sys.time()
     bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
                           beta = tmp$par$beta, PD_LENGTH = nrow(par$beta), hash_idx = data_new$idx)
+    end.time <- Sys.time()
+    cat("bw time: ", end.time - start.time, "\n")
     cat(bw$par_aux$eta, "\n")
     if (((all(abs(exp(bw$par_hmm$phi) - exp(phi_old)) < tol) == TRUE) &&
         all(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", tol) == TRUE) &&

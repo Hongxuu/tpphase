@@ -35,9 +35,11 @@ List viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm) {
    * compute log probabilities table
    */
   List path(t_max);
+  List backptr(t_max - 1);
   double max;
   double max_prob = 0;
   for (t = 0; t < t_max; ++t) {
+    IntegerVector backptr_t(num_states[t]);
     NumericVector path_t(num_states[t]);
     NumericVector emission = emit[t];
     if (t == 0) {
@@ -50,11 +52,15 @@ List viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm) {
         max = -INFINITY;
         for(w = 0; w < num_states[t - 1]; ++w) {
           max_prob = path_last(w) + transition(w, m);
-          if (max_prob > max)
+          if (max_prob > max) {
             max = max_prob;
+            max_id = w;
+          }
         }
         path_t(m) = emission(m) + max;
+        backptr_t[m] = max_id;
       }
+      backptr(t - 1) = backptr_t;
     }
     path(t) = path_t;
   }
@@ -62,18 +68,23 @@ List viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm) {
   * find the path (backtrace)
   */
   IntegerVector hidden_state(t_max);
-  for (t = t_max; t --> 0;) {
-    max = -INFINITY;
-    max_id = 0;
-    NumericVector path_t = path(t);
-    for(m = 0; m < num_states[t]; ++m) {
-      if (path_t(m) > max) {
-        max_id = m;
-        max = path_t(m);
-      }
+  t = t_max - 1;
+  max = -INFINITY;
+  int b_next = 0;
+  NumericVector path_t = path(t);
+  for(m = 0; m < num_states[t]; ++m) {
+    if (path_t(m) > max) {
+      b_next = m;
+      max = path_t(m);
     }
-    hidden_state(t) = max_id;
   }
+  hidden_state(t) = b_next;
+  while (t--) {
+    IntegerVector backptr_t = backptr(t);
+    b_next = backptr_t[b_next];
+    hidden_state(t) = b_next;
+  }
+
   /*
    * make the haplotype (return the index as well to find the assignment)
    */
