@@ -17,7 +17,7 @@ using namespace std;
 // [[Rcpp::depends(RcppArmadillo)]]
 
 // [[Rcpp::export]]
-IntegerMatrix viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm) {
+List viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm) {
   List hidden_states = hmm_info["hidden_states"];
   NumericVector phi = par_hmm["phi"];
   List trans = par_hmm["trans"];
@@ -75,7 +75,7 @@ IntegerMatrix viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm)
     hidden_state(t) = max_id;
   }
   /*
-   * make the haplotype
+   * make the haplotype (return the index as well to find the assignment)
    */
   for(t = 0; t < t_max; ++t) {
     List full_hap_t = hap_info(t);
@@ -85,5 +85,8 @@ IntegerMatrix viterbi(List hmm_info, List dat_info, List hap_info, List par_hmm)
         hap_final(k, j) = hap_t(k, j - time_pos[t] + hap_min_pos);
   }
   
-  return(hap_final);
+  List ls = List::create(
+    Named("hap_final") = hap_final,
+    Named("chosed_state") = hidden_state);
+  return ls;
 }

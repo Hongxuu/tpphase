@@ -182,6 +182,55 @@ List forward_backward(List par_hmm, unsigned int t_max, IntegerVector num_states
     full_llk += exp(alp[w] - max_penality);
   full_llk = log(full_llk) + max_penality;
   Rcout << "full log likelihood: " << full_llk << "\n";
+  // compute P(Ht|Rt)
+  // List phr(t_max);
+  // List ph(t_max);
+  // for(t = 0; t < t_max; ++t) {
+  //   NumericVector phr_t(num_states[t]);
+  //   NumericVector ph_t(num_states[t]);
+  //   NumericVector emission = emit(t);
+  //   sum = 0;
+  //   if (t == 0) {
+  //     max_penality = R_NegInf;
+  //     ph_t = phi;
+  //     for (w = 0; w < num_states[t]; ++w) {
+  //       phr_t(w) = phi[w] + emission(w); 
+  //       if(phr_t(w) > max_penality)
+  //         max_penality = phr_t(w);
+  //     }
+  //     for (w = 0; w < num_states[t]; ++w)
+  //       sum += exp(phr_t(w) - max_penality); // log sum exp trick
+  //     for (w = 0; w < num_states[t]; ++w)
+  //       phr_t(w) = phr_t[w] - (log(sum) + max_penality);
+  //   } else {
+  //     NumericVector pht_last = ph[t - 1];
+  //     NumericMatrix transition = trans(t - 1);
+  //     // compute P(Ht, Rt)
+  //     for (w = 0; w < num_states[t]; ++w) {
+  //       max_penality = R_NegInf;
+  //       for (m = 0; m < num_states[t - 1]; ++m) {
+  //         double value = pht_last(m) + transition(m, w);
+  //         if (value > max_penality)
+  //           max_penality = value;
+  //       }
+  //       for (m = 0; m < num_states[t - 1]; ++m)
+  //         ph_t(w) += exp(pht_last(m) + transition(m, w) - max_penality); // Log-Sum-Exp Trick
+  //       ph_t(w) = log(ph_t(w)) + max_penality; // compute marginal P(Ht-1)
+  //       phr_t(w) = ph_t(w) + emission(w);
+  //     }
+  //     max_penality = R_NegInf;
+  //     // compute P(Ht| Rt)
+  //     for (w = 0; w < num_states[t]; ++w)
+  //       if (phr_t(w) > max_penality)
+  //         max_penality = phr_t(w);
+  //     for (w = 0; w < num_states[t]; ++w)
+  //       sum += exp(phr_t(w) - max_penality); // log sum exp trick
+  //     for (w = 0; w < num_states[t]; ++w)
+  //       phr_t(w) = phr_t(w) - (log(sum) + max_penality);
+  //   }
+  //   ph[t] = ph_t;
+  //   phr[t] = phr_t;
+  // }
   
   List par_hmm_out = List::create(
     Named("phi") = phi,
@@ -543,6 +592,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
           }
         } 
         else {
+          Rcout << "remake linkage\n";
           // new variable site in this t, need to get the new combination while making sure it can be transferred to the next t
           for(st = 0; st < n_start; ++st)
             if(last_t == start_t[st]) {
@@ -1091,6 +1141,39 @@ List trans_permit(IntegerVector num_states, List combination, List loci, int t_m
   
   return(trans_permits);
 }
+
+// [[Rcpp::export]]
+arma::uvec find_ass(IntegerVector selected_hap, List n_in_t, List wic, int t_max, int n_obs) {
+  unsigned int t, i, k;
+  List selected_wic(t_max);
+  IntegerVector assignment(n_obs);
+  IntegerVector order(n_obs);
+  int count = 0;
+  for(t = 0; t < t_max; ++t) {
+    List wic_in = wic[t];
+    NumericMatrix wic_out = wic_in[selected_hap[t]]; 
+    IntegerVector read = n_in_t[t];
+    for(i = 0; i < wic_out.nrow(); ++i) {
+      int id = 0;
+      double max = 0;
+      for(k = 0; k < NUM_CLASS; ++k) {
+        if(wic_out(i, k) > max) {
+          id = k;
+          max = wic_out(i, k);
+        }
+      }
+      order[count] = read[i];
+      assignment[count++] = id;
+    }
+  }
+  arma::uvec assign = as<arma::uvec>(assignment);
+  arma::uvec read_order = as<arma::uvec>(order);
+  return(assign(read_order));
+}
+
+
+
+
 // List trans_permit(IntegerVector num_states, List combination, int t_max, IntegerVector undecided_pos, 
 //                    IntegerVector time_pos, IntegerVector p_tmax, int hap_min_pos) {
 //   List trans_permits(t_max - 1);

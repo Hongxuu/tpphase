@@ -410,6 +410,7 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
   List comb_in(link.ncol());
   List llk_in(link.ncol());
   int id = 0;
+  // possible or determined nuc at each position
   for(j = 0; j < link.ncol(); ++j) {
     IntegerVector nuc = possi_nuc[j];
     if(link(i, j) != -1) {
@@ -425,17 +426,20 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
   }
   IntegerVector flag(link.ncol());
   // IntegerMatrix poss_reads = comb_element(comb_in, flag, link.ncol());
-  
+  // get state likelihood
   for(j = 0; j < link.ncol(); ++j) {
+    // Rcout << j << "\t";
     IntegerVector nuc = possi_nuc[j];
     if(link(i, j) != -1) {
       for(l = 0 ; l < nuc.size(); ++l)
         if(link(i, j) == nuc[l]) {
           id = l;
+          // Rcout << "nuc " << nuc[l] << "\t";
           break;
         }
         if(j == 0) {
           llk_in(j) = initial[id];
+          // Rcout << "ini " << initial[id] << "\t";
         } else {
           NumericMatrix trans = transition[j - 1];
           IntegerVector nuc2 = possi_nuc[j - 1];
@@ -443,11 +447,14 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
           if(link(i, j - 1) != -1) {
             for(l = 0 ; l < nuc2.size(); ++l)
               if(link(i, j - 1) == nuc2[l]) {
+                // Rcout << "nuc(j-1) " << nuc2[l] << "\t";
                 id1 = l;
                 break;
               }
               llk_in(j) = trans(id1, id);
+              // Rcout << "trans " << trans(id1, id) << "\n";
           } else{
+            // Rcout << "trans: all\n";
             llk_in(j) = trans(_, id);
           }
         }
@@ -460,6 +467,7 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
         if(link(i, j - 1) != -1) {
           for(l = 0 ; l < nuc2.size(); ++l)
             if(link(i, j) == nuc2[l]) {
+              // Rcout << "nuc(j-1) " << nuc2[l] << "\n";
               id = l;
               break;
             }
@@ -470,49 +478,67 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
       }
     }
   }
+  IntegerVector hidden_state(llk_in.size());
   List path(llk_in.size());
+  List backptr(llk_in.size() - 1);
+  int b_next = 0;
   for(k = 0; k < llk_in.size(); ++k) {
+    // Rcout << k << "\n";
     IntegerVector nuc = comb_in(k);
     NumericVector path_t(nuc.size());
+    IntegerVector backptr_t(nuc.size());
     if(k == 0) {
+      NumericVector trans = llk_in(k);
       for(l = 0; l < nuc.size(); ++l) {
-        NumericVector trans = llk_in(k);
         path_t(l) = trans(l);
       }
-      Rcout << path_t << "\n";
+      // Rcout << path_t << "\n";
     } else {
       NumericVector tran = llk_in(k);
       int len = tran.size();
       int nrow = len/nuc.size();
       tran.attr("dim") = Dimension(nrow, nuc.size());
       NumericMatrix trans = as<NumericMatrix>(tran);
+      NumericVector path_last = path[k - 1];
       for(m = 0; m < trans.ncol(); ++m) {
-        NumericVector path_last = path[k - 1];
         double max = -INFINITY;
+        int max_id = 0;
         for(w = 0; w < trans.nrow(); ++w) {
           double max_prob = path_last(w) + trans(w, m);
-          if (max_prob > max)
+          if (max_prob > max) {
             max = max_prob;
+            max_id = w;
+          }
         }
         path_t(m) = max;
+        backptr_t[m] = max_id;
       }
-      Rcout << path_t << "\n";
+      backptr(k - 1) = backptr_t;
+      // Rcout << path_t << "\n";
+      // Rcout << backptr_t << "\n";
     }
     path(k) = path_t;
   }
-  IntegerVector hidden_state(llk_in.size());
-  for (k = llk_in.size(); k --> 0;) {
-    IntegerVector nuc = comb_in(k);
-    double max = -INFINITY;
-    int max_id = 0;
-    NumericVector path_t = path(k);
-    for(m = 0; m < nuc.size(); ++m) {
-      if (path_t(m) > max) {
-        max_id = m;
-        max = path_t(m);
-      }
+  // Rcout << "decode\n";
+  k = llk_in.size() - 1;
+  double max = -INFINITY;
+  IntegerVector nuc = comb_in(k);
+  NumericVector path_t = path(k);
+  for(m = 0; m < nuc.size(); ++m) {
+    if (path_t(m) > max) {
+      b_next = m;
+      max = path_t(m);
     }
-    hidden_state(k) = nuc[max_id];
+  }
+  hidden_state(k) = nuc[b_next];
+  
+  while (k--) {
+    // Rcout << k << "\n";
+    IntegerVector nuc = comb_in(k);
+    IntegerVector backptr_t = backptr(k);
+    // Rcout << backptr_t << "\n";
+    b_next = backptr_t[b_next];
+    hidden_state(k) = nuc[b_next];
   }
   
   // get the combination of reads and corresponding transition matrix
@@ -577,45 +603,69 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
       state2 = nuc1.size() - 1;
     }
     
-    List unique_row = hash_mat(link(_, Range(j, j + 1)));
-    List all_id = unique_row["all_id"];
-    IntegerVector idx = unique_row["idx"];
-    NumericMatrix trans(state1, state2);
-    for(k = 0; k < state1; ++k)
-      for(i = 0; i < state2; ++i)
-        trans(k, i) = R_NegInf;
-    // Rcout << state1 << "\t" << state2 << "\n";
-    
-    for(k = start; k < nuc.size(); ++k) {
-      // Rcout<< "\n" << nuc[k] << "\n";
-      for(i = 0; i < idx.size(); ++i) {
-        IntegerVector tmp = link(idx[i], _);
-        IntegerVector sub_read = tmp[Range(j, j + 1)];
-        // IntegerVector sub_read = ordered_read(i, _);
-        if(sub_read[0] == -1 || sub_read[1] == -1)
-          continue;
-        // Rcout << sub_read << "\n";
-        IntegerVector sub_id = all_id[i];
-        double nu = sub_id.size();
-        double de = 0;
-        int col_id = 0;
-        int flag = 0;
-        if(state2 < nuc1.size())
-          flag = 1;
-        for(l = 0; l < nuc1.size(); ++l)
-          if(nuc1[l] != -1 && nuc1[l] == sub_read[1])
-            col_id = l - flag;
-          // Rcout <<  col_id << "\n" ;
-          if(nuc[k] == sub_read[0]) {
-            de = nuc_count[k];
-            trans(k - start, col_id) = log(nu/de); // log likelihood
+    IntegerMatrix link_unique(link.nrow(), 2);
+    int unique_ct = 0;
+    for(k = 0; k < link.nrow(); ++k)
+      if(link(k, j + 1) != -1 && link(k, j) != -1) {
+        link_unique(unique_ct, 0) = link(k, j );
+        link_unique(unique_ct++, 1) = link(k, j + 1);
+      }
+      // for(k = 0; k < link.nrow(); ++k)
+      //   for(l = 0; l < 2; ++l)
+      //     Rcout << link_unique(k, j) << "\t";
+      IntegerMatrix in_link = link_unique(Range(0, unique_ct - 1), _);
+      List unique_row = hash_mat(in_link);
+      List all_id = unique_row["all_id"];
+      IntegerVector idx = unique_row["idx"];
+      NumericMatrix trans(state1, state2);
+      for(k = 0; k < state1; ++k)
+        for(i = 0; i < state2; ++i)
+          trans(k, i) = R_NegInf;
+      // Rcout << state1 << "\t" << state2 << "\n";
+      List nuc_info_uni = unique_map(in_link(_, 0));
+      IntegerVector nuc_count_uni = nuc_info_uni["lengths"];
+      IntegerVector nuc_uni = nuc_info_uni["values"];
+      
+      for(k = start; k < nuc.size(); ++k) {
+        // Rcout<< "\n" << nuc[k] << "\n";
+        int nuc_id = 0;
+        for(l = 0; l < nuc_uni.size(); ++l)
+          if(nuc_uni[l] == nuc[k]) {
+            nuc_id = l;
+            break;
+          }
+          for(i = 0; i < idx.size(); ++i) {
+            double de = nuc_count_uni[nuc_id];
+            IntegerVector sub_read = in_link(idx[i], _);
+            // Rcout << "unique sub " << sub_read << "\n";
+            // IntegerVector sub_read = ordered_read(i, _);
+            // if(sub_read[1] == -1) {
+            //   de--;
+            //   continue;
+            // }
+            if(nuc[k] != sub_read[0])
+              continue;
+            IntegerVector sub_id = all_id[i];
+            // Rcout << "uniques " << sub_id << "\n";
+            double nu = sub_id.size();
+            int col_id = 0;
+            int flag = 0;
+            if(state2 < nuc1.size())
+              flag = 1;
+            for(l = 0; l < nuc1.size(); ++l)
+              if(nuc1[l] != -1 && nuc1[l] == sub_read[1])
+                col_id = l - flag;
+              // Rcout <<"col_id " << col_id << "\n" ;
+              // if(nuc[k] == sub_read[0]) {
+              // Rcout <<"de " << de << " nu " << nu<< "\n" ;
+              trans(k - start, col_id) = log(nu/de); // log likelihood
+              // }
           }
       }
-    }
-    transition[j] = trans;
+      transition[j] = trans;
   }
-  
-  // now use MC to impute the missing nuc
+  // 
+  // // now use MC to impute the missing nuc
   arma::mat uniqu_link = unique_rows(as<arma::mat>(link));
   IntegerMatrix sub_uni_link = wrap(uniqu_link);
   IntegerMatrix mc_reads(sub_uni_link.nrow(), sub_uni_link.ncol());
@@ -631,6 +681,8 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
       mc_reads(i, _) = sub_uni_link(i, _);
       continue;
     }
+    IntegerVector tmp = sub_uni_link(i, _);
+    // Rcout << tmp << "\n";
     mc_reads(i, _) = best_branch(sub_uni_link, transition, initial, possi_nuc, i);
   }
   

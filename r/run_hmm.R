@@ -23,16 +23,22 @@ sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
 
-datafile = "../../data/tpphase/WGS/simu/short/low_cov/out.txt"
-alignment = "../../data/tpphase/WGS/simu/short/ref.fsa"
+cut_off = 0.1
+use_MC = 0
+n_class = 4 
+num_cat = 4
+seed = 0
+genotype_target = 0
+datafile = "../../data/tpphase/WGS/simu/short/HIGH_SNP/low_cov/out.txt"
+alignment = "../../data/tpphase/WGS/simu/short/HIGH_SNP/ref.fsa"
 call_aln(ref_nameA = "Genome_A:0-1000", ref_nameB = "Genome_B:0-1000",
          ref_fsa = alignment,
-         ref_sam = "../../data/tpphase/WGS/simu/short/ref.sam",
-         alnA = "../../data/tpphase/WGS/simu/short/low_cov/aln0A.sam",
-         alnB = "../../data/tpphase/WGS/simu/short/low_cov/aln0B.sam",
+         ref_sam = "../../data/tpphase/WGS/simu/short/HIGH_SNP/ref.sam",
+         alnA = "../../data/tpphase/WGS/simu/short/HIGH_SNP/low_cov/aln0A.sam",
+         alnB = "../../data/tpphase/WGS/simu/short/HIGH_SNP/low_cov/aln0B.sam",
          out_file = datafile)
 
-altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", datafile = NULL, output = NULL, cut_off = 0.1,
+altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", datafile = NULL, cut_off = 0.1, use_MC = 0,
                           formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 50, res_file = NULL,
                           n_class = 4, num_cat = 4, seed = 0, tol = 1e-05, ncores = 2, genotype_target = 0, eta = rep(0.25, 4))  {
   registerDoParallel(cores = ncores)  
@@ -61,7 +67,8 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   hap_length <- dat_info$ref_length_max - dat_info$ref_start
   linkage_in <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
   overlap_info <- get_overlap(HMM$p_tmax, HMM$time_pos, HMM$num_states, HMM$undecided_pos, HMM$t_max, dat_info$ref_start)
-  hap_full_info <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start, use_MC = 1)
+  hap_full_info <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start, use_MC = use_MC)
+  hap_full_info2 <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start, use_MC = 1)
   hap_full <- hap_full_info$full_hap
   HMM$num_states <- hap_full_info$new_num_states
   
@@ -92,7 +99,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   cat("initialization: \n");
   data_new <- format_data2(hmm_info = HMM, d_info = dat_info, hap_info = hap_full)
   data <- data_new$df_new
-  par$eta <- eta
+  # par$eta <- eta
   bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, par = par, 
                         PD_LENGTH = nrow(par$beta), trans_indicator = trans_indicator, hash_idx = data_new$idx)
   rm(hap_full_info)
@@ -105,18 +112,17 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   data$nuc <- to_char_r(data$nuc)
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
-  for (m in (1:20)) {
-    cat("iter: ", m, "\n");
+  for (m in (1:max_iter)) {
+    cat("iter: ", m, "\n")
     full_llk <- bw$par_hmm_bf$full_llk
     par_hmm_old <- bw$par_hmm
     phi_old <- bw$par_hmm$phi
     tmp <- m_beta(res = bw$par_aux, id = id, weight_id = weight_id, data = data, formula = formula, 
                   reads_lengths = read_length, ncores = ncores, old_version = genotype_target, weight = bw$par_aux$weight)
-    # init[[m]] <- bw
     ## estimation other parameters
     bw <- baum_welch_iter(hmm_info = HMM, par_hmm = bw, data_info = dat_info, hap_info = hap_full, 
                           beta = tmp$par$beta, PD_LENGTH = nrow(par$beta), hash_idx = data_new$idx)
-    cat(bw$par_aux$eta)
+    cat(bw$par_aux$eta, "\n")
     if (((all(abs(exp(bw$par_hmm$phi) - exp(phi_old)) < tol) == TRUE) &&
         all(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "emit", tol) == TRUE) &&
         all(compare_par(new = bw$par_hmm, old = par_hmm_old, name = "trans", tol) == TRUE)) ||
@@ -128,17 +134,20 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   cat("viterbi decoding\n");
   res <- list()
   hap <- viterbi(hmm_info = HMM, dat_info = dat_info, hap_info = hap_full, par_hmm = bw$par_hmm)
-  haplotypes <- matrix(to_char_r(hap), nrow = n_class)
+  haplotypes <- matrix(to_char_r(hap$hap_final), nrow = n_class)
+  # ass = find_ass(selected_hap = hap$chosed_state, n_in_t = HMM$n_in_t, wic = bw$par_aux$w_ic, 
+  #                t_max = HMM$t_max, n_obs = dat_info$n_observation)
   # idx <- duplicated(haplotypes)
   # derepliacte_h <- haplotypes[!idx, ]
   snp_location <- HMM$undecided_pos + 1
   ## check if the snps do contain snp
   id <- which(apply(haplotypes[, snp_location], 2, function(x) length(unique(x))) == 1)
-  if(!length(id))
-    snp_location <- snp_location[-id]
+  if(length(id) != 0) {
+    snp_location <- snp_location[-id] }
   snps <- haplotypes[, snp_location]
   snp_location <- snp_location + dat_info$ref_start
   
+  ## choose the weight of selected haplotypes
   res$full_llk <- bw$par_hmm_bf$full_llk
   res$haplotypes <- haplotypes
   res$snps <- snps
@@ -149,7 +158,4 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   return(res)
 }
 
-
-
-
-
+altragenotype(datafile = datafile, alignment = alignment) -> short_low
