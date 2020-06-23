@@ -22,20 +22,19 @@ sourceCpp("./r/universal_alignment.cpp")
 sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
-
 cut_off = 0.1
-use_MC = 0
+use_MC = 1
 n_class = 4 
 num_cat = 4
 seed = 0
 genotype_target = 0
-datafile = "../../data/tpphase/WGS/simu/short/HIGH_SNP/low_cov/out.txt"
-alignment = "../../data/tpphase/WGS/simu/short/HIGH_SNP/ref.fsa"
-call_aln(ref_nameA = "Genome_A:0-1000", ref_nameB = "Genome_B:0-1000",
+datafile = "../../data/hmm/WGS/simu/ref1/L_"
+alignment = "../../data/hmm/WGS/simu/ref4/ref.fsa"
+call_aln(ref_nameA = "Genome_A:0-2000", ref_nameB = "Genome_B:0-2000",
          ref_fsa = alignment,
-         ref_sam = "../../data/tpphase/WGS/simu/short/HIGH_SNP/ref.sam",
-         alnA = "../../data/tpphase/WGS/simu/short/HIGH_SNP/low_cov/aln0A.sam",
-         alnB = "../../data/tpphase/WGS/simu/short/HIGH_SNP/low_cov/aln0B.sam",
+         ref_sam = "../../data/hmm/WGS/simu/ref4/ref.sam",
+         alnA = "../../data/hmm/WGS/simu/ref4/high_cov/aln0A.sam",
+         alnB = "../../data/hmm/WGS/simu/ref4/high_cov/aln0B.sam",
          out_file = datafile)
 
 altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", datafile = NULL, cut_off = 0.1, use_MC = 0,
@@ -63,7 +62,7 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   ########################## baum-welch (iterate until converge)
   
   ## initialization
-  ##### use linkage info to limit some unlikelily happened transition
+  ##### use linkage info to limit some unlikely happened transition
   hap_length <- dat_info$ref_length_max - dat_info$ref_start
   linkage_in <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
   overlap_info <- get_overlap(HMM$p_tmax, HMM$time_pos, HMM$num_states, HMM$undecided_pos, HMM$t_max, dat_info$ref_start)
@@ -157,10 +156,18 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   res$haplotypes <- haplotypes
   res$snps <- snps
   res$snp_location <- snp_location
-  res$par <- bw
+  # res$par <- bw
   if(!is.null(res_file))
     fnlist(res, fil = res_file)
   return(res)
 }
 
-altragenotype(datafile = datafile, alignment = alignment) -> short_low
+altragenotype(datafile = "../../data/hmm/WGS/simu/ref2/LOW_SNP/low_cov/out.txt", 
+              alignment = "../../data/hmm/WGS/simu/ref2/LOW_SNP/ref.fsa",
+              res_file = "./ref2_cov50.txt") -> short_low
+
+
+
+
+
+

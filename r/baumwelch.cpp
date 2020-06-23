@@ -592,7 +592,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
           }
         } 
         else {
-          Rcout << "remake linkage\n";
+          // Rcout << "remake linkage\n";
           // new variable site in this t, need to get the new combination while making sure it can be transferred to the next t
           for(st = 0; st < n_start; ++st)
             if(last_t == start_t[st]) {
@@ -901,7 +901,7 @@ List format_data2(List hmm_info, List d_info, List hap_info) {
   List hashed_dat = hash_mat(full_dat);
   List all_id = hashed_dat["all_id"];
   IntegerVector idx =  hashed_dat["idx"];
-  // make a new dataframe cased on the hash table, i.e. repeat each record 4 times with changing the nuc
+  // make a new dataframe based on the hash table, i.e. repeat each record 4 times with changing the nuc
   IntegerMatrix subset_dat = ss(full_dat, idx);
   IntegerVector ref_pos = subset_dat(_, 1);
   IntegerVector read_pos = subset_dat(_, 2);

@@ -518,29 +518,55 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
             non_del++;
           }
         }
-      
+      if(non_del == 1) {
+        Rcout << "site " << j;
+        Rcout << " is covered by 1 read \n";
+        n_row[j] = 1;
+        IntegerVector tmp = {nuc_j[0], nuc_j[0], nuc_j[0], nuc_j[0]};
+        haplotype(j) = tmp;
+        continue;
+      }
+        
       // Rcout << j << ":\t" << non_del<< ":" << count<<"\t" << qua_min<<  "\n";
       IntegerVector tmp(count);
       IntegerVector tmp_nuc;
+      // if there are only two reads covered and only keep the one with the highest prob
+      if(non_del == 2) {
+        int max_qua = 0;
+        int keep_id = 0;
+        for(i = 0; i < count; ++i) 
+          if(nuc_j[i] != -1)
+            if(qua_ij[i] > max_qua) {
+              max_qua = qua_ij[i];
+              keep_id = i;
+            }
+        Rcout << "site " << j;
+        Rcout << " is covered by 2 reads, keep the one with the highest quality score \n";
+        n_row[j] = 1;
+        IntegerVector tmp = {nuc_j[keep_id], nuc_j[keep_id], nuc_j[keep_id], nuc_j[keep_id]};
+        haplotype(j) = tmp;
+        continue;
+      }
       // remove the ones with the lowest quality score
-        if(qua_min < QUA_ERR && non_del > 1) {
-          IntegerVector ind_que(count);
-          for(i = 0; i < count; ++i) 
-            if(qua_ij[i] == qua_min)
-              ind_que[i] = 1;
-            // Rcout << ind_que << "\n";
-            int enu = 0;
-          for(i = 0; i < count; ++i) 
-            if(!ind_que[i])
-              tmp[enu++] = nuc_j[i];
-          tmp_nuc = tmp[Range(0, enu - 1)];  
-      } else
-        tmp_nuc = nuc_j[Range(0, count - 1)];
+      if (qua_min < QUA_ERR && non_del > 1) {
+        IntegerVector ind_que(count);
+        for(i = 0; i < count; ++i) 
+          if(qua_ij[i] == qua_min)
+            ind_que[i] = 1;
+          // Rcout << ind_que << "\n";
+        int enu = 0;
+        for(i = 0; i < count; ++i) 
+          if(!ind_que[i])
+            tmp[enu++] = nuc_j[i];
+        tmp_nuc = tmp[Range(0, enu - 1)];  
+     } else
+      tmp_nuc = nuc_j[Range(0, count - 1)];
       // Rcout << tmp_nuc << "\n";
         // /* skip the noncovered site */
         // if(count == 0)
         //   continue;
         /* get the nuc table at each site */
+        // Rcout << j << "\t" << tmp_nuc << "\n";
         nuc = unique_map(tmp_nuc);
         IntegerVector key = nuc["values"];
         IntegerVector val = nuc["lengths"];
@@ -552,19 +578,19 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
             keys(num) = key(t);
             vals(num++) = val(t);
           }
-          
           // if only deletion appears
-          if(num == 1 && keys[0] == -1) {
-            nuc_unique[j] = key[Range(0, 1)];
-            nuc_count[j] = val[Range(0, 1)];
-            num++; //for using the codition num == 2
-          } else {
+          // if(num == 1 && keys[0] == -1) {
+          //   nuc_unique[j] = key[Range(0, 1)];
+          //   nuc_count[j] = val[Range(0, 1)];
+          //   num++; //for using the condition num == 2
+          // } else {
             nuc_unique[j] = keys[Range(0, num - 1)];
             nuc_count[j] = vals[Range(0, num - 1)];
-          }
+          // }
           
           IntegerVector hap_site = nuc_unique[j];
           IntegerVector sum_site = nuc_count[j];
+         
           if(sbs) {
             List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment);
             n_row[j] = out["n_row"];

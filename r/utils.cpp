@@ -206,21 +206,28 @@ IntegerMatrix call_cart_product(IntegerVector len) {
 }
 
 IntegerMatrix comb_element(List len, IntegerVector flag, unsigned int row) {
-  vector<vector<int> > vec(row);
-  unsigned int col, i, j;
+  vector<vector<int> > vec;
+  int col, i, j;
   for (i = 0; i < len.size(); i++) {
     if(flag[i])
       continue;
     IntegerVector row_vec = len[i];
     col = row_vec.size();
-    vec[i] = vector<int>(col);
-    for (j = 0; j < col; j++)
-      vec[i][j] = row_vec[j];
+    vector<int> v1(col);
+    for (j = 0; j < col; j++) {
+      v1[j] = row_vec[j];
+    }
+    vec.push_back(v1);
   }
+  // for (int i = 0; i < vec.size(); i++) { 
+  //   for (int j = 0; j < vec[i].size(); j++) 
+  //     Rcout << vec[i][j] << " "; 
+  //   Rcout << "\n"; 
+  // }
   vector<vector<int> > res = cart_product(vec);
   IntegerMatrix out(res.size(), row);
   for(i = 0; i < res.size(); ++i)
-    for(j = 0; j < row; ++j) 
+    for(j = 0; j < row; ++j)
       out(i, j) = res[i][j];
   return(out);
 }

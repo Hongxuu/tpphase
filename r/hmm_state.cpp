@@ -10,7 +10,7 @@ using namespace Rcpp;
 using namespace std;
 #define NUM_CLASS 4
 #define LINKAGE_LEN 2
-
+#define MIN_COVERGE 4
 // [[Rcpp::depends(RcppArmadillo)]]
 
 IntegerMatrix Twopossible(IntegerVector a) {
@@ -107,7 +107,7 @@ List aux_noN_S3(IntegerVector sum_site, IntegerVector hap_site) {
   double p2 = sum_site[2]/sum;
   IntegerVector small(2);
   IntegerVector small_count(2);
-  // different ceriterion to reduce the possibilities, basically rule out things like ATAG
+  // different rules to reduce the possibilities, basically rule out things like ATAG
   if (((sum_site[2] + sum_site[1])/sum_site[0] <= 1.2 && (sum_site[2] + sum_site[1])/sum_site[0] >= 0.8) ||
       (sum_site[0]/sum >= 0.45)) {
     small = {hap_site[1], hap_site[2]};
@@ -286,7 +286,7 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
   return(ls);
 }
 
-// use guess to make linkage (based on observed data)
+// remake linkage (based on observed data)
 IntegerMatrix remake_linkage(IntegerMatrix sub_link, unsigned int num) {
   unsigned int i, j, k, i1;
   arma::mat sub_uni = unique_rows(as<arma::mat>(sub_link));

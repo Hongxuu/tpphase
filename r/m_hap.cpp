@@ -302,6 +302,7 @@ List viterbi_MN(List par, List dat_info) {
    * compute log probability table to trace back the hidden state: l = 0, state M
    */
   double max_prob = 0;
+  arma::Cube<int> backptr(hap_length - 1, HIDDEN_STATE, NUM_CLASS);
   for (k = 0; k < NUM_CLASS; ++k)
     for (j = 0; j < hap_length; ++j)
       for (l = 0; l < HIDDEN_STATE; ++l) {
@@ -309,12 +310,16 @@ List viterbi_MN(List par, List dat_info) {
           path_jnk(j, l, k) = emmis_prob(j, l);
         } else {
           max = -INFINITY;
+          max_id = 0;
           for (l1 = 0; l1 < HIDDEN_STATE; ++l1) {
             max_prob = path_jnk(j - 1, l1, k) + transition_prob(l1, l, k);
-            if (max_prob > max)
+            if (max_prob > max) {
               max = max_prob;
+              max_id = l1;
+            }
           }
           path_jnk(j, l, k) = emmis_prob(j, l) + max;
+          backptr(j - 1, l, k) = max_id;
         }
       }
    // Rprintf("path_jnk prob:\n");
@@ -322,21 +327,32 @@ List viterbi_MN(List par, List dat_info) {
   /*
    * find the path (backtrace)
    */
-  for (k = 0; k < NUM_CLASS; ++k)
-    for (j = hap_length; j --> 0;) {
-      max = -INFINITY;
-      max_id = 0;
-      for (l = 0; l < HIDDEN_STATE; ++l)
-        if (path_jnk(j, l, k) > max) {
-          max_id = l;
-          max = path_jnk(j, l, k);
-        }
-      hidden_state(k, j) = max_id;
+  IntegerVector b_next(NUM_CLASS);
+  j = hap_length - 1;
+  for (k = 0; k < NUM_CLASS; ++k) {
+    max = -INFINITY;
+    for (l = 0; l < HIDDEN_STATE; ++l)
+      if (path_jnk(j, l, k) > max) {
+        b_next[k] = l;
+        max = path_jnk(j, l, k);
+      }
+    hidden_state(k, j) = b_next[k];
+    if(hidden_state(k, j) == 1) {
+      // Rprintf("%d %d deletion state\n", k, j);
+      hap_deletion_len[k]++;
+    }
+  }
+  while (j--) {
+    for (k = 0; k < NUM_CLASS; ++k) {
+      b_next[k] = backptr[j, b_next[k], k];
+      hidden_state(k, j) = b_next[k];
       if(hidden_state(k, j) == 1) {
         // Rprintf("%d %d deletion state\n", k, j);
         hap_deletion_len[k]++;
       }
     }
+  }  
+  
   unsigned int sum = 0;
   for(k = 0; k < NUM_CLASS; ++k)
     sum += hap_deletion_len[k];
