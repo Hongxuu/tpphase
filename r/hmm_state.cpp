@@ -941,18 +941,21 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   int num_states = exclude_info["num_states"];
   IntegerVector exclude = exclude_info["exclude"];
   // Rcout << "exclude "<< exclude << "\n";
-  IntegerMatrix next_comb(num_states, combination.ncol());
+  IntegerMatrix next_cb(num_states, combination.ncol());
   count = 0;
   // Now combine first and second part[make sure the connection states appear]
   if(flag) {
     for(m = 0; m < num; ++m)
       if(!exclude[m])
-          next_comb(count++, _) = new_combination(m, _);
+        next_cb(count++, _) = new_combination(m, _);
   } else {
       for(m = 0; m < combination.nrow(); ++m)
         if(!exclude[m])
-          next_comb(count++, _) = combination(m, _);
+          next_cb(count++, _) = combination(m, _);
   }
+  
+  // dereplicate
+  IntegerMatrix next_comb = dereplicate_states(next_cb, next_cb.ncol(), next_cb.nrow());
   // if next_comb does not contain one of the states in allowed, add it back (use the one w/ smallest index)
   // this will introduce more states not shown in the reads linkage, but to keep the trans works, have to...
   IntegerVector new_exist = next_comb(_, 0);

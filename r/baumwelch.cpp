@@ -511,9 +511,9 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
         new_comb(count++, _) = combination(m, _);
       }
     // dereplicate
-    // IntegerMatrix final_comb = dereplicate_states(new_comb, combination.ncol(), new_num_states[start_t[t]]);
-    comb[start_t[t]] = new_comb;
-    new_num_states[start_t[t]] = new_comb.nrow();
+    IntegerMatrix final_comb = dereplicate_states(new_comb, combination.ncol(), new_num_states[start_t[t]]);
+    comb[start_t[t]] = final_comb;
+    new_num_states[start_t[t]] = final_comb.nrow();
   }
  
   IntegerVector exclude_last;
@@ -562,10 +562,6 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
           IntegerMatrix comb_in = comb[last_t];
           IntegerMatrix new_comb = new_combination(hmm_info, loci_currt, overlapped_t, comb_in,
                                                    loci_lastt, linkage_info, new_num_states[last_t], use_MC);
-          // dereplicate
-          // IntegerMatrix final_comb = dereplicate_states(new_comb, new_comb.ncol(), new_comb.nrow());
-          // comb[t] = final_comb;
-          // new_num_states[t] = final_comb.nrow();
           new_num_states[t] = new_comb.nrow();
           comb[t] = new_comb;
         }
