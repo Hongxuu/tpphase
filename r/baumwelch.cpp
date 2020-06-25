@@ -477,7 +477,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
   IntegerVector pos_possibility = hmm_info["pos_possibility"];
   IntegerVector undecided_pos = hmm_info["undecided_pos"];
   unsigned int t_max = hmm_info["t_max"];
-  unsigned int t, m, st;
+  unsigned int t, m;
   List full_hap(t_max);
   List comb(t_max);
   IntegerMatrix hap = fill_all_hap(hidden_states, hap_length, n_row);
@@ -491,33 +491,29 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
   int n_start = start_t.size();
   //start t info(store this for t that needs to use this info)
   Rcout << "start t " << start_t << "\n";
-  List exclude_t(n_start);
-  List combination_t(n_start);
+  
   List full_hap_t;
-  List full_hap_ns(n_start);
   
   for(t = 0; t < n_start; ++t) {
     int count = 0;
     List comb_info_t0 = find_combination(undecided_pos, pos_possibility, p_tmax[start_t[t]], time_pos[start_t[t]], hap_min_pos);
     IntegerVector location = comb_info_t0["location"];
     IntegerMatrix combination = comb_info_t0["combination"];
-    combination_t[t] = combination;
     unsigned int num = comb_info_t0["num"];
+    
     List t0 = limit_comb_t0(combination, hidden_states, location, linkage_info, num, 0, num_states[start_t[t]], use_MC);
     IntegerVector exclude = t0["exclude"];
-    exclude_t[t] = exclude;
     new_num_states[start_t[t]] = t0["num_states"];
     IntegerMatrix new_comb(new_num_states[start_t[t]], combination.ncol());
-    full_hap_t = List(new_num_states[start_t[t]]);
     Rcout << start_t[t] << " new no. states: " << new_num_states[start_t[t]] << "\n";
     for(m = 0; m < num_states[start_t[t]]; ++m)
       if(!exclude[m]) {
-        IntegerMatrix haplotype = make_hap(hidden_states, hap, location, p_tmax[start_t[t]], combination(m, _), time_pos[start_t[t]], num, hap_min_pos);
-        new_comb(count, _) = combination(m, _);
-        full_hap_t(count++) = haplotype;
+        new_comb(count++, _) = combination(m, _);
       }
+    // dereplicate
+    // IntegerMatrix final_comb = dereplicate_states(new_comb, combination.ncol(), new_num_states[start_t[t]]);
     comb[start_t[t]] = new_comb;
-    full_hap_ns[t] = full_hap_t;
+    new_num_states[start_t[t]] = new_comb.nrow();
   }
  
   IntegerVector exclude_last;
@@ -525,52 +521,27 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
   // get the states  
   for(t = 0; t < t_max; ++t) {
     if(num_states[t] != 1 && overlapped_id[t] != -1) {
-      int count = 0;
+      // int count = 0;
       // Rcout << t << "\t";
         int identical = 0;
         int last_t = overlapped_id[t];
         IntegerVector overlapped_t = overlapped[t];
         IntegerVector loci_lastt = loci[last_t];
         IntegerVector loci_currt = loci[t];
-        int old_state;
+        // int old_state;
         // Rcout << last_t << "\n";
         // Rcout << "overlapped: " << overlapped_t << "\n";
         // Rcout << "loci_lastt: " << loci_lastt << "\n";
         // Rcout << "loci_currt: " << loci_currt << "\n";
-        int flag = 0;
+        // int flag = 0;
         if(loci_lastt[0] <= loci_currt[0] && loci_lastt[loci_lastt.size() - 1] >= loci_currt[loci_currt.size() - 1]) {
           if(loci_lastt.size() > loci_currt.size()) { // if current is in its overlap
             // get the unique overlapped combination from the last t
-            for(st = 0; st < n_start; ++st)
-              if(last_t == start_t[st]) {
-                flag = 1;
-                IntegerVector exclude = exclude_t(st);
-                IntegerMatrix combination = combination_t(st);
-                exclude_last = IntegerVector(exclude.size());
-                exclude_last = exclude;
-                old_state = num_states[last_t];
-                comb_in = IntegerMatrix(combination.nrow(), combination.ncol());
-                comb_in = combination;
-                break;
-              }
-            if(!flag) {
-              exclude_last = IntegerVector(new_num_states[last_t]);
-              for(m = 0; m < new_num_states[last_t]; ++m)
-                exclude_last[m] = 0;
-              old_state = new_num_states[last_t];
-              IntegerMatrix tmp = comb[last_t];
-              comb_in = IntegerMatrix(tmp.nrow(), tmp.ncol());
-              comb_in = tmp;
-            }
+              IntegerMatrix comb_in = comb[last_t];
             // Rcout << "last t:\t" << new_num_states[last_t] << "\told\t" << old_state << "\n";
-            IntegerMatrix new_comb = unique_overlap(overlapped_t, exclude_last, comb_in, loci_lastt, new_num_states[last_t], old_state);
+            IntegerMatrix new_comb = unique_overlap(overlapped_t, comb_in, loci_lastt, new_num_states[last_t]);
             new_num_states[t] = new_comb.nrow();
             comb[t] = new_comb;
-            full_hap_t = List(new_num_states[t]);
-            for(m = 0; m < new_num_states[t]; ++m) {
-              IntegerMatrix haplotype = make_hap(hidden_states, hap, loci_currt, p_tmax[t], new_comb(m, _), time_pos[t], loci_currt.size(), hap_min_pos);
-              full_hap_t(count++) = haplotype;
-            }
           } else if (loci_lastt.size() == loci_currt.size()) {// if current is same as its overlap
             for(m = 0; m < loci_lastt.size(); ++m)
               if(loci_lastt[m] != loci_currt[m]) {
@@ -582,62 +553,47 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
               IntegerMatrix new_comb = comb[last_t];
               comb[t] = new_comb;
               new_num_states[t] = new_num_states[last_t];
-              full_hap_t = List(new_num_states[t]);
-                // haps are still different since the entire covered sites are different
-              for(m = 0; m < new_num_states[t]; ++m) {
-                IntegerMatrix haplotype = make_hap(hidden_states, hap, loci_currt, p_tmax[t], new_comb(m, _), time_pos[t], loci_currt.size(), hap_min_pos);
-                full_hap_t(count++) = haplotype;
-              }
             }
           }
         } 
         else {
           // Rcout << "remake linkage\n";
           // new variable site in this t, need to get the new combination while making sure it can be transferred to the next t
-          for(st = 0; st < n_start; ++st)
-            if(last_t == start_t[st]) {
-              flag = 1;
-              IntegerVector exclude = exclude_t(st);
-              IntegerMatrix combination = combination_t(st);
-              exclude_last = IntegerVector(exclude.size());
-              exclude_last = exclude;
-              old_state = num_states[last_t];
-              comb_in = IntegerMatrix(combination.nrow(), combination.ncol());
-              comb_in = combination;
-              break;
-            }
-          if(!flag) {
-            exclude_last = IntegerVector(new_num_states[last_t]);
-            for(m = 0; m < new_num_states[last_t]; ++m)
-              exclude_last[m] = 0;
-            old_state = new_num_states[last_t];
-            IntegerMatrix tmp = comb[last_t];
-            comb_in = IntegerMatrix(tmp.nrow(), tmp.ncol());
-            comb_in = tmp;
-          }
-          IntegerMatrix new_comb = new_combination(hmm_info, loci_currt, overlapped_t, exclude_last, comb_in,
-                                                   loci_lastt, linkage_info, new_num_states[last_t], old_state, use_MC);
+          IntegerMatrix comb_in = comb[last_t];
+          IntegerMatrix new_comb = new_combination(hmm_info, loci_currt, overlapped_t, comb_in,
+                                                   loci_lastt, linkage_info, new_num_states[last_t], use_MC);
+          // dereplicate
+          // IntegerMatrix final_comb = dereplicate_states(new_comb, new_comb.ncol(), new_comb.nrow());
+          // comb[t] = final_comb;
+          // new_num_states[t] = final_comb.nrow();
           new_num_states[t] = new_comb.nrow();
           comb[t] = new_comb;
-          full_hap_t = List(new_num_states[t]);
-          for(m = 0; m < new_num_states[t]; ++m) {
-            IntegerMatrix haplotype = make_hap(hidden_states, hap, loci_currt, p_tmax[t], new_comb(m, _), time_pos[t], loci_currt.size(), hap_min_pos);
-            full_hap_t(count++) = haplotype;
-          }
         }
     } 
     else if(num_states[t] == 1) {
-      full_hap_t = List(1);
-      full_hap_t[0] = hap(_, Range(time_pos[t] - hap_min_pos, time_pos[t] + p_tmax[t] - hap_min_pos - 1));
       new_num_states[t] = 1;
       comb[t] = -1;
     }
     // Rcout << "new no. states: " << new_num_states[t] << "\n";
+    // full_hap[t] = full_hap_t;
+  }
+
+  for(t = 0; t < t_max; ++t) {
+    int count = 0;
+    if(num_states[t] == 1) {
+      full_hap_t = List(1);
+      full_hap_t[0] = hap(_, Range(time_pos[t] - hap_min_pos, time_pos[t] + p_tmax[t] - hap_min_pos - 1));
+    } else {
+      IntegerMatrix new_comb = comb[t];
+      IntegerVector loci_currt = loci[t];
+      full_hap_t = List(new_num_states[t]);
+      for(m = 0; m < new_num_states[t]; ++m) {
+        IntegerMatrix haplotype = make_hap(hidden_states, hap, loci_currt, p_tmax[t], new_comb(m, _), time_pos[t], loci_currt.size(), hap_min_pos);
+        full_hap_t(count++) = haplotype;
+      }
+    }
     full_hap[t] = full_hap_t;
   }
-  // I don't understand why directly give values would be overwritted, it doesn't work!
-  for(t = 0; t < n_start; ++t)
-    full_hap[start_t[t]] = full_hap_ns[t];
   
   List out = List::create(
     Named("full_hap") = full_hap,

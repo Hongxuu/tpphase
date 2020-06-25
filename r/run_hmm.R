@@ -28,7 +28,7 @@ n_class = 4
 num_cat = 4
 seed = 0
 genotype_target = 0
-datafile = "../../data/hmm/WGS/simu/ref1/L_"
+datafile = "../../data/hmm/WGS/simu/ref4/low_cov/out.txt"
 alignment = "../../data/hmm/WGS/simu/ref4/ref.fsa"
 call_aln(ref_nameA = "Genome_A:0-2000", ref_nameB = "Genome_B:0-2000",
          ref_fsa = alignment,
@@ -37,7 +37,7 @@ call_aln(ref_nameA = "Genome_A:0-2000", ref_nameB = "Genome_B:0-2000",
          alnB = "../../data/hmm/WGS/simu/ref4/high_cov/aln0B.sam",
          out_file = datafile)
 
-altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", datafile = NULL, cut_off = 0.1, use_MC = 0,
+altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", datafile = NULL, cut_off = 0.1, use_MC = 1,
                           formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 50, res_file = NULL,
                           n_class = 4, num_cat = 4, seed = 0, tol = 1e-05, ncores = 2, genotype_target = 0, eta = rep(0.25, 4))  {
   registerDoParallel(cores = ncores)  

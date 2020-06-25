@@ -19,9 +19,11 @@ List find_combination(IntegerVector undecided_pos, IntegerVector pos_possibility
                       unsigned int p_tmax, unsigned int time_pos, int hap_min_pos);
 IntegerMatrix make_hap(List hidden_states, IntegerMatrix haplotype, IntegerVector location, unsigned int p_tmax,
                        IntegerVector combination, unsigned int time_pos, unsigned int num, int hap_min_pos);
-IntegerMatrix unique_overlap(IntegerVector overlapped, IntegerVector exclude_last, IntegerMatrix overlap_comb, IntegerVector overlap_loci, 
-                             unsigned int overlap_new_states, unsigned int overlap_num_states);
-IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVector overlapped, IntegerVector exclude_last, IntegerMatrix overlap_comb, 
-                              IntegerVector overlap_loci, IntegerMatrix linkage_info, unsigned int overlap_new_states, unsigned int overlap_num_states,
+IntegerMatrix unique_overlap(IntegerVector overlapped, IntegerMatrix overlap_comb, IntegerVector overlap_loci, 
+                             unsigned int overlap_new_states);
+IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVector overlapped, IntegerMatrix overlap_comb, 
+                              IntegerVector overlap_loci, IntegerMatrix linkage_info, unsigned int overlap_new_states,
                               unsigned int use_MC);
+IntegerMatrix dereplicate_states(IntegerMatrix new_combination, unsigned int num,
+                                 unsigned int num_states);
 #endif
