@@ -61,7 +61,11 @@ List aux_noN_S2(IntegerVector sum_site, IntegerVector hap_site, List opt) {
     IntegerMatrix temp;
     double three_hap = opt["three_hap"];
     if (sum_site[max_id]/sum >= three_hap) {//largest one appears 3 times as much as the rest
-      temp = call_permute({hap_site[max_id], hap_site[max_id], hap_site[max_id], hap_site[1]});
+      int left = 0;
+      for(int i = 0; i < 2; ++i) 
+        if(max_id != i)
+          left = i;
+      temp = call_permute({hap_site[max_id], hap_site[max_id], hap_site[max_id], hap_site[left]});
       temp2 = Twopossible(hap_site);
       arma::Mat<int> m1 = as<arma::Mat<int>>(temp);
       arma::Mat<int> m2 = as<arma::Mat<int>>(temp2);
@@ -99,6 +103,7 @@ List aux_noN_S3(IntegerVector sum_site, IntegerVector hap_site, List opt) {
   }
   int third_nuc = opt["third_nuc"];
   if(!third_nuc) {
+    Rcout << "exclude 3rd nuc\n";
       ls = aux_noN_S2(sum_site2, hap_site2, opt);
   } else {
     sum = sum_site[2] + sum_site[1] + sum_site[0];

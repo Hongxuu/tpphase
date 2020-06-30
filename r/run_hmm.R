@@ -26,8 +26,8 @@ use_MC = 1
 
 seed = 0
 
-datafile = "../../data/hmm/WGS/simu/ref4/low_cov/out.txt"
-alignment = "../../data/hmm/WGS/simu/ref4/ref.fsa"
+datafile = "../../data/hmm/WGS/simu/ref2/LOW_SNP/mid_cov/out.txt"
+alignment = "../../data/hmm/WGS/simu/ref2/LOW_SNP/ref.fsa"
 call_aln(ref_nameA = "Genome_A:0-2000", ref_nameB = "Genome_B:0-2000",
          ref_fsa = alignment,
          ref_sam = "../../data/hmm/WGS/simu/ref4/ref.sam",
@@ -91,24 +91,24 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
       warning(opnm, " is not a valid option.")
     }
   }
-  ## make universial reference
+  ## make universal reference
   cat("preparing data: \n");
   align <- read_fasta(alignment)
   if(nrow(align$reads) != 1) { #only read in one reference pair
-    universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = 0)
-    universial <- universial %>% unlist()
+    universal <- make_universal(alignment = align, for_hmm = 1, ref_idx = 0)
+    universal <- universal %>% unlist()
   } else { ## read in many references, take the one we want
     ref_in <- strsplit(ref_name, ref_delim, fixed = TRUE) %>% unlist()
     ref_index <- ref_in[2] %>% as.integer() - 1 ## index in C
-    universial <- make_universal(alignment = align, for_hmm = 1, ref_idx = ref_index)
-    universial <- Filter(Negate(is.null), universial) %>% unlist()
+    universal <- make_universal(alignment = align, for_hmm = 1, ref_idx = ref_index)
+    universal <- Filter(Negate(is.null), universal) %>% unlist()
   }
   rm(align)
   
   ## prepare data
   genotype_target = 0
   dat_info <- read_data(datafile, old_v = genotype_target)
-  HMM <- hmm_info(dat_info = dat_info, uni_alignment = universial, opt = opts)
+  HMM <- hmm_info(dat_info = dat_info, uni_alignment = universal, opt = opts)
   
   ########################## baum-welch (iterate until converge)
   
