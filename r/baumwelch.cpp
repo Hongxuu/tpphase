@@ -514,6 +514,8 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
     IntegerMatrix final_comb = dereplicate_states(new_comb, combination.ncol(), new_num_states[start_t[t]]);
     comb[start_t[t]] = final_comb;
     new_num_states[start_t[t]] = final_comb.nrow();
+    // comb[start_t[t]] = new_comb;
+    // new_num_states[start_t[t]] = new_comb.nrow();
   }
  
   IntegerVector exclude_last;

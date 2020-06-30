@@ -6,6 +6,7 @@
 
 #include "hmm_state.h"
 #include "utils.h"
+
 using namespace Rcpp;
 using namespace std;
 
@@ -424,7 +425,8 @@ IntegerVector find_snp (CharacterMatrix hap) {
 }
 
 // [[Rcpp::export]] 
-List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsigned int sbs = 1) {
+List hmm_info(List dat_info, CharacterVector uni_alignment, 
+              List opt, unsigned int sbs = 1) {
   unsigned int i, j, t;
   unsigned int total = dat_info["total"];
   int n_observation = dat_info["n_observation"];
@@ -439,6 +441,8 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
   IntegerVector obs = dat_info["nuc"];
   IntegerVector qua = dat_info["qua"];
   IntegerVector non_covered = dat_info["non_covered_site"];
+  double cut_off = opt["cut_off"];
+  
   /* Find the number of reads with alignment start from each t (hash) */
   IntegerVector read_start(n_observation);
   for(i = 0; i < n_observation; ++i)
@@ -559,48 +563,47 @@ List hmm_info(List dat_info, double cut_off, CharacterVector uni_alignment, unsi
           if(!ind_que[i])
             tmp[enu++] = nuc_j[i];
         tmp_nuc = tmp[Range(0, enu - 1)];  
-     } else
-      tmp_nuc = nuc_j[Range(0, count - 1)];
+      } else
+        tmp_nuc = nuc_j[Range(0, count - 1)];
       // Rcout << tmp_nuc << "\n";
         // /* skip the noncovered site */
         // if(count == 0)
         //   continue;
         /* get the nuc table at each site */
         // Rcout << j << "\t" << tmp_nuc << "\n";
-        nuc = unique_map(tmp_nuc);
-        IntegerVector key = nuc["values"];
-        IntegerVector val = nuc["lengths"];
-        num = 0;
-        
-        /* remove some unlikely occurred nuc (notice the situation that only - appears) */
-        for(t = 0; t < val.length(); ++t)
-          if(val[t] >= prop(j)) {
-            keys(num) = key(t);
-            vals(num++) = val(t);
-          }
-          // if only deletion appears
-          // if(num == 1 && keys[0] == -1) {
-          //   nuc_unique[j] = key[Range(0, 1)];
-          //   nuc_count[j] = val[Range(0, 1)];
-          //   num++; //for using the condition num == 2
-          // } else {
-            nuc_unique[j] = keys[Range(0, num - 1)];
-            nuc_count[j] = vals[Range(0, num - 1)];
-          // }
-          
-          IntegerVector hap_site = nuc_unique[j];
-          IntegerVector sum_site = nuc_count[j];
-         
-          if(sbs) {
-            List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment);
-            n_row[j] = out["n_row"];
-            List hap_temp = out["haplotype"];
-            haplotype(j) = hap_temp[0];
-            if(n_row[j] > 1) {
-              undecided_pos(more_than1) = j; // relative to the haplotype currently try to infer (alignment start from 0)
-              pos_possibility(more_than1++) = n_row[j];
-            }
-          }
+      nuc = unique_map(tmp_nuc);
+      IntegerVector key = nuc["values"];
+      IntegerVector val = nuc["lengths"];
+      num = 0;
+      
+      /* remove some unlikely occurred nuc (notice the situation that only - appears) */
+      for(t = 0; t < val.length(); ++t)
+        if(val[t] >= prop(j)) {
+          keys(num) = key(t);
+          vals(num++) = val(t);
+        }
+        // if only deletion appears
+        // if(num == 1 && keys[0] == -1) {
+        //   nuc_unique[j] = key[Range(0, 1)];
+        //   nuc_count[j] = val[Range(0, 1)];
+        //   num++; //for using the condition num == 2
+        // } else {
+      nuc_unique[j] = keys[Range(0, num - 1)];
+      nuc_count[j] = vals[Range(0, num - 1)];
+        // }
+      IntegerVector hap_site = nuc_unique[j];
+      IntegerVector sum_site = nuc_count[j];
+       
+      if(sbs) {
+        List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment, opt);
+        n_row[j] = out["n_row"];
+        List hap_temp = out["haplotype"];
+        haplotype(j) = hap_temp[0];
+        if(n_row[j] > 1) {
+          undecided_pos(more_than1) = j; // relative to the haplotype currently try to infer (alignment start from 0)
+          pos_possibility(more_than1++) = n_row[j];
+        }
+      }
     } else {
       Rcout << "site " << j;
       Rcout << " is non_covered, cannot genotype \n";

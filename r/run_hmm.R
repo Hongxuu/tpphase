@@ -22,12 +22,10 @@ sourceCpp("./r/universal_alignment.cpp")
 sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
-cut_off = 0.1
 use_MC = 1
-n_class = 4 
-num_cat = 4
+
 seed = 0
-genotype_target = 0
+
 datafile = "../../data/hmm/WGS/simu/ref4/low_cov/out.txt"
 alignment = "../../data/hmm/WGS/simu/ref4/ref.fsa"
 call_aln(ref_nameA = "Genome_A:0-2000", ref_nameB = "Genome_B:0-2000",
@@ -37,10 +35,62 @@ call_aln(ref_nameA = "Genome_A:0-2000", ref_nameB = "Genome_B:0-2000",
          alnB = "../../data/hmm/WGS/simu/ref4/high_cov/aln0B.sam",
          out_file = datafile)
 
-altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", datafile = NULL, cut_off = 0.1, use_MC = 1,
-                          formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 50, res_file = NULL,
-                          n_class = 4, num_cat = 4, seed = 0, tol = 1e-05, ncores = 2, genotype_target = 0, eta = rep(0.25, 4))  {
+opts <- new.env()
+assign("cut_off", 0.1, envir = opts)
+assign("three_hap", 0.62, envir = opts)
+assign("third_nuc", 0, envir = opts)
+assign("two_hap", 0.45, envir = opts)
+assign("left_range", 1.2, envir = opts)
+
+setOpt <- function(...) {
+  opts <- getOpt()
+  args <- list(...)
+  if(length(args)==1 && is.list(args[[1]])) {
+    args <- args[[1]]
+  }
+  for(opnm in names(args)) {
+    if(opnm %in% names(opts)) { # class() OK here, since all opts are simple objects with single classes
+      if(class(getOpt(opnm)) == class(args[[opnm]])) {
+        assign(opnm, args[[opnm]], envir=opts)
+      } else {
+        warning(paste0(opnm, " not set, value provided has different class (", class(args[[opnm]]), 
+                       ") then current option value (", class(getOpt(opnm)), ")"))
+      }
+    } else {
+      warning(opnm, " is not a valid option.")
+    }
+  }
+}
+
+getOpt <- function(option = NULL) {
+  if(is.null(option)) option <- ls(opts)
+  
+  if(!all(option %in% ls(opts))) {
+    warning("Tried to get an invalid option: ", option[!(option %in% ls(opts))])
+    option <- option[option %in% ls(opts)]
+  }
+  
+  ropts <- lapply(option, function(x) get(x, envir=opts))
+  names(ropts) <- option
+  if(length(ropts) == 1) ropts <- ropts[[1]]  # If just one option requested, return it alone
+  return(ropts)
+}
+
+altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, res_file = NULL, ref_delim = ".",
+                          formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 50, 
+                          seed = 0, tol = 1e-05, use_MC = 1, ncores = 2, ...)  {
   registerDoParallel(cores = ncores)  
+  call <- sys.call(1)
+  # Read in default opts and then replace with any that were passed in to the function
+  opts <- getOpt()
+  args <- list(...)
+  for(opnm in names(args)) {
+    if(opnm %in% names(opts)) {
+      opts[[opnm]] <- args[[opnm]]
+    } else {
+      warning(opnm, " is not a valid option.")
+    }
+  }
   ## make universial reference
   cat("preparing data: \n");
   align <- read_fasta(alignment)
@@ -56,8 +106,9 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   rm(align)
   
   ## prepare data
+  genotype_target = 0
   dat_info <- read_data(datafile, old_v = genotype_target)
-  HMM <- hmm_info(dat_info = dat_info, cut_off = cut_off, uni_alignment = universial)
+  HMM <- hmm_info(dat_info = dat_info, uni_alignment = universial, opt = opts)
   
   ########################## baum-welch (iterate until converge)
   
@@ -86,6 +137,8 @@ altragenotype <- function(ref_name = NULL, alignment = NULL, ref_delim = ".", da
   id <- data["id"]
   data <- data[, !names(data) %in% c("id")]
   par <- list()
+  n_class = 4 
+  num_cat = 4
   par <- ini_par(dat = data, n_observation = dat_info$n_observation, formula = formula, old_version = genotype_target,
                  n_class = n_class, num_cat = num_cat, ncores = ncores, weight_id = weight_id)
   
