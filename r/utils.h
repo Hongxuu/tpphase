@@ -45,4 +45,7 @@ IntegerMatrix ss(IntegerMatrix X_, IntegerVector ind_);
 arma::mat unique_rows(const arma::mat& m);
 IntegerVector find_max(List ls, int n_obs);
 IntegerMatrix call_permute(vector<int> a);
+IntegerMatrix sort_mat(IntegerMatrix mat, int nrow, int ncol);
+IntegerVector matrix2vec(IntegerMatrix m, const bool byrow = true);
+void print_intmat(IntegerMatrix m);
 #endif

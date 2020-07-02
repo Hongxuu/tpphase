@@ -511,7 +511,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
         new_comb(count++, _) = combination(m, _);
       }
     // dereplicate
-    IntegerMatrix final_comb = dereplicate_states(new_comb, combination.ncol(), new_num_states[start_t[t]]);
+    IntegerMatrix final_comb = dereplicate_states(new_comb, hidden_states, location, combination.ncol(), new_num_states[start_t[t]]);
     comb[start_t[t]] = final_comb;
     new_num_states[start_t[t]] = final_comb.nrow();
     // comb[start_t[t]] = new_comb;
@@ -524,7 +524,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
   for(t = 0; t < t_max; ++t) {
     if(num_states[t] != 1 && overlapped_id[t] != -1) {
       // int count = 0;
-      // Rcout << t << "\t";
+      Rcout << t << "\t";
         int identical = 0;
         int last_t = overlapped_id[t];
         IntegerVector overlapped_t = overlapped[t];

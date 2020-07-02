@@ -242,3 +242,44 @@ IntegerMatrix call_permute(vector<int> a) {
   
   return(permutation);
 }
+
+// sort matrix by every column
+IntegerMatrix sort_mat(IntegerMatrix mat, int nrow, int ncol) {
+  int i, j;
+  IntegerMatrix sorted(nrow, ncol);
+  vector<int> vec(nrow);
+  for (i = 0; i < nrow; i++) {
+    for (j = 0; j < ncol; j++) {
+      vec[i] += pow(10, ncol - 1 - j) * mat(i, j);
+    }
+  }
+  vector<pair<int, int> > vp; 
+  for (int i = 0; i < nrow; ++i) { 
+    vp.push_back(make_pair(vec[i], i)); 
+  } 
+  
+  // Sorting pair vector 
+  sort(vp.begin(), vp.end()); 
+  
+  for(i = 0; i < nrow; ++i) 
+    sorted(i, _) = mat(vp[i].second, _);
+  return sorted;
+}
+
+// matrix to vector
+IntegerVector matrix2vec(IntegerMatrix m, const bool byrow) {
+  if (byrow){
+    m = transpose(m);
+  }
+  IntegerVector x = IntegerVector(m);
+  x.attr("dim") = R_NilValue;
+  return(x);
+}
+
+void print_intmat(IntegerMatrix m) {
+  for(int i = 0; i < m.nrow(); ++i) {
+    for(int j = 0; j < m.ncol(); ++j) 
+      Rcout << m(i, j) << "\t";
+    Rcout << "\n";
+  }
+}

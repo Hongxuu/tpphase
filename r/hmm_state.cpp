@@ -251,6 +251,7 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
             hap_site2[num] = hap_site[i];
             num++;
           }
+        opt["third_nuc"] = 1;
         List out = aux_noN_S3(sum_site2, hap_site2, opt);
         haplotype[0] = out["temp"];
         n_row = out["n_row"];
@@ -707,6 +708,7 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
     sub_link = remake_linkage(old_sub_link, num);
   else
     sub_link = mc_linkage(old_sub_link, num);
+  // print_intmat(sub_link);
   unsigned int n_observation = sub_link.nrow();
   all_excluded = 0;
   for (m = 0; m < num_states; ++m) {
@@ -755,18 +757,30 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
 // only applicable for 
 //  0    4    0    0    2 = 0    4    0    0    3
 // if max = 6, 1=2, 3=4, 5=6; else 0=1, 2=3, 4=5
-IntegerMatrix dereplicate_states(IntegerMatrix new_combination, unsigned int num,
-                                 unsigned int num_states) {
-  unsigned int i, j;
-  IntegerMatrix comb(num_states, num);
-  for(j = 0; j < num; ++j)
-    for(i = 0; i < num_states; ++i)
-      comb(i, j) = new_combination(i, j)/2;
-  // remove duplicate
-  List derep = hash_mat(comb);
-  IntegerVector idx = derep["idx"];
+IntegerMatrix dereplicate_states(IntegerMatrix new_combination, List hidden_states, IntegerVector location,
+                                 unsigned int num, unsigned int num_states) {
+  unsigned int i, j, k;
+  IntegerMatrix sub_hap(NUM_CLASS, num);
+  IntegerMatrix long_hap(num_states, NUM_CLASS * num);
+  for(i = 0; i < num_states; ++i) {
+    IntegerVector comb = new_combination(i, _);
+    for (k = 0; k < NUM_CLASS; ++k) {
+      for (j = 0; j < num; ++j) {
+        IntegerMatrix hidden = hidden_states[location[j]];
+        int id = comb[j];
+        sub_hap(k, j) = hidden(id, k);
+      }
+    }
+    IntegerMatrix ordered_hap = sort_mat(sub_hap, NUM_CLASS, num);
+    // print_intmat(ordered_hap);
+    IntegerVector tmp = matrix2vec(ordered_hap);
+    // Rcout << tmp << "\n";
+    long_hap(i, _) = tmp;
+  }
+  // hash long_hap
+  List info = hash_mat(long_hap);
+  IntegerVector idx = info["idx"];
   IntegerMatrix new_comb = ss(new_combination, idx);
-  
   return(new_comb);
 }
 
@@ -884,6 +898,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   }
   // get the coombination of the non-overlapped location (include last overlapped)
   IntegerMatrix combination = call_cart_product(left_possible[Range(0, count - 1)]);
+  
   // get the appeared possiblilities at the overlapped position
   IntegerVector last_col = first_comb(_, first_comb.ncol() - 1);
   List first_uni = unique_map(last_col); // start might not from 0 (e.g. ailgnment starts from 2)
@@ -912,10 +927,16 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   if(flag) {  // if the exist contains more possibility than allowed, only keeps the allowed          
     for(m = 0; m < combination.nrow(); ++m)
       for(w = 0; w < allowed.size(); ++w)
-        if(allowed(w) == combination(m, 0))
+        if(allowed(w) == combination(m, 0)) {
           new_combination(num++, _) = combination(m, _);
+          break;
+        }
+    // Rcout << "\n comb\n";
+    print_intmat(new_combination(Range(0, num - 1), _));
     exclude_info = limit_comb_t0(new_combination(Range(0, num - 1), _), hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, num, use_MC);
   } else {
+    // Rcout << "\n comb\n";
+    print_intmat(combination);
     exclude_info = limit_comb_t0(combination, hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, combination.nrow(), use_MC);
   }
         
@@ -936,38 +957,75 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
           next_cb(count++, _) = combination(m, _);
   }
   
+  print_intmat(next_cb);
   // dereplicate
-  IntegerMatrix next_comb = dereplicate_states(next_cb, next_cb.ncol(), next_cb.nrow());
+  IntegerMatrix next_comb;
+  int dereplicate = 0;
+  if(num_states == 1)
+    next_comb = next_cb;
+  else {
+    dereplicate = 1;
+    next_comb = dereplicate_states(next_cb, hidden_states, left_loci, next_cb.ncol(), next_cb.nrow());
+  }
+  // Rcout << "remove replicates & impossible\n";
+  print_intmat(next_comb);
   // IntegerMatrix next_comb = next_cb;
   // if next_comb does not contain one of the states in allowed, add it back (use the one w/ smallest index)
   // this will introduce more states not shown in the reads linkage, but to keep the trans works, have to...
   IntegerVector new_exist = next_comb(_, 0);
   if(!setequal(new_exist, allowed)) {
     IntegerVector diff = setdiff(allowed, new_exist);
-    Rcout << "add more possibilities " << diff << "\n";;
+    // Rcout << "add more possibilities " << diff << "\n";;
     IntegerMatrix extra(diff.size(), combination.ncol());
     arma::Mat<int> m1 = as<arma::Mat<int>>(next_comb);
     next_comb = IntegerMatrix(num_states + diff.size(), combination.ncol());
     count = 0;
-    if(flag) {
+    // first search from dereplicated ones
+    IntegerVector diff_ind(diff.size());
+    if(dereplicate) {
+      // Rcout << "from dereplicated\n";
       for(w = 0; w < diff.size(); ++w)
-        for(m = 0; m < new_combination.nrow(); ++m) {
-          IntegerVector tmp = new_combination(m, _);
-          if(new_combination(m, 0) == diff[w]) {
-            extra(count++, _) = new_combination(m, _);
+        for(m = 0; m < next_cb.nrow(); ++m) {
+          IntegerVector tmp = next_cb(m, _);
+          if(next_cb(m, 0) == diff[w]) {
+            diff_ind[w] = 1;
+            extra(count++, _) = next_cb(m, _);
             break;
           }
         }
-    } else {
-      for(w = 0; w < diff.size(); ++w)
-        for(m = 0; m < combination.nrow(); ++m) {
-          IntegerVector tmp = combination(m, _);
-          if(combination(m, 0) == diff[w]) {
-            extra(count++, _) = combination(m, _);
-            break;
+     }
+    int diff_left = diff.size() - count; 
+    if(diff_left != 0 || !dereplicate) {
+      // Rcout << "from original\n";
+      // check if include already include all
+      IntegerVector diff_more(diff_left);
+      int diff_count = 0;
+      if(dereplicate) {
+        for(w = 0; w < diff.size(); ++w)
+          if(!diff_ind[w])
+            diff_more[diff_count++] = diff[w];
+      } else
+        diff_more = diff;
+      if(flag) {
+        for(w = 0; w < diff_more.size(); ++w)
+          for(m = 0; m < new_combination.nrow(); ++m) {
+            IntegerVector tmp = new_combination(m, _);
+            if(new_combination(m, 0) == diff_more[w]) {
+              extra(count++, _) = new_combination(m, _);
+              break;
+            }
+          }
+      } else {
+        for(w = 0; w < diff_more.size(); ++w)
+          for(m = 0; m < combination.nrow(); ++m) {
+            IntegerVector tmp = combination(m, _);
+            if(combination(m, 0) == diff_more[w]) {
+              extra(count++, _) = combination(m, _);
+              break;
+            }
           }
         }
-    }
+      }
     arma::Mat<int> m2 = as<arma::Mat<int>>(extra);
     m1.insert_rows(1, m2);
     next_comb = wrap(m1);

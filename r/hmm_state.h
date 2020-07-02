@@ -23,6 +23,6 @@ IntegerMatrix unique_overlap(IntegerVector overlapped, IntegerMatrix overlap_com
 IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVector overlapped, IntegerMatrix overlap_comb, 
                               IntegerVector overlap_loci, IntegerMatrix linkage_info, unsigned int overlap_new_states,
                               unsigned int use_MC);
-IntegerMatrix dereplicate_states(IntegerMatrix new_combination, unsigned int num,
-                                 unsigned int num_states);
+IntegerMatrix dereplicate_states(IntegerMatrix new_combination, List hidden_states, IntegerVector location,
+                                 unsigned int num, unsigned int num_states);
 #endif
