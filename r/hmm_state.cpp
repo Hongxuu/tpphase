@@ -944,85 +944,47 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   int num_states = exclude_info["num_states"];
   IntegerVector exclude = exclude_info["exclude"];
   // Rcout << "exclude "<< exclude << "\n";
-  IntegerMatrix next_cb(num_states, combination.ncol());
+  IntegerMatrix next_comb(num_states, combination.ncol());
   count = 0;
   // Now combine first and second part[make sure the connection states appear]
   if(flag) {
     for(m = 0; m < num; ++m)
       if(!exclude[m])
-        next_cb(count++, _) = new_combination(m, _);
+        next_comb(count++, _) = new_combination(m, _);
   } else {
       for(m = 0; m < combination.nrow(); ++m)
         if(!exclude[m])
-          next_cb(count++, _) = combination(m, _);
+          next_comb(count++, _) = combination(m, _);
   }
   
-  print_intmat(next_cb);
-  // dereplicate
-  IntegerMatrix next_comb;
-  int dereplicate = 0;
-  if(num_states == 1)
-    next_comb = next_cb;
-  else {
-    dereplicate = 1;
-    next_comb = dereplicate_states(next_cb, hidden_states, left_loci, next_cb.ncol(), next_cb.nrow());
-  }
-  // Rcout << "remove replicates & impossible\n";
-  print_intmat(next_comb);
+  // print_intmat(next_comb);
   // IntegerMatrix next_comb = next_cb;
   // if next_comb does not contain one of the states in allowed, add it back (use the one w/ smallest index)
   // this will introduce more states not shown in the reads linkage, but to keep the trans works, have to...
   IntegerVector new_exist = next_comb(_, 0);
   if(!setequal(new_exist, allowed)) {
     IntegerVector diff = setdiff(allowed, new_exist);
-    // Rcout << "add more possibilities " << diff << "\n";;
+    Rcout << "add more possibilities " << diff << "\n";;
     IntegerMatrix extra(diff.size(), combination.ncol());
     arma::Mat<int> m1 = as<arma::Mat<int>>(next_comb);
     next_comb = IntegerMatrix(num_states + diff.size(), combination.ncol());
     count = 0;
-    // first search from dereplicated ones
-    IntegerVector diff_ind(diff.size());
-    if(dereplicate) {
-      // Rcout << "from dereplicated\n";
+    if(flag) {
       for(w = 0; w < diff.size(); ++w)
-        for(m = 0; m < next_cb.nrow(); ++m) {
-          IntegerVector tmp = next_cb(m, _);
-          if(next_cb(m, 0) == diff[w]) {
-            diff_ind[w] = 1;
-            extra(count++, _) = next_cb(m, _);
+        for(m = 0; m < new_combination.nrow(); ++m) {
+          IntegerVector tmp = new_combination(m, _);
+          if(new_combination(m, 0) == diff[w]) {
+            extra(count++, _) = new_combination(m, _);
             break;
           }
         }
-     }
-    int diff_left = diff.size() - count; 
-    if(diff_left != 0 || !dereplicate) {
-      // Rcout << "from original\n";
-      // check if include already include all
-      IntegerVector diff_more(diff_left);
-      int diff_count = 0;
-      if(dereplicate) {
-        for(w = 0; w < diff.size(); ++w)
-          if(!diff_ind[w])
-            diff_more[diff_count++] = diff[w];
-      } else
-        diff_more = diff;
-      if(flag) {
-        for(w = 0; w < diff_more.size(); ++w)
-          for(m = 0; m < new_combination.nrow(); ++m) {
-            IntegerVector tmp = new_combination(m, _);
-            if(new_combination(m, 0) == diff_more[w]) {
-              extra(count++, _) = new_combination(m, _);
-              break;
-            }
-          }
-      } else {
-        for(w = 0; w < diff_more.size(); ++w)
-          for(m = 0; m < combination.nrow(); ++m) {
-            IntegerVector tmp = combination(m, _);
-            if(combination(m, 0) == diff_more[w]) {
-              extra(count++, _) = combination(m, _);
-              break;
-            }
+    } else {
+      for(w = 0; w < diff.size(); ++w)
+        for(m = 0; m < combination.nrow(); ++m) {
+          IntegerVector tmp = combination(m, _);
+          if(combination(m, 0) == diff[w]) {
+            extra(count++, _) = combination(m, _);
+            break;
           }
         }
       }
@@ -1051,7 +1013,59 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
         all++;
       }
     }
-        
+  // dereplicate
+  // Rcout << "final mat\n";
+  // print_intmat(final_comb);
+  if(all != 1) {
+    IntegerMatrix new_comb = dereplicate_states(final_comb, hidden_states, location, final_comb.ncol(), final_comb.nrow());
+    // Rcout << "dereplicate mat\n";
+    // print_intmat(new_comb);
+    if(new_comb.nrow() != all) {
+     
+      // check if the former states have overlap with the current one
+      IntegerMatrix new_overlapped = new_comb(_, Range(0, overlap_len - 1));
+      IntegerMatrix last_overlapped = final_comb(_, Range(0, overlap_len - 1));
+      List new_hash = hash_mat(new_overlapped);
+      List old_hash = hash_mat(last_overlapped);
+      IntegerVector new_unique = new_hash["idx"];
+      IntegerVector last_unique = old_hash["idx"];
+      count = last_unique.size() - new_unique.size();
+      if(count != 0) {
+        // Rcout << "add " << count << " after dereplication\n";
+        arma::Mat<int> m1 = as<arma::Mat<int>>(new_comb);
+        IntegerMatrix new_uni_com = ss(new_overlapped, new_unique);
+        IntegerMatrix old_uni_com = ss(last_overlapped, last_unique);
+        // unique rows of new_overlapped & last_overlapped
+        // print_intmat(new_uni_com);
+        // print_intmat(old_uni_com);
+        IntegerMatrix extra(count, final_comb.ncol());
+        int same_row = 0;
+        int pass = 0;
+        count = 0;
+        // Rcout << last_unique << "\n";
+        for(w = 0; w < old_uni_com.nrow(); ++w) {
+          pass = 0;
+          for(m = 0; m < new_uni_com.nrow(); ++m) {
+            same_row = 0;
+            for(i = 0; i < overlap_len; ++i) 
+              if(new_uni_com(m, i) == old_uni_com(w, i))
+                same_row++;
+            if(same_row == overlap_len) {
+              pass = 1;
+              break;
+            }
+          }
+          if(pass == 0)
+            extra(count++, _) = final_comb(last_unique[w], _);
+        }
+        arma::Mat<int> m2 = as<arma::Mat<int>>(extra);
+        m1.insert_rows(1, m2);
+        final_comb = wrap(m1);
+      }
+    } else {
+      final_comb = new_comb;
+    }
+  }
   return(final_comb);
 }
 

@@ -26,8 +26,8 @@ use_MC = 1
 
 seed = 0
 
-datafile = "../../data/hmm/WGS/simu/ref2/LOW_SNP/mid_cov/out.txt"
-alignment = "../../data/hmm/WGS/simu/ref2/LOW_SNP/ref.fsa"
+datafile = "../../data/hmm/WGS/simu/ref4/low_cov/out.txt"
+alignment = "../../data/hmm/WGS/simu/ref4/ref.fsa"
 call_aln(ref_nameA = "Genome_A:0-2000", ref_nameB = "Genome_B:0-2000",
          ref_fsa = alignment,
          ref_sam = "../../data/hmm/WGS/simu/ref4/ref.sam",
