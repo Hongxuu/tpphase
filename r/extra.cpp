@@ -1,6 +1,7 @@
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
 #include <iostream>
+#include <cstdlib>
 #include <stdio.h>
 #include <string>
 #include <unordered_map>
@@ -16,7 +17,6 @@ using namespace std;
 // comb_element_dbl(a$miss_list[[4]], a$flag_list[[4]], a$num_list[[4]])
 // # t0 = limit_comb_t0(comb_info_t0$combination, HMM$hidden_states, comb_info_t0$location, linkage_in, comb_info_t0$num, 0, HMM$num_states[1]);
 // l2 <- mc_linkage(linkage_in[, 8:11], 4)
-
 
 
 vector<vector<int> > cart_product_dbl (const vector<vector<int> > &v) {
@@ -35,20 +35,67 @@ vector<vector<int> > cart_product_dbl (const vector<vector<int> > &v) {
 }
 // [[Rcpp::export]]
 
-IntegerMatrix dereplicate_states(IntegerMatrix new_combination, unsigned int num,
-                                 unsigned int num_states) {
-  unsigned int i, j;
-  IntegerMatrix comb(num_states, num);
-  for(j = 0; j < num; ++j)
-    for(i = 0; i < num_states; ++i)
-      comb(i, j) = new_combination(i, j)/2;
-    // remove duplicate
-    // List derep = hash_mat(comb);
-    // IntegerVector idx = derep["idx"];
-    // IntegerMatrix new_comb = ss(new_combination, idx);
-    
-    return(comb);
-  }
+IntegerMatrix dereplicate_states(IntegerMatrix new_combination, List hidden_states, IntegerVector location, 
+                                 IntegerVector possible_states, unsigned int num, unsigned int num_states) {
+  unsigned int i, j, k;
+  // unsigned int heter_snp = 0;
+  IntegerMatrix new_comb;
+  // IntegerVector heter_id(num);
+  // for (i = 0; i < num; ++i)
+  //   if (possible_states[i] == 6)
+  //     heter_id[heter_snp++] = i;
+  // // Rcout <<  heter_snp << "\n";
+  // if (heter_snp == 1) { // only on1 heter snp
+  //   unsigned int count = 0;
+  //   IntegerMatrix comb(num_states, num);
+  //   // Rcout << heter_id[0] << "\n";
+  //   for(i = 0; i < num_states; ++i) {
+  //     if(new_combination(i, heter_id[0]) != 4) {
+  //       if(new_combination(i, heter_id[0]) != 1 && new_combination(i, heter_id[0]) != 3) // exclude one of AAAC AACA
+  //         comb(count++, _) = new_combination(i, _);
+  //     } else { // for AACC and CCAA, only keep 1
+  //         for(j = 0; j < num; ++j) {
+  //           if(new_combination(i, j) == 0)
+  //             comb(count, j) = 1;
+  //           else if(new_combination(i, j) == 1)
+  //             comb(count, j) = 0;
+  //         }
+  //         comb(count++, heter_id[0]) = 5;
+  //     }
+  //   }
+  //   // Rcout << count << "\n";
+  //   IntegerMatrix tmp = comb(Range(0, count - 1), _);
+  //   // print_intmat(tmp);
+  //   // further remove duplicate
+  //   List derep = hash_mat(tmp);
+  //   IntegerVector idx = derep["idx"];
+  //   new_comb = ss(tmp, idx);
+  // } else {
+    // first remove replicate by choosing only 1 invariant rows
+    IntegerMatrix sub_hap(NUM_CLASS, num);
+    IntegerMatrix long_hap(num_states, NUM_CLASS * num);
+    for(i = 0; i < num_states; ++i) {
+      IntegerVector comb = new_combination(i, _);
+      for (k = 0; k < NUM_CLASS; ++k) {
+        for (j = 0; j < num; ++j) {
+          IntegerMatrix hidden = hidden_states[location[j]];
+          int id = comb[j];
+          sub_hap(k, j) = hidden(id, k);
+        }
+      }
+      IntegerMatrix ordered_hap = sort_mat(sub_hap, NUM_CLASS, num);
+      // print_intmat(ordered_hap);
+      IntegerVector tmp = matrix2vec(ordered_hap);
+      // Rcout << tmp << "\n";
+      long_hap(i, _) = tmp;
+    }
+    // hash long_hap
+    List info = hash_mat(long_hap);
+    IntegerVector idx = info["idx"];
+    new_comb = ss(new_combination, idx);
+  // }
+  return(new_comb);
+}
   
   
   
@@ -195,7 +242,7 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
     }
     path(k) = path_t;
   }
-  // Rcout << "decode\n";
+  
   k = llk_in.size() - 1;
   double max = -INFINITY;
   IntegerVector nuc = comb_in(k);
@@ -206,6 +253,7 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
       max = path_t(m);
     }
   }
+  Rcout << "llk" << max << "\n";
   hidden_state(k) = nuc[b_next];
   
   while (k--) {
@@ -344,25 +392,38 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
   // // now use MC to impute the missing nuc
   arma::mat uniqu_link = unique_rows(as<arma::mat>(link));
   IntegerMatrix sub_uni_link = wrap(uniqu_link);
-  IntegerMatrix mc_reads(sub_uni_link.nrow(), sub_uni_link.ncol());
-  for(i = 0; i < sub_uni_link.nrow(); ++i) {
+  int nrow = sub_uni_link.nrow();
+  int ncol = sub_uni_link.ncol();
+  IntegerMatrix mc_reads(nrow, ncol);
+  count = 0;
+  for(i = 0; i < nrow; ++i) {
     int flag = 0;
-    for(j = 0; j < sub_uni_link.ncol(); ++j) {
-      if(sub_uni_link(i, j) == -1) {
+    int missing_num = 0;
+    int exclude = 0;
+    for(j = 0; j < ncol; ++j) {
+      if(sub_uni_link(i, j) == -1) { // if no missing
         flag = 1;
-        break;
+        missing_num++;
+        // break;
+      }
+      if(missing_num == ncol - 1) {4
+        exclude = 1;
       }
     }
     if(!flag) {
-      mc_reads(i, _) = sub_uni_link(i, _);
+      mc_reads(count++, _) = sub_uni_link(i, _);
       continue;
-    }
+    } 
+    if(exclude)
+      continue;
     IntegerVector tmp = sub_uni_link(i, _);
     Rcout << tmp << "\n";
-    mc_reads(i, _) = best_branch(sub_uni_link, transition, initial, possi_nuc, i);
+    mc_reads(count++, _) = best_branch(sub_uni_link, transition, initial, possi_nuc, i);
+    tmp = mc_reads(count - 1, _);
+    Rcout << tmp << "\n";
   }
-
-  arma::mat uniqu = unique_rows(as<arma::mat>(mc_reads));
+  IntegerMatrix tmp = mc_reads(Range(0, count - 1), _);
+  arma::mat uniqu = unique_rows(as<arma::mat>(tmp));
   IntegerMatrix uni = wrap(uniqu);
   List ls = List::create(
     Named("transition") = transition, // possible comb
@@ -449,15 +510,12 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
 
 
 // [[Rcpp::export]]
-List remake_linkage(IntegerMatrix sub_link, unsigned int num) {
+IntegerMatrix remake_linkage(IntegerMatrix sub_link, unsigned int num) {
   unsigned int i, j, k, i1;
   arma::mat sub_uni = unique_rows(as<arma::mat>(sub_link));
   IntegerMatrix link_uni = wrap(sub_uni);
   List new_link(link_uni.nrow());
   unsigned int total_row = 0;
-  List miss_list(link_uni.nrow());
-  List flag_list(link_uni.nrow());
-  List num_list(link_uni.nrow());
   for (i = 0; i < link_uni.nrow(); ++i) {
     List nuc_info = unique_map(link_uni(i, _));
     IntegerVector nuc = nuc_info["values"];
@@ -476,109 +534,96 @@ List remake_linkage(IntegerMatrix sub_link, unsigned int num) {
       if(link_uni(i, j) == -1)
         idx(j) = 1; // indicate -1 is here
       
-    int move_out = 0;
-    // if this read is contained in others
-    for (i1 = 0; i1 < link_uni.nrow(); ++i1) {
-      if (i1 == i)
+      int move_out = 0;
+      // if this read is contained in others
+      for (i1 = 0; i1 < link_uni.nrow(); ++i1) {
+        if (i1 == i)
+          continue;
+        int count = 0;
+        // List nuc_info = unique_map(link_uni(i1, _));
+        // IntegerVector nuc1 = nuc_info["values"];
+        // IntegerVector nuc_count1 = nuc_info["lengths"];
+        // if(nuc_count1[0] >= nuc_count[0])
+        //   continue;
+        for(j = 0; j < num; ++j)
+          if(!idx(j))
+            if(link_uni(i, j) == link_uni(i1, j))
+              count++;
+            if(count == num - nuc_count[0]) {
+              // Rcout << i << "move" << "\n";
+              move_out = 1;
+              break;
+            }
+      }
+      if(move_out)
         continue;
-      int count = 0;
-      // List nuc_info = unique_map(link_uni(i1, _));
-      // IntegerVector nuc1 = nuc_info["values"];
-      // IntegerVector nuc_count1 = nuc_info["lengths"];
-      // if(nuc_count1[0] >= nuc_count[0])
-      //   continue;
-      for(j = 0; j < num; ++j)
-        if(!idx(j))
-          if(link_uni(i, j) == link_uni(i1, j))
-            count++;
-          if(count == num - nuc_count[0]) {
-            Rcout << i << "move" << "\n";
-            move_out = 1;
-            break;
+      List missing(num);
+      IntegerVector flag(num);
+      int in_row_num = 0;
+      for (j = 0; j < num; ++j) {
+        if (link_uni(i, j) == -1) {
+          List nuc_col = unique_map(link_uni(_, j));
+          IntegerVector nuc_unique = nuc_col["values"];
+          // Rcout << nuc_unique << "\n";
+          if(nuc_unique[0] == -1)
+            missing[j] = nuc_unique[Range(1, nuc_unique.size() - 1)];
+          else
+            missing[j] = nuc_unique;
+          in_row_num++;
+        } else
+          flag[j] = 1;
+      }
+      
+      int add_row = 0;
+      if(in_row_num != 1) {
+        IntegerMatrix missing_rows = comb_element(missing, flag, in_row_num);
+        add_row = missing_rows.nrow();
+        IntegerMatrix new_link_i(add_row, num);
+        int count = 0;
+        for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
+          if(flag[j] != 1)
+            new_link_i(_, j) = missing_rows(_, count++);
+          else
+            for (k = 0; k < add_row; ++k)
+              new_link_i(k, j) = link_uni(i, j); // repeat the non-missing ones
+        }
+        new_link[i] = new_link_i;
+      } else {
+        IntegerMatrix new_link_i;
+        IntegerVector tmp;
+        for (j = 0; j < num; ++j)
+          if(flag[j] != 1) {
+            tmp = missing[j];
+            add_row = tmp.size();
+            new_link_i = IntegerMatrix(add_row, num);
           }
-    }
-    if(move_out)
-      continue;
-    // get the nuc at missing locus
-    Rcout << i << " remake\n";
-    List missing(num);
-    IntegerVector flag(num);
-    int in_row_num = 0;
-    for (j = 0; j < num; ++j) {
-      if (link_uni(i, j) == -1) {
-        List nuc_col = unique_map(link_uni(_, j));
-        IntegerVector nuc_unique = nuc_col["values"];
-        
-        if(nuc_unique[0] == -1)
-          missing[j] = nuc_unique[Range(1, nuc_unique.size() - 1)];
-        else
-          missing[j] = nuc_unique;
-        IntegerVector tmp  = missing[j];
-        Rcout << tmp << "\n";
-        in_row_num++;
-      } else
-        flag[j] = 1;
-    }
-    miss_list[i] = missing;
-    flag_list[i] = flag;
-    num_list[i] = in_row_num;
-    Rcout << flag << "\n";
-    Rcout << in_row_num << "\n";
-    int add_row = 0;
-    if(in_row_num != 1) {
-      // IntegerMatrix missing_rows = comb_element_dbl(missing, flag, in_row_num);
-      // add_row = missing_rows.nrow();
-      // IntegerMatrix new_link_i(add_row, num);
-      // int count = 0;
-      // for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
-      //   if(flag[j] != 1)
-      //     new_link_i(_, j) = missing_rows(_, count++);
-      //   else
-      //     for (k = 0; k < add_row; ++k)
-      //       new_link_i(k, j) = link_uni(i, j); // repeat the non-missing ones
-      // }
-      // new_link[i] = new_link_i;
-    }
-    // else {
-    //   IntegerMatrix new_link_i;
-    //   IntegerVector tmp;
-    //   for (j = 0; j < num; ++j)
-    //     if(flag[j] != 1) {
-    //       tmp = missing[j];
-    //       add_row = tmp.size();
-    //       new_link_i = IntegerMatrix(add_row, num);
-    //     }
-    //   for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
-    //     if(flag[j] != 1) {
-    //       new_link_i(_, j) = tmp;
-    //     } else {
-    //       for (k = 0; k < add_row; ++k)
-    //         new_link_i(k, j) = link_uni(i, j);
-    //     }
-    //   }
-    //   new_link[i] = new_link_i;
-    // }
-    total_row += add_row;
+          for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
+            if(flag[j] != 1) {
+              new_link_i(_, j) = tmp;
+            } else {
+              for (k = 0; k < add_row; ++k)
+                new_link_i(k, j) = link_uni(i, j);
+            }
+          }
+          new_link[i] = new_link_i;
+      }
+      total_row += add_row;
   }
   
-  // IntegerMatrix new_link_out(total_row, num);
-  // total_row = 0;
-  // for(i = 0; i < link_uni.nrow(); ++i) {
-  //   if(new_link[i] == R_NilValue)
-  //     continue;
-  //   IntegerVector tmp = new_link[i];
-  //   tmp.attr("dim") = Dimension(tmp.size()/num, num);
-  //   IntegerMatrix new_link_i = as<IntegerMatrix>(tmp);
-  //   for (k = 0; k < tmp.size()/num; ++k)
-  //     new_link_out(total_row++, _) = new_link_i(k, _);
-  // }
-  // // finally, remove duplicated rows
-  // arma::mat new_linkage = unique_rows(as<arma::mat>(new_link_out));
-  // IntegerMatrix out = wrap(new_linkage);
-  
-  List out = List::create(
-    Named("miss_list") = miss_list,
-    Named("flag_list") = flag_list, Named("num_list")= num_list);
+  IntegerMatrix new_link_out(total_row, num);
+  total_row = 0;
+  for(i = 0; i < link_uni.nrow(); ++i) {
+    if(new_link[i] == R_NilValue)
+      continue;
+    IntegerVector tmp = new_link[i];
+    tmp.attr("dim") = Dimension(tmp.size()/num, num);
+    IntegerMatrix new_link_i = as<IntegerMatrix>(tmp);
+    for (k = 0; k < tmp.size()/num; ++k)
+      new_link_out(total_row++, _) = new_link_i(k, _);
+  }
+  // finally, remove duplcated rows
+  arma::mat new_linkage = unique_rows(as<arma::mat>(new_link_out));
+  IntegerMatrix out = wrap(new_linkage);
   return(out);
 }
 
