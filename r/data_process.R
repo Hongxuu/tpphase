@@ -3,10 +3,10 @@ fnlist <- function(x, fil){
   for (i in seq_along(x)) {
     if(nams[i] == "haplotypes") {
       cat(nams[i], ":", "\n", file = fil, append = TRUE)
-      write.table(x[[i]], file = fil, append = T, quote = FALSE, row.names=FALSE, col.names=FALSE)
+      write.table(x[[i]], file = fil, append = T, quote = FALSE, row.names = FALSE, col.names = FALSE)
     } else if(nams[i] == "snps") {
       cat(nams[i], ":", "\n", file = fil, append = TRUE)
-      write.table(x[[i]], file = fil, append = T, quote = FALSE, row.names=FALSE, col.names=TRUE)
+      write.table(x[[i]], file = fil, append = T, quote = FALSE, row.names = FALSE, col.names = FALSE)
     } else {
       cat(nams[i], ":", "\n", x[[i]], "\n", file = fil, append = TRUE) 
     }

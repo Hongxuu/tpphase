@@ -22,19 +22,6 @@ sourceCpp("./r/universal_alignment.cpp")
 sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
-use_MC = 1
-
-seed = 0
-
-datafile = "../../data/hmm/WGS/simu/ref4/low_cov/out.txt"
-alignment = "../../data/hmm/WGS/simu/ref4/ref.fsa"
-call_aln(ref_nameA = "Genome_A:0-2000", ref_nameB = "Genome_B:0-2000",
-         ref_fsa = alignment,
-         ref_sam = "../../data/hmm/WGS/simu/ref4/ref.sam",
-         alnA = "../../data/hmm/WGS/simu/ref4/high_cov/aln0A.sam",
-         alnB = "../../data/hmm/WGS/simu/ref4/high_cov/aln0B.sam",
-         out_file = datafile)
-
 opts <- new.env()
 assign("cut_off", 0.1, envir = opts)
 assign("three_hap", 0.62, envir = opts)
@@ -205,19 +192,18 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   snp_location <- snp_location + dat_info$ref_start
   
   ## choose the weight of selected haplotypes
-  res$full_llk <- bw$par_hmm_bf$full_llk
+  # res$full_llk <- bw$par_hmm_bf$full_llk
+  res$start_pos <- dat_info$ref_start
   res$haplotypes <- haplotypes
-  res$snps <- snps
   res$snp_location <- snp_location
+  res$snps <- snps
+  
   # res$par <- bw
   if(!is.null(res_file))
     fnlist(res, fil = res_file)
   return(res)
 }
 
-altragenotype(datafile = "../../data/hmm/WGS/simu/ref2/LOW_SNP/low_cov/out.txt", 
-              alignment = "../../data/hmm/WGS/simu/ref2/LOW_SNP/ref.fsa",
-              res_file = "./ref2_cov50.txt") -> short_low
 
 
 

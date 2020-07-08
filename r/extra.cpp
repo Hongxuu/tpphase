@@ -35,6 +35,7 @@ vector<vector<int> > cart_product_dbl (const vector<vector<int> > &v) {
 }
 // [[Rcpp::export]]
 
+
 IntegerMatrix dereplicate_states(IntegerMatrix new_combination, List hidden_states, IntegerVector location, 
                                  IntegerVector possible_states, unsigned int num, unsigned int num_states) {
   unsigned int i, j, k;
@@ -406,7 +407,7 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
         missing_num++;
         // break;
       }
-      if(missing_num == ncol - 1) {4
+      if(missing_num == ncol - 1) {
         exclude = 1;
       }
     }

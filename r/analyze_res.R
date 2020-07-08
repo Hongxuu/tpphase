@@ -35,3 +35,10 @@ true_hap <- function(true_path, start_id, end_id) {
 t_hap <- true_hap(true_path = "../../data/tpphase/WGS/simu/L_SNP/sim0.fsa", 
           start_id = dat_info$ref_start + 1, end_id = dat_info$ref_length_max + 1)
 
+grasp <- function(id, start = 0) {
+  for(i in 1:HMM$num_states[id]) {
+    print(hap_full_info$full_hap[[id]][[i]][, overlap_info$location[[id]] - HMM$time_pos[[id]] + 1 + start] )
+  }
+}
+id <- 18
+grasp(69, 13)
