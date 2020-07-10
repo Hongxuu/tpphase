@@ -1,4 +1,5 @@
 ### read the truth
+sourceCpp("./r/assess.cpp")
 
 confusion_matric <- function(res = NULL, truth_file) {
   truth <- read_fasta(truth_file)

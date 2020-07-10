@@ -500,9 +500,16 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
     IntegerVector location = comb_info_t0["location"];
     IntegerMatrix combination = comb_info_t0["combination"];
     unsigned int num = comb_info_t0["num"];
-    
-    List t0 = limit_comb_t0(combination, hidden_states, location, linkage_info, num, 0, num_states[start_t[t]], use_MC);
+    // find index in linkage matrix
+    unsigned int start_idx = 0;
+    for(m = 0; m < undecided_pos.size(); ++m)
+      if(location[0] == undecided_pos[m]) {
+        start_idx = m;
+        break;
+      }
+    List t0 = limit_comb_t0(combination, hidden_states, location, linkage_info, num, start_idx, num_states[start_t[t]], use_MC);
     IntegerVector exclude = t0["exclude"];
+    // Rcout << "\n"<< exclude << "\n";
     new_num_states[start_t[t]] = t0["num_states"];
     IntegerMatrix new_comb(new_num_states[start_t[t]], combination.ncol());
     Rcout << start_t[t] << " new no. states: " << new_num_states[start_t[t]] << "\n";
@@ -524,17 +531,17 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
   for(t = 0; t < t_max; ++t) {
     if(num_states[t] != 1 && overlapped_id[t] != -1) {
       // int count = 0;
-      Rcout << t << "\t";
+        Rcout << t << "\t";
         int identical = 0;
         int last_t = overlapped_id[t];
         IntegerVector overlapped_t = overlapped[t];
         IntegerVector loci_lastt = loci[last_t];
         IntegerVector loci_currt = loci[t];
         // int old_state;
-        // Rcout << last_t << "\n";
-        // Rcout << "overlapped: " << overlapped_t << "\n";
-        // Rcout << "loci_lastt: " << loci_lastt << "\n";
-        // Rcout << "loci_currt: " << loci_currt << "\n";
+        Rcout << last_t << "\n";
+        Rcout << "overlapped: " << overlapped_t << "\n";
+        Rcout << "loci_lastt: " << loci_lastt << "\n";
+        Rcout << "loci_currt: " << loci_currt << "\n";
         // int flag = 0;
         if(loci_lastt[0] <= loci_currt[0] && loci_lastt[loci_lastt.size() - 1] >= loci_currt[loci_currt.size() - 1]) {
           if(loci_lastt.size() > loci_currt.size()) { // if current is in its overlap
@@ -551,7 +558,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
                 break;
               }
             if(!identical) {
-              // Rcout << "same sites\n";
+              Rcout << "same sites\n";
               IntegerMatrix new_comb = comb[last_t];
               comb[t] = new_comb;
               new_num_states[t] = new_num_states[last_t];
@@ -559,7 +566,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
           }
         } 
         else {
-          // Rcout << "remake linkage\n";
+          Rcout << "remake linkage\n";
           // new variable site in this t, need to get the new combination while making sure it can be transferred to the next t
           IntegerMatrix comb_in = comb[last_t];
           IntegerMatrix new_comb = new_combination(hmm_info, loci_currt, overlapped_t, comb_in,

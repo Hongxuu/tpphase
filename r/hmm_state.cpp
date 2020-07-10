@@ -708,6 +708,7 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
     sub_link = remake_linkage(old_sub_link, num);
   else
     sub_link = mc_linkage(old_sub_link, num);
+  // Rcout << "linkage:\n";
   // print_intmat(sub_link);
   unsigned int n_observation = sub_link.nrow();
   all_excluded = 0;
@@ -932,11 +933,11 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
           break;
         }
     // Rcout << "\n comb\n";
-    print_intmat(new_combination(Range(0, num - 1), _));
+    // print_intmat(new_combination(Range(0, num - 1), _));
     exclude_info = limit_comb_t0(new_combination(Range(0, num - 1), _), hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, num, use_MC);
   } else {
     // Rcout << "\n comb\n";
-    print_intmat(combination);
+    // print_intmat(combination);
     exclude_info = limit_comb_t0(combination, hidden_states, left_loci, linkage_info, combination.ncol(), start_idx, combination.nrow(), use_MC);
   }
         
@@ -962,6 +963,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
   // if next_comb does not contain one of the states in allowed, add it back (use the one w/ smallest index)
   // this will introduce more states not shown in the reads linkage, but to keep the trans works, have to...
   IntegerVector new_exist = next_comb(_, 0);
+  // Rcout << "new_exist: " << new_exist << "\n";
   if(!setequal(new_exist, allowed)) {
     IntegerVector diff = setdiff(allowed, new_exist);
     Rcout << "add more possibilities " << diff << "\n";;
@@ -1014,8 +1016,8 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
       }
     }
   // dereplicate
-  Rcout << "final mat\n";
-  print_intmat(final_comb);
+  // Rcout << "final mat\n";
+  // print_intmat(final_comb);
   // if(all != 1) {
   //   IntegerMatrix new_comb = dereplicate_states(final_comb, hidden_states, location, final_comb.ncol(), final_comb.nrow());
   //   Rcout << "dereplicate mat\n";
