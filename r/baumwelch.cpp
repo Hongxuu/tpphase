@@ -531,17 +531,17 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
   for(t = 0; t < t_max; ++t) {
     if(num_states[t] != 1 && overlapped_id[t] != -1) {
       // int count = 0;
-        Rcout << t << "\t";
+        // Rcout << t << "\t";
         int identical = 0;
         int last_t = overlapped_id[t];
         IntegerVector overlapped_t = overlapped[t];
         IntegerVector loci_lastt = loci[last_t];
         IntegerVector loci_currt = loci[t];
         // int old_state;
-        Rcout << last_t << "\n";
-        Rcout << "overlapped: " << overlapped_t << "\n";
-        Rcout << "loci_lastt: " << loci_lastt << "\n";
-        Rcout << "loci_currt: " << loci_currt << "\n";
+        // Rcout << last_t << "\n";
+        // Rcout << "overlapped: " << overlapped_t << "\n";
+        // Rcout << "loci_lastt: " << loci_lastt << "\n";
+        // Rcout << "loci_currt: " << loci_currt << "\n";
         // int flag = 0;
         if(loci_lastt[0] <= loci_currt[0] && loci_lastt[loci_lastt.size() - 1] >= loci_currt[loci_currt.size() - 1]) {
           if(loci_lastt.size() > loci_currt.size()) { // if current is in its overlap
@@ -558,7 +558,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
                 break;
               }
             if(!identical) {
-              Rcout << "same sites\n";
+              // Rcout << "same sites\n";
               IntegerMatrix new_comb = comb[last_t];
               comb[t] = new_comb;
               new_num_states[t] = new_num_states[last_t];
@@ -566,7 +566,7 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
           }
         } 
         else {
-          Rcout << "remake linkage\n";
+          // Rcout << "remake linkage\n";
           // new variable site in this t, need to get the new combination while making sure it can be transferred to the next t
           IntegerMatrix comb_in = comb[last_t];
           IntegerMatrix new_comb = new_combination(hmm_info, loci_currt, overlapped_t, comb_in,
@@ -1055,12 +1055,20 @@ List baum_welch_iter(List hmm_info, List par_hmm, List data_info, List hap_info,
 // undecided_pos starts from 0; but time_pos starts from int hap_min_pos = dat_info["ref_start"];
 
 // [[Rcpp::export]]
-List trans_permit(IntegerVector num_states, List combination, List loci, int t_max) {
+List trans_permit(IntegerVector num_states, IntegerVector start_t, List combination, List loci, int t_max) {
   List trans_permits(t_max - 1);
   unsigned int t, j, m, w;
+  IntegerVector start(t_max);
+  if(start_t.size() > 1)
+    for(t = 0; t < t_max; ++t)
+      for(j = 0; j < start_t.size(); ++j)
+        if(t == start_t[j]) {
+          start[t] = 1;
+          break;
+        }
   
   for(t = 0; t < t_max - 1; ++t) {
-    if(num_states[t + 1] != 1 && num_states[t] != 1) {
+    if(num_states[t + 1] != 1 && num_states[t] != 1 && start[t + 1] != 1) {
       IntegerMatrix trans(num_states[t], num_states[t + 1]);
       IntegerMatrix comb_t1 = combination[t];
       IntegerMatrix comb_t2 = combination[t + 1];
