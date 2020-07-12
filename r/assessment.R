@@ -12,3 +12,6 @@ confusion_matric <- function(res = NULL, truth_file) {
 
   return(snp_call)
 }
+
+
+ref6.mid.snp <- confusion_matric(res = ref6.mid, truth_file = "../../data/hmm/WGS/simu/ref6/indiv0.fsa")

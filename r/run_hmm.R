@@ -183,7 +183,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   return(res)
 }
 
-
+read_rds("../../data/hmm/WGS/homr0.005/cov3/hmm_res") -> a
 
 
 
