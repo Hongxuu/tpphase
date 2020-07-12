@@ -540,8 +540,8 @@ List full_hap_new (List hmm_info, IntegerMatrix linkage_info, List overlap_info,
         // int old_state;
         // Rcout << last_t << "\n";
         // Rcout << "overlapped: " << overlapped_t << "\n";
-        // Rcout << "loci_lastt: " << loci_lastt << "\n";
-        // Rcout << "loci_currt: " << loci_currt << "\n";
+        Rcout << "loci_lastt: " << loci_lastt << "\n";
+        Rcout << "loci_currt: " << loci_currt << "\n";
         // int flag = 0;
         if(loci_lastt[0] <= loci_currt[0] && loci_lastt[loci_lastt.size() - 1] >= loci_currt[loci_currt.size() - 1]) {
           if(loci_lastt.size() > loci_currt.size()) { // if current is in its overlap

@@ -747,8 +747,11 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
       all_excluded++;
     }
   }
-  // remove some repeated states: ACT/ACT/GCT/GCT; GCT/GCT/ACT/ACT
-      
+  if(num_states == all_excluded) {
+    all_excluded = 0;
+    exclude = IntegerVector(num_states);
+  }
+  
   List out = List::create(
     Named("num_states") = num_states - all_excluded,
     Named("exclude") = exclude);
@@ -957,8 +960,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
         if(!exclude[m])
           next_comb(count++, _) = combination(m, _);
   }
-  
-  // print_intmat(next_comb);
+  print_intmat(next_comb);
   // IntegerMatrix next_comb = next_cb;
   // if next_comb does not contain one of the states in allowed, add it back (use the one w/ smallest index)
   // this will introduce more states not shown in the reads linkage, but to keep the trans works, have to...
@@ -990,6 +992,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
           }
         }
       }
+    print_intmat(extra);
     arma::Mat<int> m2 = as<arma::Mat<int>>(extra);
     m1.insert_rows(1, m2);
     next_comb = wrap(m1);

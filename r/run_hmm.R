@@ -1,26 +1,3 @@
-library(Rcpp)
-library(RcppArmadillo)
-library(tidyverse)
-library(foreach)
-library(mnlogit)
-library(doParallel)
-library(Formula)
-
-source("./src/read_data.R")
-source("./r/data_process.R")
-source("./r/tpphase.R")
-source("./r/modified_mnlogit.R")
-source("./r/initialization.R")
-source("./r/formula.R")
-source("./r/newton.R")
-source("./r/m_beta.R")
-source("./r/likelihood.R")
-sourceCpp("./r/data_format.cpp")
-sourceCpp("./r/mnlogit.cpp")
-sourceCpp("./r/baumwelch.cpp")
-sourceCpp("./r/universal_alignment.cpp")
-sourceCpp("./r/initialization.cpp")
-sourceCpp("./r/viterbi.cpp")
 
 opts <- new.env()
 assign("cut_off", 0.1, envir = opts)
@@ -103,7 +80,8 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   ##### use linkage info to limit some unlikely happened transition
   hap_length <- dat_info$ref_length_max - dat_info$ref_start
   linkage_in <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
-  overlap_info <- get_overlap(HMM$p_tmax, HMM$time_pos, HMM$num_states, HMM$undecided_pos, HMM$t_max, dat_info$ref_start)
+  overlap_info <- get_overlap(p_tmax = HMM$p_tmax, time_pos = HMM$time_pos, num_states = HMM$num_states, 
+                              undecided_pos = HMM$undecided_pos, t_max = HMM$t_max, hap_min_pos = dat_info$ref_start)
   hap_full_info <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start, use_MC = use_MC)
   hap_full <- hap_full_info$full_hap
   HMM$num_states <- hap_full_info$new_num_states
@@ -197,10 +175,11 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   res$haplotypes <- haplotypes
   res$snp_location <- snp_location
   res$snps <- snps
+  res$par <- bw
   
-  # res$par <- bw
-  if(!is.null(res_file))
-    fnlist(res, fil = res_file)
+  saveRDS(res, res_file)
+  # if(!is.null(res_file))
+  #   fnlist(res, fil = res_file)
   return(res)
 }
 
