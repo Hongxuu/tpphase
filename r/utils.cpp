@@ -76,6 +76,24 @@ List hash_mat(IntegerMatrix x) {
   return List::create( _["all_id"] = all_id, _["idx"] = idx );
 }
 
+List hash_intvec(IntegerVector x) {
+  int n = x.size();
+  std::map<int, vector<int>> map;
+  for (int i = 0; i < n; i++)
+    map[x[i]].push_back(i);
+  int nres = map.size();
+  IntegerVector value(nres);
+  List all_id(nres);
+  
+  int i = 0; 
+  for (auto itr = map.begin(); itr != map.end(); ++itr) { 
+    value[i] = itr->first;
+    all_id[i++] = wrap(itr->second);
+  }
+  
+  return List::create(_["all_id"] = all_id, _["value"] = value);
+}
+
 IntegerVector find_max(List ls, int n_obs) {
   unsigned int i, j, k = 0;
   IntegerVector max_id(n_obs);

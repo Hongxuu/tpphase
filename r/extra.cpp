@@ -34,7 +34,29 @@ vector<vector<int> > cart_product_dbl (const vector<vector<int> > &v) {
   return s;
 }
 // [[Rcpp::export]]
-
+List hash_vec(IntegerVector x) {
+  int n = x.size();
+  std::map<int, vector<int>> map;
+  for (int i = 0; i < n; i++)
+    map[x[i]].push_back(i);
+  int nres = map.size();
+  IntegerVector idx(nres);
+  List all_id(nres);
+  
+  int i = 0; 
+  for (auto itr = map.begin(); itr != map.end(); ++itr) { 
+    idx[i] = itr->first;
+    all_id[i++] = wrap(itr->second);
+  }
+ 
+  Rcout << idx << "\n";
+  for(int m = 0; m < idx.size(); ++m) {
+    IntegerVector id = all_id[m];
+    IntegerVector a = x[id];
+    Rcout << a << "\n";
+  }
+  return List::create( _["all_id"] = all_id, _["idx"] = idx );
+}
 
 IntegerMatrix dereplicate_states(IntegerMatrix new_combination, List hidden_states, IntegerVector location, 
                                  IntegerVector possible_states, unsigned int num, unsigned int num_states) {

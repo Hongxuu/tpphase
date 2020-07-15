@@ -118,7 +118,6 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   # par$eta <- eta
   bw <- baum_welch_init(hmm_info = HMM, data_info = dat_info, hap_info = hap_full, par = par, 
                         PD_LENGTH = nrow(par$beta), trans_indicator = trans_indicator, hash_idx = data_new$idx)
-  rm(hap_full_info)
   rm(trans_indicator)
   if(hap_info$gap_in) {
     data_rm <- data %>% filter(mode == 1) 
@@ -172,18 +171,18 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   ## choose the weight of selected haplotypes
   # res$full_llk <- bw$par_hmm_bf$full_llk
   res$start_pos <- dat_info$ref_start
-  res$haplotypes <- haplotypes
+  res$haplotypes <- hap
   res$snp_location <- snp_location
   res$snps <- snps
   res$par <- bw
+  res$combination <- hap_full_info$combination
+  res$loci <- overlap_info$location
   
-  saveRDS(res, res_file)
-  # if(!is.null(res_file))
+  if(!is.null(res_file))
+    saveRDS(res, res_file)
   #   fnlist(res, fil = res_file)
   return(res)
 }
-
-read_rds("../../data/hmm/WGS/homr0.005/cov3/hmm_res") -> a
 
 
 

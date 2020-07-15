@@ -960,7 +960,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
         if(!exclude[m])
           next_comb(count++, _) = combination(m, _);
   }
-  print_intmat(next_comb);
+  // print_intmat(next_comb);
   // IntegerMatrix next_comb = next_cb;
   // if next_comb does not contain one of the states in allowed, add it back (use the one w/ smallest index)
   // this will introduce more states not shown in the reads linkage, but to keep the trans works, have to...

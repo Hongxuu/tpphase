@@ -48,4 +48,5 @@ IntegerMatrix call_permute(vector<int> a);
 IntegerMatrix sort_mat(IntegerMatrix mat, int nrow, int ncol);
 IntegerVector matrix2vec(IntegerMatrix m, const bool byrow = true);
 void print_intmat(IntegerMatrix m);
+List hash_intvec(IntegerVector x);
 #endif
