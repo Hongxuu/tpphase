@@ -6,7 +6,7 @@ using namespace Rcpp;
 CharacterVector iupac_to_char = {"-", "A", "C", "M", "G", "R", "S",
                                  "V", "T", "W", "Y", "H", "K",
                                  "D", "B", "N"};
-// [[Rcpp::export]] 
+
 List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector both,
                 IntegerVector both_refer_type, IntegerVector both_true_type) {
   unsigned int k, j, i;
@@ -246,16 +246,13 @@ List snp_stats (CharacterMatrix inferred_snp, IntegerVector snp_location, int ha
   IntegerVector both_refer_type = inferred_snp_type[refer_match];
   IntegerVector both_true_type = snp_type[true_match];
   
-  // List sw = switch_err(hmm_snp, real_snp, both, both_refer_type, both_true_type);
+  List sw = switch_err(hmm_snp, real_snp, both, both_refer_type, both_true_type);
   
   List snp_info = List::create (
     Named("confusion metric") = confusion_metric,
     Named("tsnp_id") = snp_id,
-    Named("hmm_snp") = hmm_snp,
-    Named("real_snp") = real_snp,
-    Named("both") = both,
-    Named("both_refer_type") = both_refer_type,
-    Named("both_true_type") = both_true_type
+    Named("switch") = sw,
+    Named("both") = both
     // Named("tsnp_type") = snp_type
   );
   return snp_info;
