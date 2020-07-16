@@ -74,6 +74,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
     }
   }
   // add the end
+  double homo_swi = double(swi_AB)/non_swi_AB;
   swAB_idx[count] = len;
   swAB_id[count++] = both[len - 1] + 1;
   swAB_id.erase(count, len);
@@ -124,18 +125,24 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
   }
   List sw;
   if(heter_c) {
+    for(i = 0; i < len; ++i) {
+      double swi_er = 0;
+      if(swi_one[i] == 0 && non_swi_one[i] == 0)
+        continue;
+      swi_er = swi_one[i]/(swi_one[i] + non_swi_one[i]);
+    }
     sw = List::create (
         Named("homo_switch_id") = swAB_id,
         Named("homo_switch") = swi_AB,
-        Named("heter_nswitch") = non_swi_one,
-        Named("heter_switch") = swi_one,
+        // Named("heter_nswitch") = non_swi_one,
+        Named("heter_switch") = heter_c,
         Named("heter_switch_id") = heter_sw[Range(0, heter_c - 1)]);
   } else {
     sw = List::create (
       Named("homo_switch_id") = swAB_id,
       Named("homo_switch") = swi_AB,
-      Named("heter_nswitch") = non_swi_one,
-      Named("heter_switch") = swi_one);
+      // Named("heter_nswitch") = non_swi_one,
+      Named("heter_switch") = heter_c);
   }
  
   return(sw);
@@ -283,7 +290,7 @@ NumericVector pp_snp(IntegerVector hs_id, List combination,
         if(comb(m, j) == chosed_comb(j))
           ppt[j] += exp(gam[m]);
     count += snp_t.size();
-    Rcout << "ppt " << ppt << "\n";
+    // Rcout << "ppt " << ppt << "\n";
     pp_snp[t] = ppt;
   }
   

@@ -445,29 +445,30 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
   List start_t = unique_map(read_start); // start might not from 0 (e.g. ailgnment starts from 2)
   IntegerVector n_t = start_t["lengths"];
   IntegerVector time_pos = start_t["values"];
-  
-  // get the coverage of each site (including -)
-  List deletion = dat_info["deletion"];
-  IntegerVector del_ref_pos;
-  unsigned int del_total = 0;
-  if(deletion[0] != R_NilValue) {
-    del_ref_pos = deletion["del_ref_pos"];
-    del_total = deletion["del_total"];
-  }
-  unsigned int enuma = total + del_total;
-  IntegerVector pos(enuma);
-  for(i = 0; i < total; ++i)
-    pos(i) = ref_pos(i);
-  for(i = 0; i < del_total; ++i)
-    pos(i + total) = del_ref_pos(i);
-  List coverage_stat = unique_map(pos);
-  IntegerVector coverage = coverage_stat["lengths"];
+  IntegerVector pos;
   NumericVector prop(hap_length);
-  for(i = 0; i < hap_length; ++i)
-    prop[i] = coverage[i] * cut_off;
+  // get the coverage of each site (including -)
+  if(cut_off != 0) {
+    List deletion = dat_info["deletion"];
+    IntegerVector del_ref_pos;
+    unsigned int del_total = 0;
+    if(deletion[0] != R_NilValue) {
+      del_ref_pos = deletion["del_ref_pos"];
+      del_total = deletion["del_total"];
+    }
+    unsigned int enuma = total + del_total;
+    pos = IntegerVector(enuma);
+    for(i = 0; i < total; ++i)
+      pos(i) = ref_pos(i);
+    for(i = 0; i < del_total; ++i)
+      pos(i + total) = del_ref_pos(i);
+    List coverage_stat = unique_map(pos);
+    IntegerVector coverage = coverage_stat["lengths"];
+    for(i = 0; i < hap_length; ++i)
+      prop[i] = coverage[i] * cut_off;
+  }
   
   /* Find the max p in each t and record the observations in each set t*/
-  
   unsigned int t_max = time_pos.length();
   List n_in_t(t_max);
   IntegerVector p_tmax(t_max);
@@ -564,33 +565,42 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
         // if(count == 0)
         //   continue;
         /* get the nuc table at each site */
-        // Rcout << j << "\t" << tmp_nuc << "\n";
+      // Rcout << j << "\t" << tmp_nuc << "\n";
       nuc = unique_map(tmp_nuc);
       IntegerVector key = nuc["values"];
       IntegerVector val = nuc["lengths"];
       num = 0;
-      
+     
       /* remove some unlikely occurred nuc (notice the situation that only - appears) */
-      for(t = 0; t < val.length(); ++t)
-        if(val[t] >= prop(j)) {
-          keys(num) = key(t);
-          vals(num++) = val(t);
-        }
+      if(cut_off != 0) {
+        for(t = 0; t < val.length(); ++t)
+          if(val[t] >= prop(j)) {
+            keys(num) = key(t);
+            vals(num++) = val(t);
+          }
+          nuc_unique[j] = keys[Range(0, num - 1)];
+          nuc_count[j] = vals[Range(0, num - 1)];
+      } else {
+        num = key.size();
+        nuc_unique[j] = key;
+        nuc_count[j] = val;
+      }
+      
         // if only deletion appears
         // if(num == 1 && keys[0] == -1) {
         //   nuc_unique[j] = key[Range(0, 1)];
         //   nuc_count[j] = val[Range(0, 1)];
         //   num++; //for using the condition num == 2
         // } else {
-      nuc_unique[j] = keys[Range(0, num - 1)];
-      nuc_count[j] = vals[Range(0, num - 1)];
+     
         // }
       IntegerVector hap_site = nuc_unique[j];
       IntegerVector sum_site = nuc_count[j];
-       
+      
       if(sbs) {
         List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment, opt);
         n_row[j] = out["n_row"];
+        
         List hap_temp = out["haplotype"];
         haplotype(j) = hap_temp[0];
         if(n_row[j] > 1) {

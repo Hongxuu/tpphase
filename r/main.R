@@ -32,7 +32,7 @@ m = 1
 datfile <- list()
 ref_alignment <- list()
 res_file <- list()
-for(i in c(0.005, 0.01, 0.02)) {
+for(i in c(0.02)) {
   hr = paste0(parent_folder , "homr", i)
   alignment = paste0(hr, "/ref.fsa")
   ref_sam = paste0(hr, "/ref.sam")

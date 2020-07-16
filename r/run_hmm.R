@@ -1,6 +1,6 @@
 
 opts <- new.env()
-assign("cut_off", 0.1, envir = opts)
+assign("cut_off", 0, envir = opts)
 assign("three_hap", 0.62, envir = opts)
 assign("third_nuc", 0, envir = opts)
 assign("two_hap", 0.45, envir = opts)
@@ -177,6 +177,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   res$par <- bw
   res$combination <- hap_full_info$combination
   res$loci <- overlap_info$location
+  res$undecided_pos <- HMM$undecided_pos
   
   if(!is.null(res_file))
     saveRDS(res, res_file)
