@@ -74,7 +74,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
     }
   }
   // add the end
-  double homo_swi = double(swi_AB)/non_swi_AB;
+  double homo_swi_err = double(swi_AB)/non_swi_AB;
   swAB_idx[count] = len;
   swAB_id[count++] = both[len - 1] + 1;
   swAB_id.erase(count, len);
@@ -125,24 +125,38 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
   }
   List sw;
   if(heter_c) {
-    for(i = 0; i < len; ++i) {
-      double swi_er = 0;
+    NumericVector swi_er(count - 1);
+    int c = 0;
+    for(i = 0; i < count - 1; ++i) {
       if(swi_one[i] == 0 && non_swi_one[i] == 0)
         continue;
-      swi_er = swi_one[i]/(swi_one[i] + non_swi_one[i]);
+      swi_er[c++] = double(swi_one[i])/(swi_one[i] + non_swi_one[i]);
     }
-    sw = List::create (
-        Named("homo_switch_id") = swAB_id,
-        Named("homo_switch") = swi_AB,
+    swi_er.erase(c, count - 1);
+    double heter_se = mean(swi_er);
+    if(swi_AB) {
+      sw = List::create (
+        Named("homo_sw_id") = swAB_id,
+        Named("homo_sw_err") = homo_swi_err,
         // Named("heter_nswitch") = non_swi_one,
-        Named("heter_switch") = heter_c,
-        Named("heter_switch_id") = heter_sw[Range(0, heter_c - 1)]);
+        Named("heter_sw_err") = heter_se,
+        Named("heter_sw_id") = heter_sw[Range(0, heter_c - 1)]);
+    } else {
+      sw = List::create (
+        Named("heter_sw_id") = heter_sw[Range(0, heter_c - 1)],
+        Named("homo_sw_err") = 0,
+        Named("heter_sw_err") = heter_se);
+    }
+  } else if(!heter_c && swi_AB) {
+    sw = List::create (
+      Named("homo_sw_id") = swAB_id,
+      Named("homo_sw_err") = homo_swi_err,
+      // Named("heter_nswitch") = non_swi_one,
+      Named("heter_sw_err") = 0);
   } else {
     sw = List::create (
-      Named("homo_switch_id") = swAB_id,
-      Named("homo_switch") = swi_AB,
-      // Named("heter_nswitch") = non_swi_one,
-      Named("heter_switch") = heter_c);
+      Named("heter_sw_err") = 0,
+      Named("homo_swi_err") = 0);
   }
  
   return(sw);
