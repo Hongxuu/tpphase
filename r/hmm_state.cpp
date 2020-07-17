@@ -52,7 +52,7 @@ List aux_noN_S2(IntegerVector sum_site, IntegerVector hap_site, List opt) {
   int max_id = which_max(sum_site);
   sum = sum_site[1] + sum_site[0];
   List ls(2);
-  if ((sum - sum_site[max_id]) == 1) {
+  if ((sum - sum_site[max_id]) == 1 || (sum_site[max_id]/sum > 0.9)) {
     IntegerVector temp = {hap_site[max_id], hap_site[max_id], hap_site[max_id], hap_site[max_id]};
     n_row = 1;
     ls["temp"] = temp;
@@ -230,7 +230,7 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
               inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 1);
             temp = join_cols(temp, as<arma::Mat<int>>(inner_tmp));
           }
-          haplotype[0] = wrap(temp);
+        haplotype[0] = wrap(temp);
         n_row = 2;
       } else {
         IntegerVector sum_site_cleaned = {sum_site[1], sum_site[2], sum_site[3]};
@@ -293,80 +293,81 @@ IntegerMatrix remake_linkage(IntegerMatrix sub_link, unsigned int num) {
       if(link_uni(i, j) == -1)
         idx(j) = 1; // indicate -1 is here
       
-      int move_out = 0;
-      // if this read is contained in others
-      for (i1 = 0; i1 < link_uni.nrow(); ++i1) {
-        if (i1 == i)
-          continue;
-        int count = 0;
+    int move_out = 0;
+    // if this read is contained in others
+    for (i1 = 0; i1 < link_uni.nrow(); ++i1) {
+      if (i1 == i)
+        continue;
+      int count = 0;
         // List nuc_info = unique_map(link_uni(i1, _));
         // IntegerVector nuc1 = nuc_info["values"];
         // IntegerVector nuc_count1 = nuc_info["lengths"];
         // if(nuc_count1[0] >= nuc_count[0])
         //   continue;
-        for(j = 0; j < num; ++j)
-          if(!idx(j))
-            if(link_uni(i, j) == link_uni(i1, j))
-              count++;
-            if(count == num - nuc_count[0]) {
-              // Rcout << i << "move" << "\n";
-              move_out = 1;
-              break;
-            }
+      for(j = 0; j < num; ++j) {
+        if(!idx(j))
+          if(link_uni(i, j) == link_uni(i1, j))
+            count++;
       }
-      if(move_out)
-        continue;
-      List missing(num);
-      IntegerVector flag(num);
-      int in_row_num = 0;
-      for (j = 0; j < num; ++j) {
-        if (link_uni(i, j) == -1) {
-          List nuc_col = unique_map(link_uni(_, j));
-          IntegerVector nuc_unique = nuc_col["values"];
-          // Rcout << nuc_unique << "\n";
-          if(nuc_unique[0] == -1)
-            missing[j] = nuc_unique[Range(1, nuc_unique.size() - 1)];
-          else
-            missing[j] = nuc_unique;
-          in_row_num++;
-        } else
-          flag[j] = 1;
+      if(count == num - nuc_count[0]) {
+        // Rcout << i << "move" << "\n";
+        move_out = 1;
+        break;
       }
+    }
+    if(move_out)
+      continue;
+    List missing(num);
+    IntegerVector flag(num);
+    int in_row_num = 0;
+    for (j = 0; j < num; ++j) {
+      if (link_uni(i, j) == -1) {
+        List nuc_col = unique_map(link_uni(_, j));
+        IntegerVector nuc_unique = nuc_col["values"];
+        // Rcout << nuc_unique << "\n";
+        if(nuc_unique[0] == -1)
+          missing[j] = nuc_unique[Range(1, nuc_unique.size() - 1)];
+        else
+          missing[j] = nuc_unique;
+        in_row_num++;
+      } else
+        flag[j] = 1;
+    }
       
-      int add_row = 0;
-      if(in_row_num != 1) {
-        IntegerMatrix missing_rows = comb_element(missing, flag, in_row_num);
-        add_row = missing_rows.nrow();
-        IntegerMatrix new_link_i(add_row, num);
-        int count = 0;
-        for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
-          if(flag[j] != 1)
-            new_link_i(_, j) = missing_rows(_, count++);
-          else
-            for (k = 0; k < add_row; ++k)
-              new_link_i(k, j) = link_uni(i, j); // repeat the non-missing ones
-        }
-        new_link[i] = new_link_i;
-      } else {
-        IntegerMatrix new_link_i;
-        IntegerVector tmp;
-        for (j = 0; j < num; ++j)
-          if(flag[j] != 1) {
-            tmp = missing[j];
-            add_row = tmp.size();
-            new_link_i = IntegerMatrix(add_row, num);
-          }
-          for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
-            if(flag[j] != 1) {
-              new_link_i(_, j) = tmp;
-            } else {
-              for (k = 0; k < add_row; ++k)
-                new_link_i(k, j) = link_uni(i, j);
-            }
-          }
-          new_link[i] = new_link_i;
+    int add_row = 0;
+    if(in_row_num != 1) {
+      IntegerMatrix missing_rows = comb_element(missing, flag, in_row_num);
+      add_row = missing_rows.nrow();
+      IntegerMatrix new_link_i(add_row, num);
+      int count = 0;
+      for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
+        if(flag[j] != 1)
+          new_link_i(_, j) = missing_rows(_, count++);
+        else
+          for (k = 0; k < add_row; ++k)
+            new_link_i(k, j) = link_uni(i, j); // repeat the non-missing ones
       }
-      total_row += add_row;
+      new_link[i] = new_link_i;
+    } else {
+      IntegerMatrix new_link_i;
+      IntegerVector tmp;
+      for (j = 0; j < num; ++j)
+        if(flag[j] != 1) {
+          tmp = missing[j];
+          add_row = tmp.size();
+          new_link_i = IntegerMatrix(add_row, num);
+        }
+      for (j = 0; j < num; ++j) { // make fake reads with missing linkage info
+        if(flag[j] != 1) {
+          new_link_i(_, j) = tmp;
+        } else {
+          for (k = 0; k < add_row; ++k)
+            new_link_i(k, j) = link_uni(i, j);
+        }
+      }
+      new_link[i] = new_link_i;
+    }
+    total_row += add_row;
   }
   
   IntegerMatrix new_link_out(total_row, num);
@@ -401,7 +402,7 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
           id = l;
           break;
         }
-        comb_in(j) = link(i, j);
+      comb_in(j) = link(i, j);
     } else {
       comb_in(j) = nuc;
     }
@@ -419,10 +420,10 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
           // Rcout << "nuc " << nuc[l] << "\t";
           break;
         }
-        if(j == 0) {
-          llk_in(j) = initial[id];
+      if(j == 0) {
+        llk_in(j) = initial[id];
           // Rcout << "ini " << initial[id] << "\t";
-        } else {
+      } else {
           NumericMatrix trans = transition[j - 1];
           IntegerVector nuc2 = possi_nuc[j - 1];
           int id1 = 0;
@@ -433,7 +434,7 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
                 id1 = l;
                 break;
               }
-              llk_in(j) = trans(id1, id);
+            llk_in(j) = trans(id1, id);
               // Rcout << "trans " << trans(id1, id) << "\n";
           } else{
             // Rcout << "trans: all\n";
@@ -453,7 +454,7 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
               id = l;
               break;
             }
-            llk_in(j) = trans(id, _);
+          llk_in(j) = trans(id, _);
         } else {
           llk_in(j) = trans;
         }
@@ -538,6 +539,7 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
   unsigned int i, j, k, l;
   //remove non-covered reads
   NumericVector initial;
+  IntegerMatrix uni;
   IntegerMatrix link_pre(sub_link.nrow(), sub_link.ncol());
   int count = 0;
   for(i = 0; i < sub_link.nrow(); ++i) {
@@ -548,53 +550,69 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
     link_pre(count++, _) = sub_link(i, _);
   }
   IntegerMatrix link = link_pre(Range(0, count - 1), _);
-  List transition(link.ncol() - 1);
-  List possi_nuc(link.ncol());
-  for(j = 0 ; j < link.ncol() - 1; ++j) {
-    List nuc_info = unique_map(link(_, j));
-    IntegerVector nuc = nuc_info["values"];
-    IntegerVector nuc_count = nuc_info["lengths"];
-    // Rcout << j << "\t" << nuc << "\t" << nuc_count << "\n";
-    int state1 = nuc.size();
-    int start = 0;
-    possi_nuc[j] = nuc;
-    if(nuc[0] == -1) {
-      state1 = nuc.size() - 1;
-      start = 1;
-      possi_nuc[j] = nuc[Range(1, nuc.size() - 1)];
-    }
-    if(j == 0) {
-      double total = count;
-      initial = IntegerVector(state1);
+  // if there is only one read link them, then include all the possible combinations
+  int complete_seq = 0;
+  for(k = 0; k < link.nrow(); ++k) {
+    int flg = 0;
+    for(j = 0 ; j < link.ncol(); ++j) 
+      if(link(k, j) == -1) {
+        flg = 1;
+        break;
+      }
+    if(!flg)
+      complete_seq++;
+  }
+  if(complete_seq == 1) {
+    Rcout << "only 1 linked read\n";
+    uni = remake_linkage(link, num);
+  } else {
+    List transition(link.ncol() - 1);
+    List possi_nuc(link.ncol());
+    for(j = 0 ; j < link.ncol() - 1; ++j) {
+      List nuc_info = unique_map(link(_, j));
+      IntegerVector nuc = nuc_info["values"];
+      IntegerVector nuc_count = nuc_info["lengths"];
+      // Rcout << j << "\t" << nuc << "\t" << nuc_count << "\n";
+      int state1 = nuc.size();
+      int start = 0;
+      possi_nuc[j] = nuc;
       if(nuc[0] == -1) {
-        for(k = 1; k < nuc.size(); ++k)
-          initial[k - 1] = log(nuc_count[k]/(total - nuc_count[0])); // in the ascending order
+        state1 = nuc.size() - 1;
+        start = 1;
+        possi_nuc[j] = nuc[Range(1, nuc.size() - 1)];
       }
-      else {
-        for(k = 0; k < nuc.size(); ++k)
-          initial[k] = log(nuc_count[k]/total);
+      if(j == 0) {
+        double total = count;
+        initial = IntegerVector(state1);
+        if(nuc[0] == -1) {
+          for(k = 1; k < nuc.size(); ++k)
+            initial[k - 1] = log(nuc_count[k]/(total - nuc_count[0])); // in the ascending order
+        }
+        else {
+          for(k = 0; k < nuc.size(); ++k)
+            initial[k] = log(nuc_count[k]/total);
+        }
       }
-    }
-    // unique rows and the count
-    List nuc1_info = unique_map(link(_, j + 1));
-    IntegerVector nuc1 = nuc1_info["values"];
-    int state2 = nuc1.size();
-    possi_nuc[j + 1] = nuc1;
-    if(nuc1[0] == -1) {
-      possi_nuc[j + 1] = nuc1[Range(1, nuc1.size() - 1)];
-      state2 = nuc1.size() - 1;
-    }
-    
-    IntegerMatrix link_unique(link.nrow(), 2);
-    int unique_ct = 0;
-    for(k = 0; k < link.nrow(); ++k)
-      if(link(k, j + 1) != -1 && link(k, j) != -1) {
-        link_unique(unique_ct, 0) = link(k, j );
-        link_unique(unique_ct++, 1) = link(k, j + 1);
+      // unique rows and the count
+      List nuc1_info = unique_map(link(_, j + 1));
+      IntegerVector nuc1 = nuc1_info["values"];
+      int state2 = nuc1.size();
+      possi_nuc[j + 1] = nuc1;
+      if(nuc1[0] == -1) {
+        possi_nuc[j + 1] = nuc1[Range(1, nuc1.size() - 1)];
+        state2 = nuc1.size() - 1;
       }
-      // for(k = 0; k < link.nrow(); ++k)
-      //   for(l = 0; l < 2; ++l)
-      //     Rcout << link_unique(k, j) << "\t";
+      
+      IntegerMatrix link_unique(link.nrow(), 2);
+      int unique_ct = 0;
+      for(k = 0; k < link.nrow(); ++k)
+        if(link(k, j + 1) != -1 && link(k, j) != -1) {
+          link_unique(unique_ct, 0) = link(k, j );
+          link_unique(unique_ct++, 1) = link(k, j + 1);
+        }
+        // for(k = 0; k < link.nrow(); ++k)
+        //   for(l = 0; l < 2; ++l)
+        //     Rcout << link_unique(k, j) << "\t";
       IntegerMatrix in_link = link_unique(Range(0, unique_ct - 1), _);
       List unique_row = hash_mat(in_link);
       List all_id = unique_row["all_id"];
@@ -607,78 +625,69 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
       List nuc_info_uni = unique_map(in_link(_, 0));
       IntegerVector nuc_count_uni = nuc_info_uni["lengths"];
       IntegerVector nuc_uni = nuc_info_uni["values"];
-      
-      for(k = start; k < nuc.size(); ++k) {
-        // Rcout<< "\n" << nuc[k] << "\n";
-        int nuc_id = 0;
-        for(l = 0; l < nuc_uni.size(); ++l)
-          if(nuc_uni[l] == nuc[k]) {
-            nuc_id = l;
-            break;
-          }
-          for(i = 0; i < idx.size(); ++i) {
-            double de = nuc_count_uni[nuc_id];
-            IntegerVector sub_read = in_link(idx[i], _);
-            // Rcout << "unique sub " << sub_read << "\n";
-            // IntegerVector sub_read = ordered_read(i, _);
-            // if(sub_read[1] == -1) {
-            //   de--;
-            //   continue;
+        
+    for(k = start; k < nuc.size(); ++k) {
+      // Rcout<< "\n" << nuc[k] << "\n";
+      int nuc_id = 0;
+      for(l = 0; l < nuc_uni.size(); ++l)
+        if(nuc_uni[l] == nuc[k]) {
+          nuc_id = l;
+          break;
+        }
+        for(i = 0; i < idx.size(); ++i) {
+          double de = nuc_count_uni[nuc_id];
+          IntegerVector sub_read = in_link(idx[i], _);
+          // Rcout << "unique sub " << sub_read << "\n";
+          // IntegerVector sub_read = ordered_read(i, _);
+          // if(sub_read[1] == -1) {
+          //   de--;
+          //   continue;
+          // }
+          if(nuc[k] != sub_read[0])
+            continue;
+          IntegerVector sub_id = all_id[i];
+          // Rcout << "uniques " << sub_id << "\n";
+          double nu = sub_id.size();
+          int col_id = 0;
+          int flag = 0;
+          if(state2 < nuc1.size())
+            flag = 1;
+          for(l = 0; l < nuc1.size(); ++l)
+            if(nuc1[l] != -1 && nuc1[l] == sub_read[1])
+              col_id = l - flag;
+            // Rcout <<"col_id " << col_id << "\n" ;
+            // if(nuc[k] == sub_read[0]) {
+            // Rcout <<"de " << de << " nu " << nu<< "\n" ;
+          trans(k - start, col_id) = log(nu/de); // log likelihood
             // }
-            if(nuc[k] != sub_read[0])
-              continue;
-            IntegerVector sub_id = all_id[i];
-            // Rcout << "uniques " << sub_id << "\n";
-            double nu = sub_id.size();
-            int col_id = 0;
-            int flag = 0;
-            if(state2 < nuc1.size())
-              flag = 1;
-            for(l = 0; l < nuc1.size(); ++l)
-              if(nuc1[l] != -1 && nuc1[l] == sub_read[1])
-                col_id = l - flag;
-              // Rcout <<"col_id " << col_id << "\n" ;
-              // if(nuc[k] == sub_read[0]) {
-              // Rcout <<"de " << de << " nu " << nu<< "\n" ;
-              trans(k - start, col_id) = log(nu/de); // log likelihood
-              // }
-          }
+        }
       }
       transition[j] = trans;
-  }
-  // 
-  // // now use MC to impute the missing nuc
-  arma::mat uniqu_link = unique_rows(as<arma::mat>(link));
-  IntegerMatrix sub_uni_link = wrap(uniqu_link);
-  IntegerMatrix mc_reads(sub_uni_link.nrow(), sub_uni_link.ncol());
-  for(i = 0; i < sub_uni_link.nrow(); ++i) {
-    int flag = 0;
-    for(j = 0; j < sub_uni_link.ncol(); ++j) {
-      if(sub_uni_link(i, j) == -1) {
-        flag = 1;
-        break;
+    }
+    // 
+    // // now use MC to impute the missing nuc
+    arma::mat uniqu_link = unique_rows(as<arma::mat>(link));
+    IntegerMatrix sub_uni_link = wrap(uniqu_link);
+    IntegerMatrix mc_reads(sub_uni_link.nrow(), sub_uni_link.ncol());
+    for(i = 0; i < sub_uni_link.nrow(); ++i) {
+      int flag = 0;
+      for(j = 0; j < sub_uni_link.ncol(); ++j) {
+        if(sub_uni_link(i, j) == -1) {
+          flag = 1;
+          break;
+        }
       }
+      if(!flag) {
+        mc_reads(i, _) = sub_uni_link(i, _);
+        continue;
+      }
+      IntegerVector tmp = sub_uni_link(i, _);
+      // Rcout << tmp << "\n";
+      mc_reads(i, _) = best_branch(sub_uni_link, transition, initial, possi_nuc, i);
     }
-    if(!flag) {
-      mc_reads(i, _) = sub_uni_link(i, _);
-      continue;
-    }
-    IntegerVector tmp = sub_uni_link(i, _);
-    // Rcout << tmp << "\n";
-    mc_reads(i, _) = best_branch(sub_uni_link, transition, initial, possi_nuc, i);
+    arma::mat uniqu = unique_rows(as<arma::mat>(mc_reads));
+    uni = wrap(uniqu);
   }
-  
-  arma::mat uniqu = unique_rows(as<arma::mat>(mc_reads));
-  IntegerMatrix uni = wrap(uniqu);
-  
-  // keep the top 4 most likely reads
-  // if(uni.nrow() > 4) {
-  //   for(i = 0; i < uni.nrow(); ++i) {
-  //     for(j = 0; j < uni.ncol(); ++j)
-  //       
-  //   }
-  // }
-  
   // List ls = List::create(
   //   Named("transition") = transition, // possible comb
   //   Named("initial") = initial,
@@ -708,7 +717,7 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
   else
     sub_link = mc_linkage(old_sub_link, num);
   // Rcout << "linkage:\n";
-  // print_intmat(sub_link);
+  print_intmat(sub_link);
   unsigned int n_observation = sub_link.nrow();
   all_excluded = 0;
   for (m = 0; m < num_states; ++m) {
@@ -747,6 +756,7 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
     }
   }
   if(num_states == all_excluded) {
+    Rcout << "not enough linkage information, so include all\n";
     all_excluded = 0;
     exclude = IntegerVector(num_states);
   }

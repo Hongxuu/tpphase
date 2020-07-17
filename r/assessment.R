@@ -42,13 +42,14 @@ error_rates <- function(res, truth_file) {
   }
   return(value)
 }
-parent_path <- "../../../../peanut_simu/homr0.02/"
+
+####### get the simulation results
+parent_path <- "../../../../peanut_simu/homr0.01/"
 res_all <- list()
 covergae <- c(3, 4, 8, 12, 16)
 individual <- c(0:49)
-individual0.02 <- individual[-c(5, 11, 12, 13, 19, 20, 21, 32, 33, 24, 26, 40, 47, 25, 
-                                27, 34, 35, 36, 41, 48)]
-for(j in individual0.02) {
+n_ind = 1
+for(j in individual0.01) {
   res_ind <- list()
   count = 1
   for(i in covergae) {
@@ -57,11 +58,16 @@ for(j in individual0.02) {
     res_ind[[count]] <- read_rds(res_file)
     count = count + 1
   }
-  res_all[[j + 1]] <- res_ind
+  res_all[[n_ind]] <- res_ind
+  n_ind = n_ind + 1
 }
+
+###### err rates
 individual0.005 <- individual[-c(10, 11, 12, 13, 19, 36, 42, 45, 48, 49, 50)]
 individual0.01 <- individual[-c(15, 25, 41, 7, 5, 6, 8, 27, 32, 43, 47, 48, 50)]
-get_res <- function(individual, parent_path, res_all) {
+individual0.02 <- individual[-c(5, 11, 12, 13, 19, 20, 21, 32, 33, 24, 26, 40, 47, 25, 
+                                27, 34, 35, 36, 41, 48)]
+get_res <- function(individual, parent_path, res_all, covergae) {
   summary <- data.frame()
   for(j in individual) {
     truth_file <- paste0(parent_path, "indiv", j, ".fsa")
@@ -76,9 +82,42 @@ get_res <- function(individual, parent_path, res_all) {
     geom_boxplot() + 
     facet_wrap(~variable, scales = "free")
 }
-get_res(individual0.005, parent_path, res_all)
+get_res(individual0.005, parent_path, res_all, covergae)
 
-get_res(individual0.02, parent_path, res_all)
+get_res(individual0.02, parent_path, res_all, covergae)
 
+######## pp for snps
+get_pp <- function(individual, res_all, covergae) {
+  pp_roc <- data.frame()
+  ind = 1
+  for(j in individual) {
+    ind_res <- res_all[[ind]]
+    cov = 1
+    for(i in covergae) {
+      pp <- pp_snp(ind_res[[cov]]$haplotypes$chosed_state, ind_res[[cov]]$combination, 
+                 ind_res[[cov]]$loci, ind_res[[cov]]$par$par_hmm_bf$gamma, ncol(ind_res[[cov]]$snps))
+      cov = cov + 1
+      pp_roc <- rbind(pp_roc, data.frame("pp_all" = pp, coverage = i, individual = j)) 
+    }
+    ind = ind + 1
+  }
+  return(pp_roc)
+}
+pp_1 <- get_pp(individual = individual0.01, res_all, covergae)
 
+library(precrec)	# auc from here
+library(ROCR)		# plots from here
 
+#### heterozygotes ####
+d <- read.table("roc_het.txt", header=T)
+boxplot(PP ~ Truth, data = d)	# great separation
+em <- evalmod(scores = d$PP, labels = d$Truth, mode = "rocprc")
+d.hc <- d[d$CovA>10 & d$CovB>10,]
+em <- evalmod(scores = d.hc$PP, labels = d.hc$Truth, mode = "rocprc")
+
+## make plots
+pred <- prediction(d$PP, d$Truth)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=T)
+perf <- performance(pred, "prec", "rec")
+plot(perf, colorize=T)

@@ -61,7 +61,8 @@ foreach(m=1:length(datfile)) %dopar% {
                 alignment = ref_alignment[[m]], 
                 res_file = res_file[[m]])
 }
-datafile = "../../data/hmm/WGS/simu/homr0.01/cov3/out14.txt"
-alignment = "../../data/hmm/WGS/simu/homr0.01/ref.fsa"
+datafile = "../../../../peanut_simu/homr0.005/cov3/out25.txt"
+alignment = "../../../../peanut_simu/homr0.02/ref.fsa"
 altragenotype(datafile = datfile, 
               alignment = alignment) -> a
+res_file = "../../../../peanut_simu/homr0.02/cov4/hmm_res10"

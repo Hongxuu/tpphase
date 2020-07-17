@@ -85,7 +85,12 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   hap_full_info <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start, use_MC = use_MC)
   hap_full <- hap_full_info$full_hap
   HMM$num_states <- hap_full_info$new_num_states
+  ###indicate which transfer could happen
+  trans_indicator <- trans_permit(num_states = HMM$num_states, start_t = overlap_info$start_t, 
+                                  combination = hap_full_info$combination, 
+                                  loci = overlap_info$location, t_max = HMM$t_max)
   
+  ### start initializing
   ## initialize hap
   set.seed(seed)
   hap_info <- sample_hap2(hmm_info = HMM, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
@@ -106,12 +111,6 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   num_cat = 4
   par <- ini_par(dat = data, n_observation = dat_info$n_observation, formula = formula, old_version = genotype_target,
                  n_class = n_class, num_cat = num_cat, ncores = ncores, weight_id = weight_id)
-  
-  ###indicate which transfer could happen
-  trans_indicator <- trans_permit(num_states = HMM$num_states, start_t = overlap_info$start_t, 
-                                  combination = hap_full_info$combination, 
-                                  loci = overlap_info$location, t_max = HMM$t_max)
-  ### start initializing
   weight_id <- NULL
   cat("initialization: \n");
   data_new <- format_data2(hmm_info = HMM, d_info = dat_info, hap_info = hap_full)
@@ -128,7 +127,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   data$nuc <- to_char_r(data$nuc)
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
-  for (m in (1:10)) {
+  for (m in (1:max_iter)) {
     cat("iter: ", m, "\n")
     full_llk <- bw$par_hmm_bf$full_llk
     par_hmm_old <- bw$par_hmm
@@ -175,7 +174,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   res$haplotypes <- hap
   res$snp_location <- snp_location
   res$snps <- snps
-  res$par <- bw
+  res$gamma <- bw$par_hmm_bf$gamma
   res$combination <- hap_full_info$combination
   res$loci <- overlap_info$location
   res$undecided_pos <- HMM$undecided_pos

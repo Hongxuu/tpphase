@@ -13,7 +13,7 @@ using namespace std;
 #define MLOGIT_CLASS 4
 #define NUM_CLASS 4
 #define QUA_MAX 106
-#define QUA_ERR 0
+#define QUA_ERR 10
 
 // [[Rcpp::depends(RcppArmadillo)]]
 
@@ -88,12 +88,13 @@ int top_n_map(List unique_map)
   NumericVector result_keys = unique_map["values"];
   int n = result_keys.size();
   int key = 0;
-  for (unsigned int i = n; i --> 0;)
+  for (unsigned int i = n; i --> 0;) {
     if(result_vals(i) >= NUM_CLASS) {
       key = result_keys(i);
       break;
     }
-    return key;
+  }
+  return key;
 }
 
 // [[Rcpp::export]]
@@ -288,8 +289,8 @@ List read_data(std::string path, unsigned int old_v) {
     for(i = 0; i < n_observation; ++i)
       if (ref_index(i, m) == -1)
         num++;
-      if (num == n_observation)
-        non_covered_site[m] = 1;
+    if (num == n_observation)
+      non_covered_site[m] = 1;
   }
   List del(10); 
   if(count_del) {
@@ -388,8 +389,8 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1)
       id[k * MLOGIT_CLASS * NUM_CLASS + i] = obs_index[k];
     }
 
-    for (i = 0; i < total * MLOGIT_CLASS * NUM_CLASS; ++i)
-      r_obs[i] = input_arr[i % input_arr_sz];
+  for (i = 0; i < total * MLOGIT_CLASS * NUM_CLASS; ++i)
+    r_obs[i] = input_arr[i % input_arr_sz];
 
   for (i = 0; i < total; ++i)
     for (k = 0; k < MLOGIT_CLASS * NUM_CLASS; ++k)
@@ -505,6 +506,7 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
       int qua_min = QUA_MAX;
       count = 0;
       int non_del = 0;
+     
       for (i = 0; i < n_observation; ++i)
         if((ref_j >= ref_pos[index[i]]) && (ref_j <= ref_pos[index[i] + length[i] - 1])) {
           if(ref_index(i, j) == -1) { // deletion appears
@@ -552,12 +554,15 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
         for(i = 0; i < count; ++i) 
           if(qua_ij[i] == qua_min)
             ind_que[i] = 1;
-          // Rcout << ind_que << "\n";
+        // Rcout << ind_que << "\n";
         int enu = 0;
         for(i = 0; i < count; ++i) 
           if(!ind_que[i])
             tmp[enu++] = nuc_j[i];
-        tmp_nuc = tmp[Range(0, enu - 1)];  
+        if(enu == 0)
+          tmp_nuc = nuc_j[Range(0, count - 1)];
+        else
+          tmp_nuc = tmp[Range(0, enu - 1)];  
       } else
         tmp_nuc = nuc_j[Range(0, count - 1)];
       // Rcout << tmp_nuc << "\n";
@@ -565,7 +570,7 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
         // if(count == 0)
         //   continue;
         /* get the nuc table at each site */
-      // Rcout << j << "\t" << tmp_nuc << "\n";
+      // Rcout << j << "\n";
       nuc = unique_map(tmp_nuc);
       IntegerVector key = nuc["values"];
       IntegerVector val = nuc["lengths"];
@@ -578,8 +583,8 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
             keys(num) = key(t);
             vals(num++) = val(t);
           }
-          nuc_unique[j] = keys[Range(0, num - 1)];
-          nuc_count[j] = vals[Range(0, num - 1)];
+        nuc_unique[j] = keys[Range(0, num - 1)];
+        nuc_count[j] = vals[Range(0, num - 1)];
       } else {
         num = key.size();
         nuc_unique[j] = key;
@@ -596,7 +601,7 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
         // }
       IntegerVector hap_site = nuc_unique[j];
       IntegerVector sum_site = nuc_count[j];
-      
+      // Rcout << num << "|||" << hap_site << ": " << sum_site << "\n";
       if(sbs) {
         List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment, opt);
         n_row[j] = out["n_row"];

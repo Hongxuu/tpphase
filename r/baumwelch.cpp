@@ -1083,7 +1083,9 @@ List trans_permit(IntegerVector num_states, IntegerVector start_t, List combinat
           id = j;
           break;
         }
-      
+      if(id == -1) {
+        Rcout << "no overlapping\n";
+      }
       int end = id;
       for(j = id + 1; j < location_t1.size(); ++j)
         if(location_t1[j] == location_t2[j - id])
@@ -1112,7 +1114,7 @@ List trans_permit(IntegerVector num_states, IntegerVector start_t, List combinat
   return(trans_permits);
 }
 
-// [[Rcpp::export]]
+
 arma::uvec find_ass(IntegerVector selected_hap, List n_in_t, List wic, int t_max, int n_obs) {
   unsigned int t, i, k;
   List selected_wic(t_max);
