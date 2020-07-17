@@ -13,7 +13,7 @@ using namespace std;
 #define MLOGIT_CLASS 4
 #define NUM_CLASS 4
 #define QUA_MAX 106
-#define QUA_ERR 10
+#define QUA_ERR 0
 
 // [[Rcpp::depends(RcppArmadillo)]]
 
