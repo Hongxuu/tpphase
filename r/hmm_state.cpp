@@ -102,9 +102,9 @@ List aux_noN_S3(IntegerVector sum_site, IntegerVector hap_site, List opt) {
     }
   }
   int third_nuc = opt["third_nuc"];
-  if(!third_nuc) {
+  if(third_nuc == 0) {
     Rcout << "exclude 3rd nuc\n";
-      ls = aux_noN_S2(sum_site2, hap_site2, opt);
+    ls = aux_noN_S2(sum_site2, hap_site2, opt);
   } else {
     sum = sum_site[2] + sum_site[1] + sum_site[0];
     // double p0 = sum_site[0]/sum;
@@ -115,7 +115,7 @@ List aux_noN_S3(IntegerVector sum_site, IntegerVector hap_site, List opt) {
     int max_id = which_max(sum_site);
     double two_hap = opt["two_hap"];
     double left_range = opt["left_range"];
-    double right_range = opt["right_range"];
+    double right_range = 2 - left_range;
     // different rules to reduce the possibilities, basically rule out things like ATAG
     if (((sum - sum_site[max_id])/sum_site[max_id] <= left_range
            && (sum - sum_site[max_id])/sum_site[max_id] >= right_range) ||
@@ -251,7 +251,6 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
             hap_site2[num] = hap_site[i];
             num++;
           }
-        opt["third_nuc"] = 1;
         List out = aux_noN_S3(sum_site2, hap_site2, opt);
         haplotype[0] = out["temp"];
         n_row = out["n_row"];

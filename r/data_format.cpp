@@ -535,7 +535,7 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
         int keep_id = 0;
         for(i = 0; i < count; ++i) 
           if(nuc_j[i] != -1)
-            if(qua_ij[i] > max_qua) {
+            if(qua_ij[i] >= max_qua) {
               max_qua = qua_ij[i];
               keep_id = i;
             }
@@ -585,7 +585,7 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
         nuc_unique[j] = key;
         nuc_count[j] = val;
       }
-      
+     
         // if only deletion appears
         // if(num == 1 && keys[0] == -1) {
         //   nuc_unique[j] = key[Range(0, 1)];

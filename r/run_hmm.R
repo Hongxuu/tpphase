@@ -108,7 +108,8 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
                  n_class = n_class, num_cat = num_cat, ncores = ncores, weight_id = weight_id)
   
   ###indicate which transfer could happen
-  trans_indicator <- trans_permit(num_states = HMM$num_states, start_t = overlap_info$start_t, combination = hap_full_info$combination, 
+  trans_indicator <- trans_permit(num_states = HMM$num_states, start_t = overlap_info$start_t, 
+                                  combination = hap_full_info$combination, 
                                   loci = overlap_info$location, t_max = HMM$t_max)
   ### start initializing
   weight_id <- NULL
@@ -127,7 +128,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   data$nuc <- to_char_r(data$nuc)
   data$hap_nuc <- to_char_r(data$hap_nuc)
   id <- data["id"]
-  for (m in (1:max_iter)) {
+  for (m in (1:10)) {
     cat("iter: ", m, "\n")
     full_llk <- bw$par_hmm_bf$full_llk
     par_hmm_old <- bw$par_hmm

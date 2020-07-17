@@ -1077,12 +1077,13 @@ List trans_permit(IntegerVector num_states, IntegerVector start_t, List combinat
       // Rcout << location_t1 << "\n";
       // Rcout << location_t2 << "\n";
       // get the overlapped region, this might be different from the overlapped states we had
-      int id = 0;
+      int id = -1;
       for(j = 0; j < location_t1.size(); ++j) 
         if(location_t1[j] == location_t2[0]) {
           id = j;
           break;
         }
+      
       int end = id;
       for(j = id + 1; j < location_t1.size(); ++j)
         if(location_t1[j] == location_t2[j - id])

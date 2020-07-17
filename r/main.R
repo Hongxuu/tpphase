@@ -32,7 +32,7 @@ m = 1
 datfile <- list()
 ref_alignment <- list()
 res_file <- list()
-for(i in c(0.02)) {
+for(i in c(0.02, 0.01, 0.005)) {
   hr = paste0(parent_folder , "homr", i)
   alignment = paste0(hr, "/ref.fsa")
   ref_sam = paste0(hr, "/ref.sam")
@@ -61,3 +61,7 @@ foreach(m=1:length(datfile)) %dopar% {
                 alignment = ref_alignment[[m]], 
                 res_file = res_file[[m]])
 }
+datafile = "../../data/hmm/WGS/simu/homr0.01/cov3/out14.txt"
+alignment = "../../data/hmm/WGS/simu/homr0.01/ref.fsa"
+altragenotype(datafile = datfile, 
+              alignment = alignment) -> a
