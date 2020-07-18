@@ -63,7 +63,7 @@ m_beta <- function(res, weight_id, data, id, formula, reads_lengths, ncores, old
   par$beta <- res$param$beta #beta from last step as starting value
   data <- data[, !names(data) %in% c("id")] # (modified_moligit exclude first column: id)
   
-  Mpar <- Mstep(dat = data, read_length = reads_lengths, weight_id= weight_id, formula = formula, par = par, 
+  Mpar <- Mstep(dat = data, read_length = reads_lengths, weight_id = weight_id, formula = formula, par = par, 
                 ncores = ncores, weights = TRUE, given_weights = weight)
   par$beta <- Mpar$beta 
   

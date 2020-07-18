@@ -717,7 +717,7 @@ List limit_comb_t0(IntegerMatrix combination, List hidden_states, IntegerVector 
   else
     sub_link = mc_linkage(old_sub_link, num);
   // Rcout << "linkage:\n";
-  print_intmat(sub_link);
+  // print_intmat(sub_link);
   unsigned int n_observation = sub_link.nrow();
   all_excluded = 0;
   for (m = 0; m < num_states; ++m) {
@@ -1001,7 +1001,7 @@ IntegerMatrix new_combination(List hmm_info, IntegerVector location, IntegerVect
           }
         }
       }
-    print_intmat(extra);
+    // print_intmat(extra);
     arma::Mat<int> m2 = as<arma::Mat<int>>(extra);
     m1.insert_rows(1, m2);
     next_comb = wrap(m1);

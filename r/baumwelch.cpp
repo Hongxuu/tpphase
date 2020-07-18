@@ -857,7 +857,7 @@ List format_data2(List hmm_info, List d_info, List hap_info) {
         }
     }
   }
-  // Rcout << numerate << "\n";
+  // Rcout << "all_len" << numerate << "\n";
   // hash the matrix
   List hashed_dat = hash_mat(full_dat);
   List all_id = hashed_dat["all_id"];
@@ -934,6 +934,7 @@ NumericVector make_weight(List wic, List gamma, List hmm_info, List dat_info) {
     }
     count += num * NUM_CLASS * num_states[t];
   }
+  // Rcout << "weight length:" << count << "\n";
   NumericVector weight(count);
   count = 0;
   for(t = 0; t < t_max; ++t) {

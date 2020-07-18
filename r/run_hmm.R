@@ -122,6 +122,8 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   if(hap_info$gap_in) {
     data_rm <- data %>% filter(mode == 1) 
     weight_id <- which(data_rm$hap_nuc == -1)
+    if(length(weight_id) == 0)
+      weight_id <- NULL
     data <- data %>% filter(hap_nuc != -1) # mnlogit only takes data without indels in read or in haplotypes
   }
   data$nuc <- to_char_r(data$nuc)

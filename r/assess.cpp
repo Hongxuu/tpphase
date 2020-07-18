@@ -334,7 +334,55 @@ NumericVector pp_snp(IntegerVector hs_id, List combination,
   }
   return pp;
 }
-// 1 homo, 2 heter in first 2, 3 heter in last 2
 
-  
+// NumericVector pp_all(IntegerVector hs_id, List combination, IntegerVector start_t, int hap_len,
+//                      IntegerVector t_len, List gamma, IntegerVector ref_snp, IntegerVector t_snp) {
+//   unsigned int t, m, j;
+//   NumericVector pp(hap_len);
+//   List pp_all(start_t.size());
+//   //get the pp for each snp at each t
+//   int count = 0;
+//   for(t = 0; t < start_t.size(); ++t) {
+//     NumericVector gam = gamma(t); 
+//     IntegerMatrix comb = combination(t);
+//     // print_intmat(comb);
+//     IntegerVector chosed_comb = comb(hs_id[t], _);
+//     // Rcout << "choosed " << chosed_comb << "\n";
+//     NumericVector ppt(t_len.size());
+//     
+//     for(j = 0; j < comb.ncol(); ++j)
+//       for(m = 0; m < comb.nrow(); ++m)
+//         if(comb(m, j) == chosed_comb(j))
+//           ppt[j] += exp(gam[m]);
+//     count += snp_t.size();
+//         // Rcout << "ppt " << ppt << "\n";
+//     pp_snp[t] = ppt;
+//   }
+//   
+//   IntegerVector snp_flat(count);
+//   NumericVector pp_all(count);
+//   count = 0;
+//   // average over the snp pp
+//   for(t = 0; t < snp_loci_t.size(); ++t) {
+//     IntegerVector snp_t = snp_loci_t(t);
+//     if(snp_t[0] == -1)
+//       continue;
+//     NumericVector ppt = pp_snp[t];
+//     for(j = 0; j < snp_t.size(); ++j) {
+//       pp_all(count) = ppt[j];
+//       snp_flat(count++) = snp_t[j];
+//     }
+//   }
+//   // Rcout << snp_flat << "\n";
+//   List hased_info = hash_intvec(snp_flat);
+//   IntegerVector value = hased_info["value"];
+//   List all_id = hased_info["all_id"];
+//   count = 0;
+//   for(m = 0; m < value.size(); ++m) {
+//     IntegerVector id = all_id[m];
+//     NumericVector snp_each = pp_all[id];
+//     pp[count++] = mean(snp_each);
+//   }
+//   return pp;
+// }
   

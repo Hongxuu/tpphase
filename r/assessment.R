@@ -44,12 +44,13 @@ error_rates <- function(res, truth_file) {
 }
 
 ####### get the simulation results
-parent_path <- "../../../../peanut_simu/homr0.01/"
+parent_path <- "../../../../peanut_simu/homr0.02/"
 res_all <- list()
 covergae <- c(3, 4, 8, 12, 16)
 individual <- c(0:49)
 n_ind = 1
-for(j in individual0.01) {
+individual0.02 <-  individual[-c(12, 20, 26, 32)]
+for(j in individual0.02) {
   res_ind <- list()
   count = 1
   for(i in covergae) {
@@ -64,9 +65,7 @@ for(j in individual0.01) {
 
 ###### err rates
 individual0.005 <- individual[-c(10, 11, 12, 13, 19, 36, 42, 45, 48, 49, 50)]
-individual0.01 <- individual[-c(15, 25, 41, 7, 5, 6, 8, 27, 32, 43, 47, 48, 50)]
-individual0.02 <- individual[-c(5, 11, 12, 13, 19, 20, 21, 32, 33, 24, 26, 40, 47, 25, 
-                                27, 34, 35, 36, 41, 48)]
+
 get_res <- function(individual, parent_path, res_all, covergae) {
   summary <- data.frame()
   for(j in individual) {
@@ -82,6 +81,7 @@ get_res <- function(individual, parent_path, res_all, covergae) {
     geom_boxplot() + 
     facet_wrap(~variable, scales = "free")
 }
+get_res(individual, parent_path, res_all, covergae)
 get_res(individual0.005, parent_path, res_all, covergae)
 
 get_res(individual0.02, parent_path, res_all, covergae)
@@ -103,7 +103,7 @@ get_pp <- function(individual, res_all, covergae) {
   }
   return(pp_roc)
 }
-pp_1 <- get_pp(individual = individual0.01, res_all, covergae)
+pp_1 <- get_pp(individual = individual0.02, res_all, covergae)
 
 library(precrec)	# auc from here
 library(ROCR)		# plots from here

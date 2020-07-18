@@ -363,7 +363,7 @@ DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1)
   IntegerVector mode(len);
   IntegerVector id(len);
 
-  /* pick out the haplotypes accordingg to ref_pos */
+  /* pick out the haplotypes according to ref_pos */
   for (i = 0; i < total; ++i)
     for (k = 0; k < NUM_CLASS; ++k)
       for (l = 0; l < MLOGIT_CLASS; ++l) {
