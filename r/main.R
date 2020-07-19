@@ -65,4 +65,4 @@ datafile = "../../../../peanut_simu/homr0.005/cov3/out26.txt"
 alignment = "../../../../peanut_simu/homr0.005/ref.fsa"
 altragenotype(datafile = datfile, 
               alignment = alignment) -> a
-res_file = "../../../../peanut_simu/homr0.02/cov4/hmm_res10"
+res_file = "../../../../peanut_simu/homr0.005/cov3/hmm_res26"

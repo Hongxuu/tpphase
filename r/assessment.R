@@ -44,29 +44,32 @@ error_rates <- function(res, truth_file) {
 }
 
 ####### get the simulation results
-parent_path <- "../../../../peanut_simu/homr0.02/"
-res_all <- list()
+parent_path <- "../../../../peanut_simu/homr0.005/"
 covergae <- c(3, 4, 8, 12, 16)
 individual <- c(0:49)
-n_ind = 1
-individual0.02 <-  individual[-c(12, 20, 26, 32)]
-for(j in individual0.02) {
-  res_ind <- list()
-  count = 1
-  for(i in covergae) {
-    coverage_path <- paste0(parent_path, "cov", i)
-    res_file <- paste0(coverage_path, "/hmm_res", j)
-    res_ind[[count]] <- read_rds(res_file)
-    count = count + 1
+
+get_res <- function(parent_path, covergae, individual) {
+  res_all <- list()
+  n_ind = 1
+  for(j in individual) {
+    res_ind <- list()
+    count = 1
+    for(i in covergae) {
+      coverage_path <- paste0(parent_path, "cov", i)
+      res_file <- paste0(coverage_path, "/hmm_res", j)
+      res_ind[[count]] <- read_rds(res_file)
+      count = count + 1
+    }
+    res_all[[n_ind]] <- res_ind
+    n_ind = n_ind + 1
   }
-  res_all[[n_ind]] <- res_ind
-  n_ind = n_ind + 1
+  return(res_all)
 }
+res_all.0.005 <- get_res(parent_path, covergae, individual)
 
 ###### err rates
-individual0.005 <- individual[-c(10, 11, 12, 13, 19, 36, 42, 45, 48, 49, 50)]
 
-get_res <- function(individual, parent_path, res_all, covergae) {
+get_err <- function(individual, parent_path, res_all, covergae) {
   summary <- data.frame()
   for(j in individual) {
     truth_file <- paste0(parent_path, "indiv", j, ".fsa")
@@ -81,10 +84,9 @@ get_res <- function(individual, parent_path, res_all, covergae) {
     geom_boxplot() + 
     facet_wrap(~variable, scales = "free")
 }
-get_res(individual, parent_path, res_all, covergae)
-get_res(individual0.005, parent_path, res_all, covergae)
 
-get_res(individual0.02, parent_path, res_all, covergae)
+get_err(individual, parent_path, res_all, covergae)
+get_err(individual0.005, parent_path, res_all.0.005, covergae)
 
 ######## pp for snps
 get_pp <- function(individual, res_all, covergae) {
@@ -103,7 +105,7 @@ get_pp <- function(individual, res_all, covergae) {
   }
   return(pp_roc)
 }
-pp_1 <- get_pp(individual = individual0.02, res_all, covergae)
+pp_1 <- get_pp(individual, res_all.0.005, covergae)
 
 library(precrec)	# auc from here
 library(ROCR)		# plots from here
