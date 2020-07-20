@@ -109,6 +109,8 @@ data_clean <- function(dat_path, hap_path, n_class = 4, num_cat = 4, filter = TR
 
 write.table(dat_long, file = "long.txt", quote = FALSE, row.names=FALSE, col.names=FALSE)
 data_r <- rea_dat(filepath = datafile)
+datafile2 = "../../../../peanut_simu/homr0.005/cov3/out0a.txt"
+data_r2 <- rea_dat(filepath = datafile2)
 data_r %>% filter(!(idx %in% c(1:40) & ref_pos %in% c(150:200))) -> d
 d <- d %>% group_by(idx) %>% mutate_at("read_pos", function(x) x - x[1])
 data_r <- data_r %>% filter(idx <= 125)

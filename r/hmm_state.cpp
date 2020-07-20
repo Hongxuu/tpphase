@@ -52,7 +52,7 @@ List aux_noN_S2(IntegerVector sum_site, IntegerVector hap_site, List opt) {
   int max_id = which_max(sum_site);
   sum = sum_site[1] + sum_site[0];
   List ls(2);
-  if ((sum - sum_site[max_id]) == 1 || (sum_site[max_id]/sum > 0.9)) {
+  if (((sum - sum_site[max_id]) == 1 && sum > 2) || (sum_site[max_id]/sum > 0.9)) {
     IntegerVector temp = {hap_site[max_id], hap_site[max_id], hap_site[max_id], hap_site[max_id]};
     n_row = 1;
     ls["temp"] = temp;

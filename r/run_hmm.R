@@ -182,6 +182,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   res$combination <- hap_full_info$combination
   res$loci <- overlap_info$location
   res$undecided_pos <- HMM$undecided_pos
+  res$cov_record <- HMM$cov_record
   
   if(!is.null(res_file))
     saveRDS(res, res_file)

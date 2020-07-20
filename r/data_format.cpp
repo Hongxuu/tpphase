@@ -500,6 +500,8 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
   IntegerVector n_row(hap_length);
   IntegerVector pos_possibility(hap_length);
   IntegerVector undecided_pos(hap_length);
+  IntegerVector record_cov(hap_length);
+  int cov_count = 0;
   for (j = 0; j < hap_length; ++j) {
     if(!non_covered[j]) {
       unsigned int ref_j = j + hap_min_pos;
@@ -519,8 +521,11 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
             non_del++;
           }
         }
+      
       if(non_del == 1) {
-        Rcout << "site " << j;
+        record_cov[cov_count++] = ref_j;
+        //record the min and the max index that covered by one nuc, exclude them when compare with other algorithms
+        Rcout << "site " << ref_j;
         Rcout << " is covered by 1 read \n";
         n_row[j] = 1;
         IntegerVector tmp = {nuc_j[0], nuc_j[0], nuc_j[0], nuc_j[0]};
@@ -533,16 +538,21 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
       IntegerVector tmp_nuc;
       // if there are only two reads covered and only keep the one with the highest prob
       if(non_del == 2) {
+        record_cov[cov_count++] = ref_j;
         int max_qua = 0;
         int keep_id = 0;
-        for(i = 0; i < count; ++i) 
-          if(nuc_j[i] != -1)
-            if(qua_ij[i] >= max_qua) {
-              max_qua = qua_ij[i];
-              keep_id = i;
-            }
-        Rcout << "site " << j;
-        Rcout << " is covered by 2 reads, keep the one with the highest quality score \n";
+        if(nuc_j[0] == nuc_j[1])
+          keep_id = 0;
+        else {
+          for(i = 0; i < count; ++i)
+            if(nuc_j[i] != -1)
+              if(qua_ij[i] >= max_qua) {
+                max_qua = qua_ij[i];
+                keep_id = i;
+              }
+        }
+        Rcout << "site " << ref_j;
+        Rcout << " is covered by 2 reads \n";
         n_row[j] = 1;
         IntegerVector tmp = {nuc_j[keep_id], nuc_j[keep_id], nuc_j[keep_id], nuc_j[keep_id]};
         haplotype(j) = tmp;
@@ -571,6 +581,8 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
         //   continue;
         /* get the nuc table at each site */
       // Rcout << j << "\n";
+      if(ref_j == 54)
+        Rcout << tmp_nuc << "\n";
       nuc = unique_map(tmp_nuc);
       IntegerVector key = nuc["values"];
       IntegerVector val = nuc["lengths"];
@@ -621,6 +633,8 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
       haplotype(j) = tmp;
     }
   }
+  IntegerVector record = record_cov[Range(0, cov_count - 1)];
+
   // find the number of hidden states at each t
   IntegerVector num_states(t_max, 1);
   for(t = 0; t < t_max; ++t)
@@ -640,7 +654,9 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
     Named("n_t") = n_t,// no. emission reads at each time t
     Named("time_pos") = time_pos, // emission start position
     Named("n_in_t") = n_in_t, // reads index in each t 
-    Named("t_max") = t_max); //biggest t
+    Named("t_max") = t_max, //biggest t
+    Named("cov_record") = record // samll cov
+    ); 
   
   return ls;
 }

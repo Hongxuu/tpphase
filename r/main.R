@@ -32,7 +32,7 @@ m = 1
 datfile <- list()
 ref_alignment <- list()
 res_file <- list()
-for(i in c(0.02, 0.01, 0.005)) {
+for(i in c( 0.005)) {
   hr = paste0(parent_folder , "homr", i)
   alignment = paste0(hr, "/ref.fsa")
   ref_sam = paste0(hr, "/ref.sam")
@@ -50,7 +50,7 @@ for(i in c(0.02, 0.01, 0.005)) {
                out_file = datafile)
       datfile[[m]] = datafile
       ref_alignment[[m]] = alignment
-      res_file[[m]] = paste0(hr, "/cov", j, "/hmm_res", l)
+      res_file[[m]] = paste0(hr, "/cov", j, "/hmm2_res", l)
       m = m + 1
     }
   }   
@@ -63,6 +63,6 @@ foreach(m=1:length(datfile)) %dopar% {
 }
 datafile = "../../../../peanut_simu/homr0.005/cov3/out0.txt"
 alignment = "../../../../peanut_simu/homr0.005/ref.fsa"
-altragenotype(datafile = datfile, 
+altragenotype(datafile = datafile2, 
               alignment = alignment) -> a
 res_file = "../../../../peanut_simu/homr0.005/cov3/hmm_res26"

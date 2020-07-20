@@ -78,15 +78,15 @@ error_rates <- function(res, truth_file, is_hmm) {
 ####### get the simulation results
 
 
-get_res <- function(parent_path, covergae, individual) {
+get_res <- function(parent_path, covergae, individual, name) {
   res_all <- list()
   n_ind = 1
   for(j in individual) {
     res_ind <- list()
     count = 1
     for(i in covergae) {
-      coverage_path <- paste0(parent_path, "cov", i)
-      res_file <- paste0(coverage_path, "/hmm_res", j)
+      coverage_path <- paste0(parent_path, "cov", i, "/", name)
+      res_file <- paste0(coverage_path, "/", name, j)
       res_ind[[count]] <- read_rds(res_file)
       count = count + 1
     }

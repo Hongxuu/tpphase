@@ -161,7 +161,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
  
   return(sw);
 }
-
+// [[Rcpp::export]] 
 List find_snp(IntegerMatrix true_hap)  {
   unsigned int j, count = 0;
   
