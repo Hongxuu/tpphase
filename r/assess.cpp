@@ -156,18 +156,15 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
   } else {
     sw = List::create (
       Named("heter_sw_err") = 0,
-      Named("homo_swi_err") = 0);
+      Named("homo_sw_err") = 0);
   }
  
   return(sw);
 }
 
-// [[Rcpp::export]] 
-// snps encoding 0 1 2 3: no, homologous snp, heter snp in A, heter in B
-//construct a confusion matrix for multiclass
-List snp_stats (CharacterMatrix inferred_snp, IntegerVector snp_location, int hap_length, int min_ref, 
-                IntegerMatrix true_hap) {
-  unsigned int k, j, count = 0;
+List find_snp(IntegerMatrix true_hap)  {
+  unsigned int j, count = 0;
+  
   IntegerVector snp_type(true_hap.ncol());
   IntegerVector snp_id(true_hap.ncol());
   for(j = 0; j < true_hap.ncol(); ++j) {
@@ -186,6 +183,15 @@ List snp_stats (CharacterMatrix inferred_snp, IntegerVector snp_location, int ha
   }
   snp_id.erase(count, true_hap.ncol());
   snp_type.erase(count, true_hap.ncol());
+  List ls = List::create (
+    Named("snp_id") = snp_id,
+    Named("snp_type") = snp_type);
+  return(ls);
+}
+
+List tf_table(IntegerVector inferred_snp_type, IntegerVector snp_location,
+              IntegerVector snp_type, IntegerVector snp_id, int hap_length, int min_ref) {
+  unsigned int j;
   IntegerVector both = intersect(snp_location, snp_id);
   std::vector<int> s = as<std::vector<int> >(both);
   std::sort(s.begin(), s.end());
@@ -200,18 +206,6 @@ List snp_stats (CharacterMatrix inferred_snp, IntegerVector snp_location, int ha
     true_match[j] = true_match[j] - 1;
   }
   
-  IntegerVector inferred_snp_type(snp_location.size());
-  for(j = 0; j < snp_location.size(); ++j) {
-    if(inferred_snp(0, j) != inferred_snp(1, j)) {
-      inferred_snp_type[j] = 2;
-    }
-    else if(inferred_snp(2, j) != inferred_snp(3, j)) {
-      inferred_snp_type[j] = 3;
-    }
-    else if(inferred_snp(0, j) != inferred_snp(2, j) && inferred_snp(1, j) != inferred_snp(3, j)) {
-      inferred_snp_type[j] = 1;
-    }
-  }
   int homo2heter = 0, heter2homo = 0, heter2heter = 0, homo2homo = 0;
   int homo2non = 0, heter2non = 0, non2heter = 0, non2homo = 0;
   CharacterVector true_snp(NUM_CLASS);
@@ -252,7 +246,86 @@ List snp_stats (CharacterMatrix inferred_snp, IntegerVector snp_location, int ha
   IntegerVector homo = {homo2homo, heter2homo, non2homo};
   IntegerVector heter = {homo2heter, heter2heter, non2heter};
   IntegerVector non = {homo2non, heter2non, non2non};
+  List tf = List::create (
+    Named("homo") = homo,
+    Named("heter") = heter,
+    Named("non") = non,
+    Named("refer_match") = refer_match,
+    Named("true_match") = true_match,
+    Named("both") = both);
+  return(tf);
+}
+
+// [[Rcpp::export]] 
+List snp_stats_other (IntegerMatrix inferred_hap, int hap_length, int min_ref, IntegerMatrix true_hap) {
+  unsigned int j, k;
+  List true_info = find_snp(true_hap);
+  IntegerVector snp_type = true_info["snp_type"];
+  IntegerVector snp_id = true_info["snp_id"];
+  
+  List ref_info = find_snp(inferred_hap);
+  IntegerVector inferred_snp_type = ref_info["snp_type"];
+  IntegerVector snp_location = ref_info["snp_id"];
+  
+  List tf_info = tf_table(inferred_snp_type, snp_location, snp_type, snp_id, hap_length, min_ref);
+  IntegerVector both = tf_info["both"];
+  IntegerVector refer_match = tf_info["refer_match"];
+  IntegerVector true_match = tf_info["true_match"];
+  
+  // switch error get the both snps first
+  int len = both.size();
+  CharacterMatrix hmm_snp(NUM_CLASS, len);
+  CharacterMatrix real_snp(NUM_CLASS, len);
+  
+  for(j = 0; j < len; ++j) {
+    for(k = 0; k < NUM_CLASS; ++k) {
+      hmm_snp(k, j) = iupac_to_char[inferred_hap(k, snp_location[refer_match[j]])]; // to character
+      real_snp(k, j) = iupac_to_char[true_hap(k, snp_id[true_match[j]])]; // to character
+    }
+  }
+  IntegerVector both_refer_type = inferred_snp_type[refer_match];
+  IntegerVector both_true_type = snp_type[true_match];
+  
+  List sw = switch_err(hmm_snp, real_snp, both, both_refer_type, both_true_type);
+  IntegerVector homo = tf_info["homo"];
+  IntegerVector heter = tf_info["heter"];
+  IntegerVector non = tf_info["non"];
   DataFrame confusion_metric = DataFrame::create(_["homo"] = homo, _["heter"] = heter, _["non"] = non);
+  
+  List snp_info = List::create (Named("confusion metric") = confusion_metric,
+                                       Named("tsnp_id") = snp_id,
+                                       Named("switch") = sw,
+                                       Named("both") = both);
+  return snp_info;
+}
+// [[Rcpp::export]] 
+// snps encoding 0 1 2 3: no, homologous snp, heter snp in A, heter in B
+//construct a confusion matrix for multiclass
+List snp_stats (CharacterMatrix inferred_snp, IntegerVector snp_location, int hap_length, int min_ref, 
+                IntegerMatrix true_hap) {
+  unsigned int j, k;
+  List true_info = find_snp(true_hap);
+  IntegerVector snp_type = true_info["snp_type"];
+  IntegerVector snp_id = true_info["snp_id"];
+  
+  IntegerVector inferred_snp_type(snp_location.size());
+  for(j = 0; j < snp_location.size(); ++j) {
+    if(inferred_snp(0, j) != inferred_snp(1, j)) {
+      inferred_snp_type[j] = 2;
+    }
+    else if(inferred_snp(2, j) != inferred_snp(3, j)) {
+      inferred_snp_type[j] = 3;
+    }
+    else if(inferred_snp(0, j) != inferred_snp(2, j) && inferred_snp(1, j) != inferred_snp(3, j)) {
+      inferred_snp_type[j] = 1;
+    }
+  }
+  
+  List tf_info = tf_table(inferred_snp_type, snp_location, snp_type, snp_id, hap_length, min_ref);
+  IntegerVector both = tf_info["both"];
+  IntegerVector refer_match = tf_info["refer_match"];
+  IntegerVector true_match = tf_info["true_match"];
+  
   // switch error get the both snps first
   int len = both.size();
   CharacterMatrix hmm_snp(NUM_CLASS, len);
@@ -268,6 +341,10 @@ List snp_stats (CharacterMatrix inferred_snp, IntegerVector snp_location, int ha
   IntegerVector both_true_type = snp_type[true_match];
   
   List sw = switch_err(hmm_snp, real_snp, both, both_refer_type, both_true_type);
+  IntegerVector homo = tf_info["homo"];
+  IntegerVector heter = tf_info["heter"];
+  IntegerVector non = tf_info["non"];
+  DataFrame confusion_metric = DataFrame::create(_["homo"] = homo, _["heter"] = heter, _["non"] = non);
   
   List snp_info = List::create (
     Named("confusion metric") = confusion_metric,
