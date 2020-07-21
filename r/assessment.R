@@ -88,9 +88,9 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
 }
 
 ####### get the simulation results
-res_file = "../../../../peanut_simu/homr0.005/cov4/hmm_res/hmm_res21"
-truth_file = "../../../../peanut_simu/homr0.005/indiv21.fsa"
-read_rds(res_file) -> individual
+# res_file = "../../../../peanut_simu/homr0.005/cov4/hmm_res/hmm_res21"
+# truth_file = "../../../../peanut_simu/homr0.005/indiv21.fsa"
+# read_rds(res_file) -> individual
 
 get_res <- function(parent_path, covergae, individual, name) {
   res_all <- list()

@@ -13,7 +13,7 @@ res_all.0.01 <- get_res(parent_path = "../../../../peanut_simu/homr0.01/", cover
 
 hmm_res.0.01 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.01/", res_all.0.01, covergae, is_hmm = 1)
 hmm_res.0.005 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.005/", res_all.0.005, covergae, is_hmm = 1)
-
+hmm_res.0.0052 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.005/", res_all.0.0052, covergae, is_hmm = 1)
 # 
 # roshan <- get_res_other(parent_path, covergae, individual, name = "roshan")
 # roshan_res <- get_err(individual, parent_path, roshan, covergae, is_hmm = 0)
@@ -22,7 +22,7 @@ gatk_res.0.005 <- get_err(individual, parent_path= "../../../../peanut_simu/homr
 gatk.0.01 <- get_res_other(parent_path = "../../../../peanut_simu/homr0.01/", covergae, individual, name = "gatk")
 gatk_res.0.01 <- get_err(individual, parent_path= "../../../../peanut_simu/homr0.01/", gatk.0.01, covergae, is_hmm = 0)
 
-res_0.005 <- rbind(hmm_res.0.005, gatk_res.0.005) %>% 
+res_0.005 <- rbind(hmm_res.0.0052, gatk_res.0.005) %>% 
   add_column(method = rep(c("hmm", "gatk+hapcut2"), each = nrow(gatk_res.0.005))) %>% 
   add_column("homeo_rate" = 0.005)
 res_0.01 <- rbind(hmm_res.0.01, gatk_res.0.01) %>% 
