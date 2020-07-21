@@ -332,8 +332,10 @@ int load_data(simu_dat *dat, simu_options *opt, fastq_data *fds) {
 	fprint_seq(fp, dat->seq_B, opt->len_N, "Genome_B");
 	fclose(fp);
 	fp = NULL;
-	call_bwa(opt, fsaA_file, NULL, NULL, NULL);
-	call_bwa(opt, fsaB_file, NULL, NULL, NULL);
+	if (opt->bwa_command) {
+		call_bwa(opt, fsaA_file, NULL, NULL, NULL);
+		call_bwa(opt, fsaB_file, NULL, NULL, NULL);
+	}
 	// make heter loci
 	for (j = 0; j < opt->len_N; ++j) {
 		if (dat->homo_loci[j]) {
@@ -437,7 +439,7 @@ int load_data(simu_dat *dat, simu_options *opt, fastq_data *fds) {
 					}
 					if (dat->seq_B[j] != dat->ind[0][j] && hwe != 1) {
 						fprintf(stderr, "++ %d: %c%c|%c%c\n", j, xy_to_char[dat->ind[0][j]],xy_to_char[dat->ind[1][j]], xy_to_char[dat->ind[2][j]], xy_to_char[dat->ind[3][j]]);
-					}	
+					}
 				} else {
 					for (i = 0; i < 2; ++i)
 						dat->ind[i][j] = dat->seq_A[j];
@@ -594,7 +596,7 @@ void fprint_usage(FILE *fp, const char *cmdname, void *obj) {
 	fprintf(fp, "\t-c <error_file1>\n\t\tSpecify error file 1\n");
 	fprintf(fp, "\t-d <error_file2>\n\t\tSpecify error file 2\n");
 	fprintf(fp, "\t-m <fq_file>\n\t\tFastq file name (Default: %s)\n", opt->fq_file);
-	fprintf(fp, "\t-t <ART>\n\t\tART command\n");
+	fprintf(fp, "\t-t <ART>\n\t\tART command(only use it and bwa with -n = 1 and one coverage)\n");
 	fprintf(fp, "\t-w <bwa>\n\t\tBWA command\n");
 	fprintf(fp, "\t-k <rsam>\n\t\tRead aligned to reference name\n");
 	fprintf(fp, "\t-h \n\t\tThis help\n");
