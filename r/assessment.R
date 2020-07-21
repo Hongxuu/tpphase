@@ -21,7 +21,7 @@ get_res_other <- function(parent_path, covergae, individual, name) {
 }
 
 
-error_rates <- function(res, truth_file, is_hmm) {
+error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
   truth <- read_fasta(truth_file)
   true_geno <- truth$reads
   
@@ -34,7 +34,6 @@ error_rates <- function(res, truth_file, is_hmm) {
   for(i in 1:length(res)) {
     individual <- res[[i]]
     if(is_hmm) {
-      snps <- individual$snps
       snp_location <- individual$snp_location
       hap_length <- ncol(individual$haplotypes$hap_final)
       start_pos <- individual$start_pos
@@ -45,16 +44,24 @@ error_rates <- function(res, truth_file, is_hmm) {
       inferred_geno <- inferred$reads
       snp_call <- snp_stats_other(inferred_hap = inferred_geno, hap_length = ncol(inferred_geno), min_ref = 0, true_hap = true_geno)
     }
-    a <- sum(snp_call$`confusion metric`[, 2]) - snp_call$`confusion metric`[2, 2]
-    b <- sum(snp_call$`confusion metric`[2, ]) - snp_call$`confusion metric`[2, 2]
-    heter_fp <- (a)/(sum(snp_call$`confusion metric`[, 2]))
-    a <- sum(snp_call$`confusion metric`[, 1]) - snp_call$`confusion metric`[1, 1]
-    b <- sum(snp_call$`confusion metric`[1, ]) - snp_call$`confusion metric`[1, 1]
-    homo_fp <- (a)/(sum(snp_call$`confusion metric`[, 1]))
     heter_swe <- snp_call$switch$heter_sw_err
     homo_swe <- snp_call$switch$homo_sw_err
-    stats <- list("heter_fdr" = heter_fp, "homo_fdr" = homo_fp,
-                  "heter_swe" = heter_swe, "homo_swe" = homo_swe)
+    a <- sum(snp_call$`confusion metric`[, 2]) - snp_call$`confusion metric`[2, 2]
+    b <- sum(snp_call$`confusion metric`[2, ]) - snp_call$`confusion metric`[2, 2]
+    c <- sum(snp_call$`confusion metric`[, 1]) - snp_call$`confusion metric`[1, 1]
+    d <- sum(snp_call$`confusion metric`[1, ]) - snp_call$`confusion metric`[1, 1]
+    if(fdr) {
+      heter_fp <- (a)/(sum(snp_call$`confusion metric`[, 2]))
+      homo_fp <- (c)/(sum(snp_call$`confusion metric`[, 1]))
+      stats <- list("heter_fdr" = heter_fp, "homo_fdr" = homo_fp,
+                    "heter_swe" = heter_swe, "homo_swe" = homo_swe)
+    } else {
+      heter_fp <- (a)/(a + b)
+      homo_fp <- (c)/(c + d)
+      stats <- list("heter_fp" = heter_fp, "homo_fp" = homo_fp,
+                    "heter_swe" = heter_swe, "homo_swe" = homo_swe)
+    }
+    
     # stats <- append(stats, snp_call[-3])
     if(heter_swe != 0) {
       heter_msw <- mean(diff(c(0, snp_call$switch$heter_sw_id)))
