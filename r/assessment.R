@@ -67,13 +67,17 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
     if(heter_swe != 0) {
       heter_msw <- mean(diff(c(0, snp_call$switch$heter_sw_id)))
       stats <- append(stats, list("heter_msw" = heter_msw))
-    } else
+    } else {
+      stats$heter_swe = NA
       stats <- append(stats, list("heter_msw" = NA))
+      }
     if(homo_swe != 0) {
       homo_msw <- mean(diff(c(0, snp_call$switch$homo_sw_id)))
       stats <- append(stats, list("homo_msw" = homo_msw))
-    } else
+    } else {
+      stats$homo_swe = NA
       stats <- append(stats, list("homo_msw" = NA))
+    }
     value[[i]] <- stats
   }
   if(length(res) == 8) {
@@ -84,7 +88,9 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
 }
 
 ####### get the simulation results
-
+res_file = "../../../../peanut_simu/homr0.005/cov4/hmm_res/hmm_res21"
+truth_file = "../../../../peanut_simu/homr0.005/indiv21.fsa"
+read_rds(res_file) -> individual
 
 get_res <- function(parent_path, covergae, individual, name) {
   res_all <- list()
