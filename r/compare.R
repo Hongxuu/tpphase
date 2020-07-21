@@ -1,6 +1,7 @@
 ### read the truth
 library(reshape2)
 sourceCpp("./r/assess.cpp")
+source("./r/assessment.R")
 
 covergae <- c(3, 4, 8, 12, 16)
 individual <- c(0:49)
@@ -37,7 +38,7 @@ res_homeo <- rbind(res_0.005, res_0.01) %>%
 res_heter %>% 
   ggplot(aes(coverage, value)) +
   geom_boxplot(aes(fill = method)) + 
-  facet_grid(homeo_rate~variable, scales = "free")
+  facet_wrap(homeo_rate~variable, scales = "free")
 
 res_homeo %>% 
   ggplot(aes(coverage, value)) +

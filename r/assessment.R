@@ -39,13 +39,14 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
       start_pos <- individual$start_pos
       snp_call <- snp_stats(individual$snps, snp_location - 1, hap_length, start_pos, true_geno)
     } else {
-      cat(individual, "\n");
+      # cat(individual, "\n");
       inferred <- read_fasta(individual)
       inferred_geno <- inferred$reads
       snp_call <- snp_stats_other(inferred_hap = inferred_geno, hap_length = ncol(inferred_geno), min_ref = 0, true_hap = true_geno)
     }
     heter_swe <- snp_call$switch$heter_sw_err
     homo_swe <- snp_call$switch$homo_sw_err
+    
     a <- sum(snp_call$`confusion metric`[, 2]) - snp_call$`confusion metric`[2, 2]
     b <- sum(snp_call$`confusion metric`[2, ]) - snp_call$`confusion metric`[2, 2]
     c <- sum(snp_call$`confusion metric`[, 1]) - snp_call$`confusion metric`[1, 1]
@@ -128,36 +129,20 @@ get_err <- function(individual, parent_path, res_all, covergae, is_hmm, verbose 
 }
 
 ################ pp for snps
-get_pp <- function(individual, res_all, covergae) {
-  pp_roc <- data.frame()
-  ind = 1
-  for(j in individual) {
-    ind_res <- res_all[[ind]]
-    cov = 1
-    for(i in covergae) {
-      pp <- pp_snp(ind_res[[cov]]$haplotypes$chosed_state, ind_res[[cov]]$combination, 
-                 ind_res[[cov]]$loci, ind_res[[cov]]$par$par_hmm_bf$gamma, ncol(ind_res[[cov]]$snps))
-      cov = cov + 1
-      pp_roc <- rbind(pp_roc, data.frame("pp_all" = pp, coverage = i, individual = j)) 
-    }
-    ind = ind + 1
-  }
-  return(pp_roc)
-}
+# get_pp <- function(individual, res_all, covergae) {
+#   pp_roc <- data.frame()
+#   ind = 1
+#   for(j in individual) {
+#     ind_res <- res_all[[ind]]
+#     cov = 1
+#     for(i in covergae) {
+#       pp <- pp_snp(ind_res[[cov]]$haplotypes$chosed_state, ind_res[[cov]]$combination, 
+#                  ind_res[[cov]]$loci, ind_res[[cov]]$par$par_hmm_bf$gamma, ncol(ind_res[[cov]]$snps))
+#       cov = cov + 1
+#       pp_roc <- rbind(pp_roc, data.frame("pp_all" = pp, coverage = i, individual = j)) 
+#     }
+#     ind = ind + 1
+#   }
+#   return(pp_roc)
+# }
 
-library(precrec)	# auc from here
-library(ROCR)		# plots from here
-
-#### heterozygotes ####
-d <- read.table("roc_het.txt", header=T)
-boxplot(PP ~ Truth, data = d)	# great separation
-em <- evalmod(scores = d$PP, labels = d$Truth, mode = "rocprc")
-d.hc <- d[d$CovA>10 & d$CovB>10,]
-em <- evalmod(scores = d.hc$PP, labels = d.hc$Truth, mode = "rocprc")
-
-## make plots
-pred <- prediction(d$PP, d$Truth)
-perf <- performance(pred, "tpr", "fpr")
-plot(perf, colorize=T)
-perf <- performance(pred, "prec", "rec")
-plot(perf, colorize=T)
