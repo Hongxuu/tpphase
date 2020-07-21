@@ -439,7 +439,7 @@ int load_data(simu_dat *dat, simu_options *opt, fastq_data *fds) {
 					}
 					if (dat->seq_B[j] != dat->ind[0][j] && hwe != 1) {
 						fprintf(stderr, "++ %d: %c%c|%c%c\n", j, xy_to_char[dat->ind[0][j]],xy_to_char[dat->ind[1][j]], xy_to_char[dat->ind[2][j]], xy_to_char[dat->ind[3][j]]);
-					}
+					}	
 				} else {
 					for (i = 0; i < 2; ++i)
 						dat->ind[i][j] = dat->seq_A[j];

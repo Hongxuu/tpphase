@@ -80,13 +80,14 @@ call_ampliclust <- function(ampliclust_command = NULL, fastq_file = NULL, ac_out
 }
 
 call_aln <- function(ref_nameA = NULL, ref_nameB = NULL, ref_fsa = NULL, ref_sam = NULL,
-                     alnA = NULL, alnB = NULL, out_file = NULL) {
+                     alnA = NULL, alnB = NULL, out_file = NULL, uni_geno_file = NULL) {
   checkmate::expect_file_exists(ref_fsa, access = "r")
   checkmate::expect_file_exists(ref_sam, access = "r")
   checkmate::expect_file_exists(alnA, access = "r")
   checkmate::expect_file_exists(alnB, access = "r")
   if (utils::tail(unlist(strsplit(ref_fsa, "[.]")), 1) != "fsa" &
-      utils::tail(unlist(strsplit(ref_fsa, "[.]")), 1) != "fa")
+      utils::tail(unlist(strsplit(ref_fsa, "[.]")), 1) != "fa" &
+      utils::tail(unlist(strsplit(ref_fsa, "[.]")), 1) != "fasta")
     stop("The input ref_fsa has to be fasta file!")
   if (utils::tail(unlist(strsplit(ref_sam, "[.]")), 1) != "sam" &
       utils::tail(unlist(strsplit(alnA, "[.]")), 1) != "sam" &
@@ -94,11 +95,14 @@ call_aln <- function(ref_nameA = NULL, ref_nameB = NULL, ref_fsa = NULL, ref_sam
     stop("The input alnA, alnB, ref_sam must be sam file!")
   if (!dir.exists(sub('/[^/]*$', '', out_file)))
     stop("out_file path does not exist!")
+  if (!dir.exists(sub('/[^/]*$', '', uni_geno_file)))
+    stop("uni_geno_file path does not exist!")
   
   if (!is.loaded("r_make_aln", PACKAGE = "sync_data_r"))
     dyn.load("./src/sync_data_r.so")
   
-  .Call("r_make_aln", ref_nameA, ref_nameB, ref_fsa, ref_sam, alnA, alnB, out_file)
+  .Call("r_make_aln", ref_nameA, ref_nameB, ref_fsa, ref_sam, 
+        alnA, alnB, out_file, uni_geno_file)
 }
 # samfile = "../../data/tetraploid/308-TAN-A.sam"
 # ref_name = "Adur420_2:199509_P2"

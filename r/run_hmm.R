@@ -57,17 +57,18 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   }
   ## make universal reference
   cat("preparing data: \n");
-  align <- read_fasta(alignment)
-  if(nrow(align$reads) != 1) { #only read in one reference pair
-    universal <- make_universal(alignment = align, for_hmm = 1, ref_idx = 0)
-    universal <- universal %>% unlist()
-  } else { ## read in many references, take the one we want
-    ref_in <- strsplit(ref_name, ref_delim, fixed = TRUE) %>% unlist()
-    ref_index <- ref_in[2] %>% as.integer() - 1 ## index in C
-    universal <- make_universal(alignment = align, for_hmm = 1, ref_idx = ref_index)
-    universal <- Filter(Negate(is.null), universal) %>% unlist()
-  }
-  rm(align)
+  universal <- read_lines(alignment)[2] %>% str_split("") %>% unlist()
+  # align <- read_lines(alignment)
+  # if(nrow(align$reads) != 1) { #only read in one reference pair
+  #   universal <- make_universal(alignment = align, for_hmm = 1, ref_idx = 0)
+  #   universal <- universal %>% unlist()
+  # } else { ## read in many references, take the one we want
+  #   ref_in <- strsplit(ref_name, ref_delim, fixed = TRUE) %>% unlist()
+  #   ref_index <- ref_in[2] %>% as.integer() - 1 ## index in C
+  #   universal <- make_universal(alignment = align, for_hmm = 1, ref_idx = ref_index)
+  #   universal <- Filter(Negate(is.null), universal) %>% unlist()
+  # }
+  # rm(align)
   
   ## prepare data
   genotype_target = 0

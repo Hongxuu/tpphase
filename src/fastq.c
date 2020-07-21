@@ -265,7 +265,6 @@ int read_fastq(const char *filename, fastq_data **in_fqd, fastq_options *fqo)
 	err = fread_fastq(fp, in_fqd, fqo);
 
 	fclose(fp);
-
 	return err;
 } /* read_fastq */
 

@@ -54,13 +54,13 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
     if(fdr) {
       heter_fp <- (a)/(sum(snp_call$`confusion metric`[, 2]))
       homo_fp <- (c)/(sum(snp_call$`confusion metric`[, 1]))
-      stats <- list("heter_fdr" = heter_fp, "homo_fdr" = homo_fp,
-                    "heter_swe" = heter_swe, "homo_swe" = homo_swe)
+      stats <- list("heter_fdr" = heter_fp, "homeo_fdr" = homo_fp,
+                    "heter_swe" = heter_swe, "homeo_swe" = homo_swe)
     } else {
       heter_fp <- (a)/(a + b)
       homo_fp <- (c)/(c + d)
-      stats <- list("heter_fp" = heter_fp, "homo_fp" = homo_fp,
-                    "heter_swe" = heter_swe, "homo_swe" = homo_swe)
+      stats <- list("heter_fp" = heter_fp, "homeo_fp" = homo_fp,
+                    "heter_swe" = heter_swe, "homeo_swe" = homo_swe)
     }
     
     # stats <- append(stats, snp_call[-3])
@@ -68,15 +68,13 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
       heter_msw <- mean(diff(c(0, snp_call$switch$heter_sw_id)))
       stats <- append(stats, list("heter_msw" = heter_msw))
     } else {
-      stats$heter_swe = NA
       stats <- append(stats, list("heter_msw" = NA))
       }
     if(homo_swe != 0) {
       homo_msw <- mean(diff(c(0, snp_call$switch$homo_sw_id)))
-      stats <- append(stats, list("homo_msw" = homo_msw))
+      stats <- append(stats, list("homeo_msw" = homo_msw))
     } else {
-      stats$homo_swe = NA
-      stats <- append(stats, list("homo_msw" = NA))
+      stats <- append(stats, list("homeo_msw" = NA))
     }
     value[[i]] <- stats
   }
@@ -88,10 +86,10 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
 }
 
 ####### get the simulation results
-# res_file = "../../../../peanut_simu/homr0.005/cov4/hmm_res/hmm_res21"
-# truth_file = "../../../../peanut_simu/homr0.005/indiv21.fsa"
-# read_rds(res_file) -> individual
-
+res_file = "../../../../peanut_simu/homr0.005/cov16/hmm_res/hmm_res45"
+truth_file = "../../../../peanut_simu/homr0.005/indiv45.fsa"
+read_rds(res_file) -> individual
+gatk <- gatk.0.005[[16]][[5]]
 get_res <- function(parent_path, covergae, individual, name) {
   res_all <- list()
   n_ind = 1

@@ -32,7 +32,7 @@ m = 1
 datfile <- list()
 ref_alignment <- list()
 res_file <- list()
-for(i in c( 0.005)) {
+for(i in c(0.005)) {
   hr = paste0(parent_folder , "homr", i)
   alignment = paste0(hr, "/ref.fsa")
   ref_sam = paste0(hr, "/ref.sam")
@@ -65,4 +65,23 @@ datafile = "../../../../peanut_simu/homr0.005/cov3/out0.txt"
 alignment = "../../../../peanut_simu/homr0.005/ref.fsa"
 altragenotype(datafile = datafile2, 
               alignment = alignment) -> a
-res_file = "../../../../peanut_simu/homr0.005/cov3/hmm_res26"
+
+alignment = "../../data/roshan/real/target_homeo.fasta"
+ref_sam = "../../data/roshan/real/combine.sam" 
+alnA = "../../data/roshan/real/Tifguard_subset_A_WGS.sam"
+alnB = "../../data/roshan/real/Tifguard_subset_B_WGS.sam"
+datafile = "../../../../real_out/out2.txt"
+uni_geno = "../../../../real_out/uni2.fa"
+#######################real data
+
+call_aln(ref_nameA = "aradu.V14167.gnm2.chr04:119340965-119341964",
+         ref_nameB = "araip.K30076.gnm2.B04:141199721-141200721",
+         ref_fsa = alignment,
+         ref_sam = ref_sam,
+         alnA = alnA,
+         alnB = alnB,
+         out_file = datafile,
+         uni_geno_file = uni_geno)
+
+
+

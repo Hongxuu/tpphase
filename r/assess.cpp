@@ -149,7 +149,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
       swi_er[c++] = double(swi_one[i])/(swi_one[i] + non_swi_one[i]);
     }
     swi_er.erase(c, count - 1);
-    double heter_se = mean(swi_er);
+    double heter_se = median(swi_er);
     if(swi_AB) {
       sw = List::create (
         Named("homo_sw_id") = swAB_id,
@@ -163,7 +163,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
         Named("homo_sw_err") = 0,
         Named("heter_sw_err") = heter_se);
     }
-  } else if(!heter_c && swi_AB) {
+  } else if(!heter_c && swi_AB && non_swi_one) {
     sw = List::create (
       Named("homo_sw_id") = swAB_id,
       Named("homo_sw_err") = homo_swi_err,

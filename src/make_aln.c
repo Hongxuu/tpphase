@@ -54,9 +54,9 @@ int make_alignment(options opt) {
 	unsigned int rptr = 0, rptr_b = 0;
 	char *A_name = NULL;
 	char *names = NULL;
-	//	printf("%lu\n", strlen(opt.ref_names[0]));
+//		printf("%lu\n", strlen(opt.ref_names[0]));
 	//	strlen has to be the same when comparing
-	fdr->n_lengths = malloc(fdr->n_reads * sizeof(*fdr->n_lengths));
+//	fdr->n_lengths = malloc(fdr->n_reads * sizeof(*fdr->n_lengths));
 	if (fdr->n_max_length == fdr->n_min_length)
 		for (j = 0; j < fdr->n_reads; ++j)
 			fdr->n_lengths[j] = fdr->n_min_length;
@@ -68,9 +68,9 @@ int make_alignment(options opt) {
 		A_name = malloc((fdr->name_lengths[j] + 1) * sizeof(*A_name));
 		//		for (i = 0; i < fdr->name_lengths[j]; ++i)
 		//			A_name[i] = names[i];
-		strncpy (A_name, names, fdr->name_lengths[j]);
+		strncpy(A_name, names, fdr->name_lengths[j]);
 		A_name[fdr->name_lengths[j]] = '\0';
-		//		printf("%lu %s\n", strlen(A_name), A_name);
+//				printf("%lu %s\n", strlen(A_name), A_name);
 		if (!strcmp(opt.ref_names[0], A_name)) {
 			A_id = j;
 			B_id = j+1;
@@ -98,7 +98,25 @@ int make_alignment(options opt) {
 			uni_genome[j] = 4;
 		}
 	}
-	//	PRINT_VECTOR(uni_genome, fdr->n_lengths[A_id]);
+	FILE *uni_fa = NULL;
+	if (opt.uni_geno_file) {
+		uni_fa = fopen(opt.uni_geno_file, "w");
+		if (!uni_fa)
+			exit(mmessage(ERROR_MSG, FILE_OPEN_ERROR, opt.uni_geno_file));
+		// output the universal alignment
+		fprintf(uni_fa, ">uni_genome\n");
+		for (j = 0; j < fdr->n_lengths[A_id]; ++j) {
+			if (uni_genome[j] == 5) {
+				fprintf(uni_fa, "J"); // GAP IN B
+			} else if (uni_genome[j] == 4) {
+				fprintf(uni_fa, "I"); // GAP IN A
+			} else
+				fprintf(uni_fa, "M");
+		}
+		fprintf(uni_fa, "\n");
+		fclose(uni_fa);
+	}
+//		PRINT_VECTOR(uni_genome, fdr->n_lengths[A_id]);
 	// store the index after alignment, if gap use -1, this alignment does not contain softclips, when map the reads back, the start and position should consider its length
 	unsigned int gap_a = 0;
 	unsigned int gap_b = 0;
@@ -115,9 +133,9 @@ int make_alignment(options opt) {
 			id_B[j] = -1;
 		}
 	}
-	//	PRINT_VECTOR(id_A, fdr->n_lengths[A_id]);
-	//	printf("B\n");
-	//	PRINT_VECTOR(id_B, fdr->n_lengths[A_id]);
+//		PRINT_VECTOR(id_A, fdr->n_lengths[A_id]);
+//		printf("B\n");
+//		PRINT_VECTOR(id_B, fdr->n_lengths[A_id]);
 	/* store information to the reference targeted sam file */
 	make_targets_info(opt_rf, &rf_info);
 	
@@ -346,4 +364,36 @@ int make_alignment(options opt) {
 #endif
 	fclose(fp);
 	return err;
+}
+
+
+void output_sam(FILE *fp, sam_entry *se, long ref_len) {
+	fprintf(fp, "@SQ	SN:");
+	fprintf(fp, "%s	LN:%lu\n", se->ref_name, ref_len);
+	fprintf(fp, "%s	%d	%s	%zu	60	", se->name, se->flag, se->ref_name, se->pos); // give mapping quality 60 (GATK does not depend on MAPQ)
+	cigar *cig = se->cig;
+	for (unsigned int l = 0; l < cig->n_ashes; ++l) {
+		fprintf(fp, "%d", cig->ashes[l].len);
+		if (cig->ashes[l].type == CIGAR_DELETION)
+			fprintf(fp, "D");
+		else if (cig->ashes[l].type == CIGAR_MATCH ||
+			 cig->ashes[l].type == CIGAR_MISMATCH ||
+			 cig->ashes[l].type == CIGAR_MMATCH)
+			fprintf(fp, "M");
+		else if (cig->ashes[l].type == CIGAR_SKIP)
+			fprintf(fp, "N");
+		else if (cig->ashes[l].type == CIGAR_PAD)
+			fprintf(fp, "P");
+		else if (cig->ashes[l].type == CIGAR_INSERTION)
+			fprintf(fp, "I");
+		else if (cig->ashes[l].type == CIGAR_SOFT_CLIP)
+			fprintf(fp, "S");
+		else if (cig->ashes[l].type == CIGAR_HARD_CLIP)
+			fprintf(fp, "H");
+	}
+	fprintf(fp, "	*	0	0	");
+	fwrite_nuc_sequence(fp, se->read, XY_ENCODING);
+	fprintf(fp, "	");
+	fwrite_qual_sequence(fp, se->qual);
+	fprintf(fp, "\n");
 }

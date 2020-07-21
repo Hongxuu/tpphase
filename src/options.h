@@ -41,6 +41,7 @@ struct _options {
 //	int max_quality_score;		/*<! censory quality scores here */
 	unsigned int n_sample;		/*<! number of Monte Carlo samples */
 	const char *out_file;		/*<! out_file */
+	const char *uni_geno_file;	/*<! uni_geno_file */
 	FILE *error_file;		/*<! error data file */
 	unsigned int use_bam;		/*<! files are in bam format */
 	const char *sbam_files[N_FILES];/*<! sam/bam files */

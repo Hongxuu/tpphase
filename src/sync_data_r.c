@@ -270,7 +270,8 @@ SEXP r_make_aln (SEXP ref_nameA,
 		   SEXP ref_sam,
 		   SEXP alnA,
 		   SEXP alnB,
-		   SEXP out_file
+		   SEXP out_file,
+		   SEXP uni_geno_file
 		   )
 {
 	options opt;
@@ -280,6 +281,7 @@ SEXP r_make_aln (SEXP ref_nameA,
 	opt.ref_names[0] = CHAR(STRING_ELT(ref_nameA, 0));
 	opt.ref_names[1] = CHAR(STRING_ELT(ref_nameB, 0));
 	opt.out_file = CHAR(STRING_ELT(out_file, 0));
+	opt.uni_geno_file = CHAR(STRING_ELT(uni_geno_file, 0));
 	opt.uni_genome = CHAR(STRING_ELT(ref_fsa, 0));
 	opt.sam_file = CHAR(STRING_ELT(ref_sam, 0));
 	make_alignment(opt);

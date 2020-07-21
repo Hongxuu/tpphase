@@ -24,6 +24,7 @@ int default_options(options *opt)
 	opt->n_sample = 100;
 	opt->max_eerr = INFINITY;
 	opt->out_file = NULL;
+	opt->uni_geno_file = NULL;
 	opt->error_file = NULL;
 	//	opt->ampliclust_file = NULL;
 //	opt->max_quality_score = INT_MAX;
@@ -104,6 +105,14 @@ int parse_options(options *opt, int argc, const char **argv)
 				opt->out_file = argv[++i];
 				fprintf(stderr, " %s",
 					opt->out_file);
+				
+				fprintf(stderr, "\n");
+				break;
+			case 'n':
+				mmessage(INFO_MSG, NO_ERROR, "Uni genome file:");
+				opt->uni_geno_file = argv[++i];
+				fprintf(stderr, " %s",
+					opt->uni_geno_file);
 				
 				fprintf(stderr, "\n");
 				break;
@@ -206,6 +215,7 @@ void fprint_usage(FILE *fp, const char *cmdname, void *obj) {
 		&cmdname[start]);
 	fprintf(fp, "\nOPTIONS\n");
 	fprintf(fp, "\t--o <outfile> \n\t\tOut file \n");
+	fprintf(fp, "\t--n <uni_geno> \n\t\tUni_geno file \n");
 	fprintf(fp, "\t--sam_files <fsam1> <fsam2>\n\t\tSpecify sam files "
 		"containing alignments (Default: none)\n");
 	fprintf(fp, "\t--ref_names <sref1> <sref2>\n\t\tSpecify names of "
