@@ -23,10 +23,10 @@ sourceCpp("./r/universal_alignment.cpp")
 sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
-parent_folder = "../../data/hmm/WGS/"
+parent_folder = "../data/hmm/"
 ref_nameA = "Genome_A:0-5000"
 ref_nameB = "Genome_B:0-5000"
-registerDoParallel(cores = 7)
+registerDoParallel(cores = 16)
 
 m = 1
 datfile <- list()
@@ -54,7 +54,7 @@ for(i in c(0.01)) {
       datfile[[m]] = datafile
       uni_file[[m]] = uni_geno
       ref_alignment[[m]] = alignment
-      res_file[[m]] = paste0(hr, "/cov", j, "/hmm2_res", l)
+      res_file[[m]] = paste0(hr, "/cov", j, "/hmm_res", l)
       m = m + 1
     }
   }   

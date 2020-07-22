@@ -134,6 +134,8 @@ get_err <- function(individual, parent_path, res_all, covergae, is_hmm, verbose 
   return(df)
 }
 
+read_sam(samfile = "../../../../peanut_simu/homr0.005/cov12/sim0test.sam", 
+         datafile = "../../../aaa.txt")
 ################ pp for snps
 # get_pp <- function(individual, res_all, covergae) {
 #   pp_roc <- data.frame()

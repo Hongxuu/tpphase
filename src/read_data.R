@@ -30,8 +30,8 @@ read_sam <- function(samfile = NULL, ref_name = NULL,
     dyn.load("./src/sync_data_r.so")
   }
   
-  if(is.null(datafile) == TRUE | is.null(samfile) == TRUE | is.null(fastq_file) == TRUE | is.null(ref_name) == TRUE)
-    stop("Must input data file and a reference name!")
+  if(is.null(datafile) == TRUE | is.null(samfile) == TRUE)
+    stop("Must input a data file and a samfile!")
   
   .Call("r_read_sam", samfile, ref_name, fastq_file, datafile)
 }

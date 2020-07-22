@@ -30,8 +30,10 @@ SEXP r_read_sam (SEXP samfile_r, SEXP ref_name_r, SEXP fastq_file_r, SEXP datafi
 	unsigned int max_length = 0;
 	
 	sam_file = CHAR(STRING_ELT(samfile_r, 0));
-	fastq_file = CHAR(STRING_ELT(fastq_file_r, 0));
-	ref_name = CHAR(STRING_ELT(ref_name_r, 0));
+	if (ref_name)
+	  ref_name = CHAR(STRING_ELT(ref_name_r, 0));
+	if (fastq_file)
+	  fastq_file = CHAR(STRING_ELT(fastq_file_r, 0));
 	datafile = CHAR(STRING_ELT(datafile_r, 0));
 	
 	uint32_t rf_idx = -1;
