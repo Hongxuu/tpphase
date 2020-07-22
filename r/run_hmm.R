@@ -58,7 +58,8 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   ## make universal reference
   cat("preparing data: \n");
   universal <- read_lines(alignment)[2] %>% str_split("") %>% unlist()
-  # align <- read_lines(alignment)
+  
+  # align <- read_fasta(alignment)
   # if(nrow(align$reads) != 1) { #only read in one reference pair
   #   universal <- make_universal(alignment = align, for_hmm = 1, ref_idx = 0)
   #   universal <- universal %>% unlist()

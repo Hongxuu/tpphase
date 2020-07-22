@@ -4,7 +4,7 @@ REFERENCE=~/Documents/Karin/alleotetraploid/data/hmm/WGS/reference/ref9.fsa
 OUTPUT_SIMU=~/Documents/Karin/alleotetraploid/data/hmm/WGS
 ERR_FILE=~/Documents/Karin/alleotetraploid/data/roshan/simu/miseq250R2.txt
 
-for p in 0.005 0.01 0.02
+for p in 0.005 0.008 0.01
 do
 	PARENT_FOLDER="$OUTPUT_SIMU/homr${p}"
 #echo "$PARENT_FOLDER"

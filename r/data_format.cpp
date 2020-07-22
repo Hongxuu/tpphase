@@ -581,8 +581,6 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
         //   continue;
         /* get the nuc table at each site */
       // Rcout << j << "\n";
-      if(ref_j == 54)
-        Rcout << tmp_nuc << "\n";
       nuc = unique_map(tmp_nuc);
       IntegerVector key = nuc["values"];
       IntegerVector val = nuc["lengths"];

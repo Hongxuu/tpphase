@@ -86,10 +86,12 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
 }
 
 ####### get the simulation results
-res_file = "../../../../peanut_simu/homr0.005/cov16/hmm_res/hmm_res45"
-truth_file = "../../../../peanut_simu/homr0.005/indiv45.fsa"
-read_rds(res_file) -> individual
-gatk <- gatk.0.005[[16]][[5]]
+# res_file = "../../../../peanut_simu/homr0.005/cov16/hmm_res/hmm_res45"
+# truth_file = "../../../../peanut_simu/homr0.005/indiv45.fsa"
+# read_rds(res_file) -> individual
+# gatk <- gatk.0.005[[16]][[5]]
+
+
 get_res <- function(parent_path, covergae, individual, name) {
   res_all <- list()
   n_ind = 1

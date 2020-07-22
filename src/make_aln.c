@@ -56,10 +56,11 @@ int make_alignment(options opt) {
 	char *names = NULL;
 //		printf("%lu\n", strlen(opt.ref_names[0]));
 	//	strlen has to be the same when comparing
-//	fdr->n_lengths = malloc(fdr->n_reads * sizeof(*fdr->n_lengths));
-	if (fdr->n_max_length == fdr->n_min_length)
-		for (j = 0; j < fdr->n_reads; ++j)
-			fdr->n_lengths[j] = fdr->n_min_length;
+	if (fdr->n_max_length == fdr->n_min_length) {
+	  fdr->n_lengths = malloc(fdr->n_reads * sizeof(*fdr->n_lengths));
+	  for (j = 0; j < fdr->n_reads; ++j)
+	    fdr->n_lengths[j] = fdr->n_min_length;
+	}
 	
 	for (j = 0; j < fdr->n_reads; ++j) {
 		names = fdr->names;

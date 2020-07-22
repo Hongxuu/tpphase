@@ -6,4 +6,5 @@ using namespace Rcpp;
 DataFrame format_data(List dat_info, IntegerMatrix haplotype, int time_pos = -1);
 int top_n_map(List unique_map);
 int uni_sum(List unique_map, unsigned int cut_off);
+IntegerMatrix linkage_info(List dat_info, IntegerVector undecided_pos);
 #endif

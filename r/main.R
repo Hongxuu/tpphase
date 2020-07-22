@@ -32,23 +32,27 @@ m = 1
 datfile <- list()
 ref_alignment <- list()
 res_file <- list()
-for(i in c(0.005)) {
+uni_file <- list()
+for(i in c(0.01)) {
   hr = paste0(parent_folder , "homr", i)
   alignment = paste0(hr, "/ref.fsa")
   ref_sam = paste0(hr, "/ref.sam")
-  for(j in c(3, 4, 8, 12, 16)) {
+  for(j in c(4, 8, 12, 16)) {
     for(l in c(0:49)) {
       alnA = paste0(hr, "/cov", j, "/aln", l, "A.sam")
       alnB = paste0(hr, "/cov", j, "/aln", l, "B.sam")
       datafile = paste0(hr, "/cov", j, "/out", l, ".txt")
-      call_aln(ref_nameA = ref_nameA,
-               ref_nameB = ref_nameB,
-               ref_fsa = alignment,
-               ref_sam = ref_sam,
-               alnA = alnA,
-               alnB = alnB,
-               out_file = datafile)
+      uni_geno = paste0(hr, "/cov", j, "/uni", l, ".fa")
+      # call_aln(ref_nameA = ref_nameA,
+      #          ref_nameB = ref_nameB,
+      #          ref_fsa = alignment,
+      #          ref_sam = ref_sam,
+      #          alnA = alnA,
+      #          alnB = alnB,
+      #          out_file = datafile,
+      #          uni_geno_file = uni_geno)
       datfile[[m]] = datafile
+      uni_file[[m]] = uni_geno
       ref_alignment[[m]] = alignment
       res_file[[m]] = paste0(hr, "/cov", j, "/hmm2_res", l)
       m = m + 1
@@ -58,7 +62,7 @@ for(i in c(0.005)) {
 
 foreach(m=1:length(datfile)) %dopar% {
   altragenotype(datafile = datfile[[m]], 
-                alignment = ref_alignment[[m]], 
+                alignment = uni_file[[m]], 
                 res_file = res_file[[m]])
 }
 datafile = "../../../../peanut_simu/homr0.005/cov3/out0.txt"
