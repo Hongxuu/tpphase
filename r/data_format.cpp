@@ -115,7 +115,7 @@ List read_data(std::string path, unsigned int old_v) {
     /* exclude -1 in ref_pos and qua */
     if (l == -1)
       count_del++;
-    else {
+    else if(k != -1) {
       if (temp_n != i) {
         temp_n = i;
         n_observation++;
@@ -168,7 +168,7 @@ List read_data(std::string path, unsigned int old_v) {
       del_flag[i-1] = 1;
       count_del++;
     }
-    else {
+    else if(k != -1) {
       obs_index[count] = i;
       read_pos[count] = j;
       ref_pos[count] = k;
@@ -282,7 +282,7 @@ List read_data(std::string path, unsigned int old_v) {
           break;
         }
   
-  IntegerVector non_covered_site(max_len- min_len);
+  IntegerVector non_covered_site(max_len - min_len);
   unsigned int num;
   for (m = 0; m < max_len - min_len; ++m) {
     num = 0;

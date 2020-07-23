@@ -13,6 +13,7 @@ CharacterVector xy_to_c = {"A", "C", "T", "G"};
 double MEC(List dat_info, CharacterMatrix haps, IntegerVector cov_record) {
   double mec = 0;
   unsigned int i, j, k;
+  int hap_max_pos = dat_info["ref_length_max"];
   int hap_min_pos = dat_info["ref_start"];
   IntegerVector index = dat_info["start_id"];
   IntegerVector length = dat_info["length"];
@@ -39,11 +40,13 @@ double MEC(List dat_info, CharacterMatrix haps, IntegerVector cov_record) {
     for(j = 0; j < len; ++j)
       referred_hap(_, j) = haps(_, true_match[j]);
   } else {
-    len = haps.ncol();
+    len = hap_max_pos - hap_min_pos;
+    referred_hap = CharacterMatrix(NUM_CLASS, len);
     missing = IntegerVector(len);
     for(j = 0; j < len; ++j)
       missing[j] = j;
-    referred_hap = haps;
+    for(j = 0; j < len; ++j)
+      referred_hap(_, j) = haps(_, j + hap_min_pos);
   }
   linkage = linkage_info(dat_info, missing);
   unsigned int ref_j;
@@ -71,7 +74,6 @@ double MEC(List dat_info, CharacterMatrix haps, IntegerVector cov_record) {
     mec += max;
   }
   mec /= linkage.nrow();
-  
   return(mec);
 }
 

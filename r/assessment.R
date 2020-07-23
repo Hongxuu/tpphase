@@ -132,9 +132,7 @@ get_res <- function(parent_path, covergae, individual, name) {
 iu_to_char_r <- function(x) {
   as.character(c("1" = "A", "8" = "T", "2" = "C", "4" = "G", "16" = "N")[as.character(x)])
 }
-datafile <- "../../../../peanut_simu/homr0.005/cov4/hmm_res/out0hmm.txt"
-individual <- "../../../../peanut_simu/homr0.005/cov4/hmm_res/hmm_res0"
-
+datafile = "../../../../peanut_simu/homr0.005/cov4/gatk_res/out0gatk.txt"
 individual = "../../../../peanut_simu/homr0.005/cov4/gatk_res/sim0_gatk.fa"
 get_mec <- function(datfile, res, is_hmm) {
   if(length(res) == 9) {
@@ -158,7 +156,8 @@ get_mec <- function(datfile, res, is_hmm) {
       cov_record = individual$cov_record - dat_info$ref_start
     }
     mec <- MEC(dat_info, haps, cov_record)
-    value <- c(value, mec)
+    
+    value[i] <- mec
   }
   return(value)
 }
@@ -177,15 +176,20 @@ get_err <- function(individual, parent_path, res_all, covergae, is_hmm,
       for(i in covergae) {
         coverage_path <- paste0(parent_path, "cov", i, "/", datfile_name, "_res")
         data_f <- paste0(coverage_path, "/out", j, datfile_name, ".txt")
-        res_f <- paste0(coverage_path, "/", datfile_name, "_res", j)
+        if(datfile_name == "hmm") {
+          res_f <- paste0(coverage_path, "/", datfile_name, "_res", j)
+          res_ind[[count]] <- res_f
+        }
         d_ind[[count]] <- data_f
-        res_ind[[count]] <- res_f
         count = count + 1
       }
       datfile[[n_ind]] <- d_ind
-      resfile[[n_ind]] <- res_ind
+      if(datfile_name == "hmm")
+        resfile[[n_ind]] <- res_ind
       n_ind = n_ind + 1
     }
+    if(datfile_name == "gatk")
+      resfile = res_all
   }
   
   summary <- data.frame()
@@ -198,7 +202,6 @@ get_err <- function(individual, parent_path, res_all, covergae, is_hmm,
       mec <- get_mec(datfile = datfile[[j + 1]], res = resfile[[j + 1]], is_hmm)
       tmp <- tmp %>% add_column("mec" = mec, .before = 1)
     }
-     
     print(tmp, "\n")
     summary <- rbind(summary, tmp)
   }
