@@ -132,15 +132,12 @@ get_res <- function(parent_path, covergae, individual, name) {
 iu_to_char_r <- function(x) {
   as.character(c("1" = "A", "8" = "T", "2" = "C", "4" = "G", "16" = "N")[as.character(x)])
 }
-datafile <- "../../../../peanut_simu/homr0.005/cov12/hmm_res/out0.txt"
-individual <- "../../../../peanut_simu/homr0.005/cov12/hmm_res/hmm_res0"
+datafile <- "../../../../peanut_simu/homr0.005/cov4/hmm_res/out0hmm.txt"
+individual <- "../../../../peanut_simu/homr0.005/cov4/hmm_res/hmm_res0"
 
-
-read_sam(samfile = "../../../../peanut_simu/homr0.005/cov12/gatk_res/sim0test.sam", 
-         datafile = "../../../../peanut_simu/homr0.005/cov12/gatk_res/out0_gatk.txt")
-individual = "../../../../peanut_simu/homr0.005/cov12/gatk_res/sim0_gatk.fa"
-get_mec <- function(datfile, res, is_hmm, coverage) {
-  if(length(res) == 8) {
+individual = "../../../../peanut_simu/homr0.005/cov4/gatk_res/sim0_gatk.fa"
+get_mec <- function(datfile, res, is_hmm) {
+  if(length(res) == 9) {
     a <- list()
     a[[1]] <- res
     res <- a
@@ -154,9 +151,8 @@ get_mec <- function(datfile, res, is_hmm, coverage) {
       inferred <- read_fasta(individual)
       haps <- matrix(iu_to_char_r(inferred$reads), nrow = 4)
       cov_record = -1;
-    }
-    else {
-      individual <- read_rds(individual)
+    } else {
+      individual <- readRDS(individual)
       haps = individual$haplotypes$hap_final
       haps <- matrix(to_char_r(haps), nrow = 4)
       cov_record = individual$cov_record - dat_info$ref_start
@@ -168,15 +164,41 @@ get_mec <- function(datfile, res, is_hmm, coverage) {
 }
 
 ## all error metric
-get_err <- function(individual, parent_path, res_all, covergae, is_hmm, datfile, verbose = 0) {
+get_err <- function(individual, parent_path, res_all, covergae, is_hmm, 
+                    datfile_name = NULL, verbose = 0) {
+  if(!is.null(datfile_name)) {
+    datfile <- list()
+    resfile <- list()
+    n_ind = 1
+    for(j in individual) {
+      d_ind <- list()
+      res_ind <- list()
+      count = 1
+      for(i in covergae) {
+        coverage_path <- paste0(parent_path, "cov", i, "/", datfile_name, "_res")
+        data_f <- paste0(coverage_path, "/out", j, datfile_name, ".txt")
+        res_f <- paste0(coverage_path, "/", datfile_name, "_res", j)
+        d_ind[[count]] <- data_f
+        res_ind[[count]] <- res_f
+        count = count + 1
+      }
+      datfile[[n_ind]] <- d_ind
+      resfile[[n_ind]] <- res_ind
+      n_ind = n_ind + 1
+    }
+  }
+  
   summary <- data.frame()
   for(j in individual) {
     truth_file <- paste0(parent_path, "indiv", j, ".fsa")
     tmp <- error_rates(res = res_all[[j + 1]], truth_file, is_hmm) %>% 
       bind_rows() %>% 
       add_column(coverage = covergae, individual = j)
-    mec <- get_mec(datfile = datfile[[j + 1]], res = res_all[[j + 1]], is_hmm)
-    tmp <- tmp %>% add_column("mec" = mec, .before = 1)
+    if(!is.null(datfile_name)) {
+      mec <- get_mec(datfile = datfile[[j + 1]], res = resfile[[j + 1]], is_hmm)
+      tmp <- tmp %>% add_column("mec" = mec, .before = 1)
+    }
+     
     print(tmp, "\n")
     summary <- rbind(summary, tmp)
   }

@@ -6,6 +6,22 @@ source("./r/assessment.R")
 covergae <- c(4, 8, 12, 16)
 individual <- c(0:49)
 
+### get the out data from sam for gatk
+# samfile <- list()
+# outfile <- list()
+# for(i in c(0.008, 0.005, 0.01)) {
+#   hr = paste0("../../../../peanut_simu/" , "homr", i)
+#   for(j in covergae) {
+#     for(l in individual) {
+#       samfile = paste0(hr, "/cov", j, "/gatk_res/sim", l, "test.sam")
+#       outfile = paste0(hr, "/cov", j,  "/gatk_res/out", l, "gatk.txt")
+#       read_sam(samfile, datafile = outfile)
+#     }
+#   }   
+# }
+
+##################
+
 res_all.0.005 <- get_res(parent_path = "../../../../peanut_simu/homr0.005/", covergae, individual, name = "hmm_res")
 res_all.0.008 <- get_res(parent_path = "../../../../peanut_simu/homr0.008/", covergae, individual, name = "hmm_res")
 res_all.0.01 <- get_res(parent_path = "../../../../peanut_simu/homr0.01/", covergae, individual, name = "hmm_res")
@@ -13,9 +29,7 @@ res_all.0.01 <- get_res(parent_path = "../../../../peanut_simu/homr0.01/", cover
 hmm_res.0.01 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.01/", res_all.0.01, covergae, is_hmm = 1)
 hmm_res.0.005 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.005/", res_all.0.005, covergae, is_hmm = 1)
 hmm_res.0.008 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.008/", res_all.0.008, covergae, is_hmm = 1)
-# 
-# roshan <- get_res_other(parent_path, covergae, individual, name = "roshan")
-# roshan_res <- get_err(individual, parent_path, roshan, covergae, is_hmm = 0)
+
 gatk.0.005 <- get_res_other(parent_path = "../../../../peanut_simu/homr0.005/", covergae, individual, name = "gatk")
 gatk_res.0.005 <- get_err(individual, parent_path= "../../../../peanut_simu/homr0.005/", gatk.0.005, covergae, is_hmm = 0)
 gatk.0.008 <- get_res_other(parent_path = "../../../../peanut_simu/homr0.008/", covergae, individual, name = "gatk")

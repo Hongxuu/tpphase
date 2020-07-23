@@ -29,7 +29,9 @@ double MEC(List dat_info, CharacterMatrix haps, IntegerVector cov_record) {
     for(i = 1; i < full_len; ++i)
       full_record[i] = full_record[i - 1] + 1;
     missing = setdiff(full_record, cov_record);
+    // Rcout << missing << "\n";
     IntegerVector true_match = match(missing, full_record); // 1-based
+    // Rcout << true_match << "\n";
     len = missing.size();
     referred_hap = CharacterMatrix(NUM_CLASS, true_match.size());
     for(j = 0; j < len; ++j)
@@ -45,7 +47,7 @@ double MEC(List dat_info, CharacterMatrix haps, IntegerVector cov_record) {
   }
   linkage = linkage_info(dat_info, missing);
   unsigned int ref_j;
-  // compute mec between referred_hap & reads
+  // compute mec between referred_hap & read
   for(i = 0; i < linkage.nrow(); ++i) {
     int max = read_maxi;
     unsigned int max_id = 0;
@@ -55,17 +57,12 @@ double MEC(List dat_info, CharacterMatrix haps, IntegerVector cov_record) {
             ref_j = missing[j] + hap_min_pos;
           if (ref_pos[index[i]] <= ref_j && ref_j <= ref_pos[index[i] + length[i] - 1]) {
             int nuc = linkage(i, j);
-            if(referred_hap(k, j) == "N" && nuc == -1) {
-              continue;
-           } else if(referred_hap(k, j) != "N" && nuc == -1) {
-              hamming++;
-           } else if (xy_to_c[nuc] == referred_hap(k, j)) {
-             continue;
-           } else {
-              hamming++;
-             }
+              if(nuc != 4 && nuc!= -1) {
+                if (xy_to_c[nuc] != referred_hap(k, j))
+                  hamming++;
+              } 
+           }
         }
-      }
       if(hamming < max) {
         max = hamming;
         max_id = k;
