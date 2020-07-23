@@ -54,7 +54,7 @@ inline xy_t char_to_xy(char c)
     return 1 << 7;	/* non-nuc */
 } /* char_to_xy */
 
-CharacterVector xy_to_char[4] = {"A", "C", "T", "G"};
+CharacterVector xy_to_char = {"A", "C", "T", "G"};
 
 
 /**
@@ -631,7 +631,9 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
       haplotype(j) = tmp;
     }
   }
-  IntegerVector record = record_cov[Range(0, cov_count - 1)];
+  IntegerVector record;
+  if(cov_count != 0)
+    record = record_cov[Range(0, cov_count - 1)];
 
   // find the number of hidden states at each t
   IntegerVector num_states(t_max, 1);

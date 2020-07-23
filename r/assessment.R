@@ -39,7 +39,7 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
       start_pos <- individual$start_pos
       snp_call <- snp_stats(individual$snps, snp_location - 1, hap_length, start_pos, true_geno)
     } else {
-      # cat(individual, "\n");
+      cat(individual, "\n");
       inferred <- read_fasta(individual)
       inferred_geno <- inferred$reads
       snp_call <- snp_stats_other(inferred_hap = inferred_geno, hap_length = ncol(inferred_geno), min_ref = 0, true_hap = true_geno)
@@ -110,32 +110,6 @@ get_res <- function(parent_path, covergae, individual, name) {
   return(res_all)
 }
 
-###### err rates
-
-get_err <- function(individual, parent_path, res_all, covergae, is_hmm, verbose = 0) {
-  summary <- data.frame()
-  for(j in individual) {
-    truth_file <- paste0(parent_path, "indiv", j, ".fsa")
-    tmp <- error_rates(res = res_all[[j + 1]], truth_file, is_hmm) %>% 
-      bind_rows() %>% 
-      add_column(coverage = covergae, individual = j)
-    print(tmp, "\n")
-    summary <- rbind(summary, tmp)
-  }
-  summary$coverage <- as.factor(summary$coverage)
-  df <- summary[, -ncol(summary)] %>% melt(id.vars = "coverage") 
-  if(verbose) {
-    df %>% 
-      ggplot(aes(coverage, value)) +
-      geom_boxplot() + 
-      facet_wrap(~variable, scales = "free")
-  }
-  
-  return(df)
-}
-
-read_sam(samfile = "../../../../peanut_simu/homr0.005/cov12/sim0test.sam", 
-         datafile = "../../../aaa.txt")
 ################ pp for snps
 # get_pp <- function(individual, res_all, covergae) {
 #   pp_roc <- data.frame()
@@ -153,4 +127,72 @@ read_sam(samfile = "../../../../peanut_simu/homr0.005/cov12/sim0test.sam",
 #   }
 #   return(pp_roc)
 # }
+
+############
+iu_to_char_r <- function(x) {
+  as.character(c("1" = "A", "8" = "T", "2" = "C", "4" = "G", "16" = "N")[as.character(x)])
+}
+datafile <- "../../../../peanut_simu/homr0.005/cov12/hmm_res/out0.txt"
+individual <- "../../../../peanut_simu/homr0.005/cov12/hmm_res/hmm_res0"
+
+
+read_sam(samfile = "../../../../peanut_simu/homr0.005/cov12/gatk_res/sim0test.sam", 
+         datafile = "../../../../peanut_simu/homr0.005/cov12/gatk_res/out0_gatk.txt")
+individual = "../../../../peanut_simu/homr0.005/cov12/gatk_res/sim0_gatk.fa"
+get_mec <- function(datfile, res, is_hmm, coverage) {
+  if(length(res) == 8) {
+    a <- list()
+    a[[1]] <- res
+    res <- a
+  }
+  value <- c()
+  for(i in 1:length(res)) {
+    individual <- res[[i]]
+    datafile <- datfile[[i]]
+    dat_info <- read_data(datafile, old_v = 0)
+    if(!is_hmm) {
+      inferred <- read_fasta(individual)
+      haps <- matrix(iu_to_char_r(inferred$reads), nrow = 4)
+      cov_record = -1;
+    }
+    else {
+      individual <- read_rds(individual)
+      haps = individual$haplotypes$hap_final
+      haps <- matrix(to_char_r(haps), nrow = 4)
+      cov_record = individual$cov_record - dat_info$ref_start
+    }
+    mec <- MEC(dat_info, haps, cov_record)
+    value <- c(value, mec)
+  }
+  return(value)
+}
+
+## all error metric
+get_err <- function(individual, parent_path, res_all, covergae, is_hmm, datfile, verbose = 0) {
+  summary <- data.frame()
+  for(j in individual) {
+    truth_file <- paste0(parent_path, "indiv", j, ".fsa")
+    tmp <- error_rates(res = res_all[[j + 1]], truth_file, is_hmm) %>% 
+      bind_rows() %>% 
+      add_column(coverage = covergae, individual = j)
+    mec <- get_mec(datfile = datfile[[j + 1]], res = res_all[[j + 1]], is_hmm)
+    tmp <- tmp %>% add_column("mec" = mec, .before = 1)
+    print(tmp, "\n")
+    summary <- rbind(summary, tmp)
+  }
+  summary$coverage <- as.factor(summary$coverage)
+  df <- summary[, -ncol(summary)] %>% melt(id.vars = "coverage") 
+  if(verbose) {
+    df %>% 
+      ggplot(aes(coverage, value)) +
+      geom_boxplot() + 
+      facet_wrap(~variable, scales = "free")
+  }
+  return(df)
+}
+
+
+
+
+
 

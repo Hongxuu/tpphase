@@ -7,7 +7,7 @@ using namespace Rcpp;
 CharacterVector iupac_to_char = {"-", "A", "C", "M", "G", "R", "S",
                                  "V", "T", "W", "Y", "H", "K",
                                  "D", "B", "N"};
-haracterVector xy_to_char[4] = {"A", "C", "T", "G"};
+CharacterVector xy_to_c = {"A", "C", "T", "G"};
 
 // [[Rcpp::export]]
 double MEC(List dat_info, CharacterMatrix haps, IntegerVector cov_record) {
@@ -17,47 +17,63 @@ double MEC(List dat_info, CharacterMatrix haps, IntegerVector cov_record) {
   IntegerVector index = dat_info["start_id"];
   IntegerVector length = dat_info["length"];
   IntegerVector ref_pos = dat_info["ref_pos"];
-  IntegerVector full_record(cov_record[cov_record.size()] - cov_record[0] + 1);
-  full_record[0] = cov_record[0];
-  for(i = 1; i < full_record.size(); ++i)
-    full_record[i] = full_record[i - 1] + 1;
-  IntegerVector missing = setdiff(full_record, cov_record);
-  IntegerMatrix linkage = linkage_info(dat_info, missing);
-  IntegerVector true_match = match(missing, full_record); // 1-based
-
-  CharacterMatrix referred_hap(NUM_CLASS, true_match.size());
-  for(j = 0; j < missing.size(); ++j)
-    true_match[j] = true_match[j] - 1;
-  Rcout << true_match << "\n";
-  for(j = 0; j < true_match.size(); ++j)
-    referred_hap(_, j) = inferred_snp(_, true_match[j]);
-  
+  CharacterMatrix referred_hap;
+  IntegerVector missing;
+  IntegerMatrix linkage;
+  int len;
+  int read_maxi = max(length);
+  if(cov_record[0] != -1) {
+    int full_len = cov_record[cov_record.size() - 1] - cov_record[0] + 1;
+    IntegerVector full_record(full_len);
+    full_record[0] = cov_record[0];
+    for(i = 1; i < full_len; ++i)
+      full_record[i] = full_record[i - 1] + 1;
+    missing = setdiff(full_record, cov_record);
+    IntegerVector true_match = match(missing, full_record); // 1-based
+    len = missing.size();
+    referred_hap = CharacterMatrix(NUM_CLASS, true_match.size());
+    for(j = 0; j < len; ++j)
+      true_match[j] = true_match[j] - 1;
+    for(j = 0; j < len; ++j)
+      referred_hap(_, j) = haps(_, true_match[j]);
+  } else {
+    len = haps.ncol();
+    missing = IntegerVector(len);
+    for(j = 0; j < len; ++j)
+      missing[j] = j;
+    referred_hap = haps;
+  }
+  linkage = linkage_info(dat_info, missing);
+  unsigned int ref_j;
   // compute mec between referred_hap & reads
   for(i = 0; i < linkage.nrow(); ++i) {
-    unsigned int max = 0;
+    int max = read_maxi;
     unsigned int max_id = 0;
     for(k = 0; k < NUM_CLASS; ++k) {
-      unsigned int hamming = 0;
-        for(j = 0; j < true_match.size(); ++j) {
-          unsigned int ref_j = missing[j] + hap_min_pos;
+       int hamming = 0;
+        for(j = 0; j < len; ++j) {
+            ref_j = missing[j] + hap_min_pos;
           if (ref_pos[index[i]] <= ref_j && ref_j <= ref_pos[index[i] + length[i] - 1]) {
-            if(referred_hap(k, j) == "N" && linkage[i, j] == -1)
+            int nuc = linkage(i, j);
+            if(referred_hap(k, j) == "N" && nuc == -1) {
+              continue;
+           } else if(referred_hap(k, j) != "N" && nuc == -1) {
               hamming++;
-            else if(referred_hap(k, j) != "N" && linkage[i, j] == -1)
-              hamming--;
-            else if(xy_to_char(linkage[i, j]) == referred_hap(k, j))
+           } else if (xy_to_c[nuc] == referred_hap(k, j)) {
+             continue;
+           } else {
               hamming++;
-            else
-              hamming--;
+             }
         }
       }
-      if(hamming > max) {
+      if(hamming < max) {
         max = hamming;
         max_id = k;
       }
     }
     mec += max;
   }
+  mec /= linkage.nrow();
   
   return(mec);
 }
@@ -67,8 +83,8 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
   unsigned int k, j, i;
   int len = hmm_snp.ncol();
   IntegerVector status(len); // 0: A->A
-  Rcout << "refer " << both_refer_type << "\n";
-  Rcout << "true " << both_true_type << "\n";
+  // Rcout << "refer " << both_refer_type << "\n";
+  // Rcout << "true " << both_true_type << "\n";
   for(j = 0; j < len; ++j) {
     // first determine the order
     if(both_refer_type[j] == 1 && both_true_type[j] == 1) {
@@ -97,7 +113,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
     } else
       status[j] = 10; // homo to heter or heter to homo(wrong anyway, should we consider this?)
   }
-  Rcout << status << "\n";
+  // Rcout << status << "\n";
   // switched A B 
   IntegerVector swAB_id(len);
   IntegerVector swAB_idx(len);
@@ -148,7 +164,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
   swAB_idx.erase(count, len); // snp index (relative to whole hap) to seperate entire snps into blocks
   // switched heter within each correct homo region (get the switch error separately)
   // Rcout << "homo_swi " << swAB_id << "\n";
-  Rcout << "homo_swid "  << swAB_idx << "\n";
+  // Rcout << "homo_swid "  << swAB_idx << "\n";
   IntegerVector swi_one(count - 1);
   IntegerVector non_swi_one(count - 1); 
   IntegerVector heter_sw(len);
@@ -168,27 +184,27 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
         inx_B[count_b++] = i;
     }
     for(i = 0, k = 1; k < count_a; ++i, ++k) {
-      Rcout << status[inx_A[i]] <<  status[inx_A[k]] << "\n";
+      // Rcout << status[inx_A[i]] <<  status[inx_A[k]] << "\n";
       if((status[inx_A[i]] == 2 && status[inx_A[k]] == 2) || 
          (status[inx_A[i]] == 3 && status[inx_A[k]] == 3) || 
          (status[inx_A[i]] == 6 && status[inx_A[k]] == 6) || 
          (status[inx_A[i]] == 7 && status[inx_A[k]] == 7)) {
         non_swi_one[j]++;
       } else {
-        Rcout << "switch\n";
+        // Rcout << "switch\n";
         heter_sw[heter_c++] = both[inx_A[k]];
         swi_one[j]++;
       }
     }
     for(i = 0, k = 1; k < count_b; ++i, ++k) {
-      Rcout << status[inx_B[i]] <<  status[inx_B[k]] << "\n";
+      // Rcout << status[inx_B[i]] <<  status[inx_B[k]] << "\n";
       if((status[inx_B[i]] == 4 && status[inx_B[k]] == 4) || 
          (status[inx_B[i]] == 5 && status[inx_B[k]] == 5) || 
          (status[inx_B[i]] == 8 && status[inx_B[k]] == 8) || 
          (status[inx_B[i]] == 9 && status[inx_B[k]] == 9)) {
         non_swi_one[j]++;
       } else {
-        Rcout << "switch\n";
+        // Rcout << "switch\n";
         heter_sw[heter_c++] = both[inx_B[k]];
         swi_one[j]++;
       }
