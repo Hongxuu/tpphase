@@ -40,7 +40,7 @@ getOpt <- function(option = NULL) {
   return(ropts)
 }
 
-altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, res_file = NULL, ref_delim = ".",
+altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
                           formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 50, 
                           seed = 0, tol = 1e-05, use_MC = 1, ncores = 2, ...)  {
   registerDoParallel(cores = ncores)  
@@ -88,9 +88,8 @@ altragenotype <- function(datafile = NULL, alignment = NULL, ref_name = NULL, re
   hap_full <- hap_full_info$full_hap
   HMM$num_states <- hap_full_info$new_num_states
   ###indicate which transfer could happen
-  trans_indicator <- trans_permit(num_states = HMM$num_states, start_t = overlap_info$start_t, 
-                                  combination = hap_full_info$combination, 
-                                  loci = overlap_info$location, t_max = HMM$t_max)
+  trans_indicator <- trans_permit(num_states = HMM$num_states, combination = hap_full_info$combination, 
+                                  overlap_info = overlap_info, t_max = HMM$t_max)
   
   ### start initializing
   ## initialize hap

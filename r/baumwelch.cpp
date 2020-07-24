@@ -1053,11 +1053,17 @@ List baum_welch_iter(List hmm_info, List par_hmm, List data_info, List hap_info,
 }
 
 // find which states at t can transfer to the next states at t+1
+// NOTICE: EVEN IF TWO HEIGHBOURING STATES DO NOT HAVE OVERLAP! THERE ARE STILL POSSIBLY THAT THEY HAVE OVERLAP THROUGH COMMOM STATES!
 // undecided_pos starts from 0; but time_pos starts from int hap_min_pos = dat_info["ref_start"];
 
 // [[Rcpp::export]]
-List trans_permit(IntegerVector num_states, IntegerVector start_t, List combination, List loci, int t_max) {
+List trans_permit(IntegerVector num_states, List overlap_info, List combination, int t_max) {
   List trans_permits(t_max - 1);
+  List loci = overlap_info["location"];
+  IntegerVector overlapped_id = overlap_info["overlapped_id"];
+  // List overlapped = overlap_info["overlapped"];
+  IntegerVector start_t = overlap_info["start_t"];
+  
   unsigned int t, j, m, w;
   IntegerVector start(t_max);
   if(start_t.size() > 1)
@@ -1068,47 +1074,116 @@ List trans_permit(IntegerVector num_states, IntegerVector start_t, List combinat
           break;
         }
   
-  for(t = 0; t < t_max - 1; ++t) {
-    if(num_states[t + 1] != 1 && num_states[t] != 1 && start[t + 1] != 1) {
-      IntegerMatrix trans(num_states[t], num_states[t + 1]);
-      IntegerMatrix comb_t1 = combination[t];
-      IntegerMatrix comb_t2 = combination[t + 1];
-      IntegerVector location_t1 = loci[t];
-      IntegerVector location_t2 = loci[t + 1];
+  for(t = 1; t < t_max; ++t) {
+    if(num_states[t] != 1 && num_states[t - 1] != 1 && start[t] != 1) {
+      IntegerMatrix trans(num_states[t - 1], num_states[t]);
+      IntegerMatrix comb_t1 = combination[t - 1];
+      IntegerMatrix comb_t2 = combination[t];
+      
+      IntegerVector location_t1 = loci[t - 1];
+      IntegerVector location_t2 = loci[t];
+      
+      // Need to check if t0 contains t1 and t2
+      int len = comb_t2.ncol() + comb_t1.ncol();
+      IntegerVector index(len);
+     
+      // find the transition between t2 and t0, then map to the common between t1 and t0
       // Rcout << location_t1 << "\n";
       // Rcout << location_t2 << "\n";
-      // get the overlapped region, this might be different from the overlapped states we had
+      // get the overlapped_id region, this might be different from the overlapped_id states we had
       int id = -1;
       for(j = 0; j < location_t1.size(); ++j) 
         if(location_t1[j] == location_t2[0]) {
           id = j;
           break;
         }
-      if(id == -1) {
-        Rcout << "no overlapping\n";
-      }
       int end = id;
       for(j = id + 1; j < location_t1.size(); ++j)
         if(location_t1[j] == location_t2[j - id])
           end = j;
-      // 
-      // Rcout << "overlapped " << id << "\t" << end << "\n";
-      for(m = 0; m < num_states[t]; ++m) {
-        IntegerVector hap_t1 = comb_t1(m, _);
-        for(w = 0; w < num_states[t + 1]; ++w) {
-          IntegerVector hap_t2 = comb_t2(w, _);
-          for(j = id; j < end + 1; ++j) {
-            if (hap_t1[j] != hap_t2[j - id]) {
-              trans(m, w) = 1; // represents m cannot transfer to w
-              break;
+
+      if(id != -1) {
+        // Rcout << t << ":overlapped_id " << id << "\t" << end << "\n";
+        for(m = 0; m < num_states[t - 1]; ++m) {
+          IntegerVector hap_t1 = comb_t1(m, _);
+          for(w = 0; w < num_states[t]; ++w) {
+            IntegerVector hap_t2 = comb_t2(w, _);
+            // Rcout << hap_t1 << "|| " << hap_t2 << "\n";
+            for(j = id; j < end + 1; ++j) {
+              if (hap_t1[j] != hap_t2[j - id]) {
+                trans(m, w) = 1; // represents m cannot transfer to w
+                break;
+              }
             }
           }
         }
+        trans_permits(t - 1) = trans;
+      } else {
+        IntegerVector location_t0 = loci[overlapped_id[t]];
+        IntegerMatrix comb_t0 = combination[overlapped_id[t]]; // overlapped_id t
+        int count = 0;
+        int id_t1 = -1;
+        // Rcout << t << " not overlapped with last\n";
+        for(j = 0; j < location_t0.size(); ++j) 
+          if(location_t0[j] == location_t1[location_t1.size() - 1]) {
+            index[count++] = j;
+            id_t1 = j;
+            break;
+          }
+        if(id_t1 == -1)
+          continue;
+        
+        for(j = id_t1 + 1; j < location_t0.size(); ++j)
+          if(location_t0[j] == location_t1[j - id_t1])
+            index[count++] = j;
+          
+        for(j = 0; j < location_t0.size(); ++j) 
+          if(location_t0[j] == location_t2[0]) {
+            index[count++] = j;
+            id = j;
+            break;
+          }
+        for(j = id + 1; j < location_t0.size(); ++j)
+          if(location_t0[j] == location_t2[j - id])
+            index[count++] = j;
+          
+        index.erase(count, len);
+        
+        for(m = 0; m < num_states[t - 1]; ++m) {
+          IntegerVector hap_t1 = comb_t1(m, _);
+          for(w = 0; w < num_states[t]; ++w) {
+            int flag = 0;
+            IntegerVector hap_t2 = comb_t2(w, _);
+            // get this combination 
+            int new_len = hap_t2.size() + hap_t1.size();
+            IntegerVector new_v(new_len);
+            for(int i = 0; i < hap_t1.size(); ++i)
+              new_v[i] = hap_t1[i];
+            for(j = 0; j < hap_t2.size(); ++j)
+              new_v[j + hap_t1.size()] = hap_t2[j];
+            // Rcout << "com " << new_v << "\n";
+            for(int i = 0; i < num_states[overlapped_id[t]]; ++i) {
+              IntegerVector hap_t0 = comb_t0(i, _);
+              IntegerVector tmp = hap_t0[index];
+              // Rcout << tmp << "|| ";
+              count = 0;
+              for(j = 0; j < tmp.size(); ++j)
+                if(tmp[j] == new_v[j]) 
+                  count++;
+              if(count == tmp.size()) {
+                flag = 1;
+                break;
+              }
+            }
+            if(!flag)
+              trans(m, w) = 1;
+          }
+        }
+        trans_permits(t - 1) = trans;
       }
-      trans_permits(t) = trans;
     } else {
-      IntegerMatrix temp(num_states[t], num_states[t + 1]);
-      trans_permits(t) = temp;
+      IntegerMatrix temp(num_states[t - 1], num_states[t]);
+      trans_permits(t - 1) = temp;
     }
   }
   

@@ -82,8 +82,8 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
   unsigned int k, j, i;
   int len = hmm_snp.ncol();
   IntegerVector status(len); // 0: A->A
-  // Rcout << "refer " << both_refer_type << "\n";
-  // Rcout << "true " << both_true_type << "\n";
+  Rcout << "refer " << both_refer_type << "\n";
+  Rcout << "true " << both_true_type << "\n";
   for(j = 0; j < len; ++j) {
     // first determine the order
     if(both_refer_type[j] == 1 && both_true_type[j] == 1) {
@@ -112,7 +112,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
     } else
       status[j] = 10; // homo to heter or heter to homo(wrong anyway, should we consider this?)
   }
-  // Rcout << status << "\n";
+  Rcout << status << "\n";
   // switched A B 
   IntegerVector swAB_id(len);
   IntegerVector swAB_idx(len);
@@ -162,7 +162,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
   swAB_id.erase(count, len);
   swAB_idx.erase(count, len); // snp index (relative to whole hap) to seperate entire snps into blocks
   // switched heter within each correct homo region (get the switch error separately)
-  // Rcout << "homo_swi " << swAB_id << "\n";
+  Rcout << "homo_swi " << swAB_id << "\n";
   // Rcout << "homo_swid "  << swAB_idx << "\n";
   IntegerVector swi_one(count - 1);
   IntegerVector non_swi_one(count - 1); 
@@ -183,27 +183,27 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
         inx_B[count_b++] = i;
     }
     for(i = 0, k = 1; k < count_a; ++i, ++k) {
-      // Rcout << status[inx_A[i]] <<  status[inx_A[k]] << "\n";
+      Rcout << status[inx_A[i]] <<  status[inx_A[k]] << "\n";
       if((status[inx_A[i]] == 2 && status[inx_A[k]] == 2) || 
          (status[inx_A[i]] == 3 && status[inx_A[k]] == 3) || 
          (status[inx_A[i]] == 6 && status[inx_A[k]] == 6) || 
          (status[inx_A[i]] == 7 && status[inx_A[k]] == 7)) {
         non_swi_one[j]++;
       } else {
-        // Rcout << "switch\n";
+        Rcout << "switch\n";
         heter_sw[heter_c++] = both[inx_A[k]];
         swi_one[j]++;
       }
     }
     for(i = 0, k = 1; k < count_b; ++i, ++k) {
-      // Rcout << status[inx_B[i]] <<  status[inx_B[k]] << "\n";
+      Rcout << status[inx_B[i]] <<  status[inx_B[k]] << "\n";
       if((status[inx_B[i]] == 4 && status[inx_B[k]] == 4) || 
          (status[inx_B[i]] == 5 && status[inx_B[k]] == 5) || 
          (status[inx_B[i]] == 8 && status[inx_B[k]] == 8) || 
          (status[inx_B[i]] == 9 && status[inx_B[k]] == 9)) {
         non_swi_one[j]++;
       } else {
-        // Rcout << "switch\n";
+        Rcout << "switch\n";
         heter_sw[heter_c++] = both[inx_B[k]];
         swi_one[j]++;
       }

@@ -53,4 +53,4 @@ grasp2 <- function(id, start=0) {
   }
 }
 id <- 18
-grasp(69, 13)
+grasp2(682, dat_info$ref_start)
