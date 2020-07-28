@@ -1,5 +1,6 @@
 
 opts <- new.env()
+assign("majority", 0.9, envir = opts)
 assign("cut_off", 0, envir = opts)
 assign("three_hap", 0.62, envir = opts)
 assign("third_nuc", 0, envir = opts)
@@ -41,7 +42,7 @@ getOpt <- function(option = NULL) {
 }
 
 altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
-                          formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 50, 
+                          formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 100, 
                           seed = 0, tol = 1e-05, use_MC = 1, ncores = 2, ...)  {
   registerDoParallel(cores = ncores)  
   call <- sys.call(1)
@@ -74,6 +75,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
   ## prepare data
   genotype_target = 0
   dat_info <- read_data(datafile, old_v = genotype_target)
+  
   HMM <- hmm_info(dat_info = dat_info, uni_alignment = universal, opt = opts)
   
   ########################## baum-welch (iterate until converge)
@@ -187,8 +189,8 @@ altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
   
   if(!is.null(res_file))
     saveRDS(res, res_file)
-  #   fnlist(res, fil = res_file)
-  return(res)
+  else
+    return(res)
 }
 
 

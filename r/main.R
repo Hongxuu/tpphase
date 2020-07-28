@@ -23,7 +23,7 @@ sourceCpp("./r/universal_alignment.cpp")
 sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
-parent_folder = "../data/hmm/"
+parent_folder = "../../data/hmm/WGS/"
 ref_nameA = "Genome_A:0-5000"
 ref_nameB = "Genome_B:0-5000"
 registerDoParallel(cores = 16)
@@ -33,8 +33,8 @@ datfile <- list()
 ref_alignment <- list()
 res_file <- list()
 uni_file <- list()
-for(i in c(0.01)) {
-  hr = paste0(parent_folder , "homr", i)
+for(i in c(0.005)) {
+  hr = paste0(parent_folder , "heter", i)
   alignment = paste0(hr, "/ref.fsa")
   ref_sam = paste0(hr, "/ref.sam")
   for(j in c(4, 8, 12, 16)) {
@@ -43,14 +43,14 @@ for(i in c(0.01)) {
       alnB = paste0(hr, "/cov", j, "/aln", l, "B.sam")
       datafile = paste0(hr, "/cov", j, "/out", l, ".txt")
       uni_geno = paste0(hr, "/cov", j, "/uni", l, ".fa")
-      # call_aln(ref_nameA = ref_nameA,
-      #          ref_nameB = ref_nameB,
-      #          ref_fsa = alignment,
-      #          ref_sam = ref_sam,
-      #          alnA = alnA,
-      #          alnB = alnB,
-      #          out_file = datafile,
-      #          uni_geno_file = uni_geno)
+      call_aln(ref_nameA = ref_nameA,
+               ref_nameB = ref_nameB,
+               ref_fsa = alignment,
+               ref_sam = ref_sam,
+               alnA = alnA,
+               alnB = alnB,
+               out_file = datafile,
+               uni_geno_file = uni_geno)
       datfile[[m]] = datafile
       uni_file[[m]] = uni_geno
       ref_alignment[[m]] = alignment
@@ -65,10 +65,7 @@ foreach(m=1:length(datfile)) %dopar% {
                 alignment = uni_file[[m]], 
                 res_file = res_file[[m]])
 }
-datafile = "../../../../peanut_simu/homr0.008/cov16/hmm_res/out0hmm.txt"
-alignment = "../../../../peanut_simu/homr0.008/cov16/hmm_res/uni0.fa"
-altragenotype(datafile = datafile2, 
-              alignment = alignment) -> a
+read_sam(samfile = "../../../../peanut_simu/heter0.005/cov4/gatk_res/sim0test.sam")
 
 alignment = "../../data/roshan/real/target_homeo.fasta"
 ref_sam = "../../data/roshan/real/combine.sam" 

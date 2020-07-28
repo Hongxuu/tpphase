@@ -52,7 +52,9 @@ List aux_noN_S2(IntegerVector sum_site, IntegerVector hap_site, List opt) {
   int max_id = which_max(sum_site);
   sum = sum_site[1] + sum_site[0];
   List ls(2);
-  if (((sum - sum_site[max_id]) == 1 && sum > 2) || (sum_site[max_id]/sum > 0.9)) {
+  double majority = opt["majority"];
+  // if one nuc appears 90% or one nuc appears only once
+  if (((sum - sum_site[max_id]) == 1 && sum > 2) || (sum_site[max_id]/sum > majority)) {
     IntegerVector temp = {hap_site[max_id], hap_site[max_id], hap_site[max_id], hap_site[max_id]};
     n_row = 1;
     ls["temp"] = temp;
@@ -530,7 +532,9 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
   //   Named("comb_in") = comb_in,
   //   Named("llk_in") = llk_in, 
   //   Named("read") = hidden_state);
-  
+  // List ls = List::create(
+  //     Named("llk") = max,
+  //     Named("read") = hidden_state);
   return(hidden_state);
 }
 
@@ -668,23 +672,37 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
     // // now use MC to impute the missing nuc
     arma::mat uniqu_link = unique_rows(as<arma::mat>(link));
     IntegerMatrix sub_uni_link = wrap(uniqu_link);
-    IntegerMatrix mc_reads(sub_uni_link.nrow(), sub_uni_link.ncol());
-    for(i = 0; i < sub_uni_link.nrow(); ++i) {
-      int flag = 0;
-      for(j = 0; j < sub_uni_link.ncol(); ++j) {
+    int len = sub_uni_link.ncol();
+    int row_num = sub_uni_link.nrow();
+    IntegerMatrix mc_reads(row_num, len);
+    // NumericVector llk(row_num);
+    count = 0;
+    for(i = 0; i < row_num; ++i) {
+      int flag = 0; // record the no. of -1 in read
+      for(j = 0; j < len; ++j)
         if(sub_uni_link(i, j) == -1) {
           flag = 1;
           break;
         }
-      }
-      if(!flag) {
+      
+      if(flag == 0) {
         mc_reads(i, _) = sub_uni_link(i, _);
+        // llk[i] = 0;
         continue;
       }
       IntegerVector tmp = sub_uni_link(i, _);
       // Rcout << tmp << "\n";
       mc_reads(i, _) = best_branch(sub_uni_link, transition, initial, possi_nuc, i);
+      // llk[i] = inferred_read["llk"];
+      // mc_reads(i, _) = inferred_read["read"];
     }
+    // if(count > NUM_CLASS) {// Only keep top 4?
+    //   NumericVector y = clone(llk);
+    //   std::sort(y.begin(), y.end());
+    //   y.erase(0, count - NUM_CLASS - 1);
+    //   IntegerVector index = match(y, llk);
+    //   IntegerMatrix reads_in = ss(mc_reads, index);
+    // } 
     arma::mat uniqu = unique_rows(as<arma::mat>(mc_reads));
     uni = wrap(uniqu);
   }

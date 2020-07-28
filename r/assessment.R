@@ -132,8 +132,7 @@ get_res <- function(parent_path, covergae, individual, name) {
 iu_to_char_r <- function(x) {
   as.character(c("1" = "A", "8" = "T", "2" = "C", "4" = "G", "16" = "N")[as.character(x)])
 }
-datafile = "../../../../peanut_simu/homr0.005/cov4/gatk_res/out0gatk.txt"
-individual = "../../../../peanut_simu/homr0.005/cov4/gatk_res/sim0_gatk.fa"
+
 get_mec <- function(datfile, res, is_hmm) {
   if(length(res) == 9) {
     a <- list()
