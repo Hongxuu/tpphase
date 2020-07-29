@@ -74,6 +74,7 @@ double MEC(List dat_info, CharacterMatrix haps, IntegerVector cov_record) {
     mec += max;
   }
   mec /= linkage.nrow();
+ 
   return(mec);
 }
 
@@ -82,6 +83,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
   unsigned int k, j, i;
   int len = hmm_snp.ncol();
   IntegerVector status(len); // 0: A->A
+  List sw;
   Rcout << "refer " << both_refer_type << "\n";
   Rcout << "true " << both_true_type << "\n";
   for(j = 0; j < len; ++j) {
@@ -123,13 +125,16 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
     if(status[j] == 10)
       continue;
     int tmp = i;
+    int flag = 0;
     for(int m = tmp; m < len; ++m) {
       if(status[m] != 10) {
         i = m;
+        flag = 1;
         break;
       }
     }
-      
+    if(!flag) 
+      continue;
     // Rcout <<j << " "<< status[j]  << "|| "<< i << " "<< status[i] << "\n";
     // switch error in A B 
     if(status[j] == 0 || status[j] == 2 || status[j] == 3
@@ -155,99 +160,116 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
     }
     i = tmp;
   }
-  // add the end
-  double homo_swi_err = double(swi_AB)/(non_swi_AB + swi_AB);
-  swAB_idx[count] = len;
-  swAB_id[count++] = both[len - 1] + 1;
-  swAB_id.erase(count, len);
-  swAB_idx.erase(count, len); // snp index (relative to whole hap) to seperate entire snps into blocks
-  // switched heter within each correct homo region (get the switch error separately)
-  Rcout << "homo_swi " << swAB_id << "\n";
-  // Rcout << "homo_swid "  << swAB_idx << "\n";
-  IntegerVector swi_one(count - 1);
-  IntegerVector non_swi_one(count - 1); 
-  IntegerVector heter_sw(len);
-  int heter_c = 0;
   
-  for(j = 0; j < count - 1; ++j) {
-    IntegerVector inx_A(len);
-    IntegerVector inx_B(len);
-    int count_a = 0, count_b = 0;
-    // pick A sites and B sites
-    for(i = swAB_idx[j]; i < swAB_idx[j + 1]; ++i) {
-      if(status[i] == 10)
-        continue;
-      if(both_refer_type[i] == 2) //A
-        inx_A[count_a++] = i;
-      else if(both_refer_type[i] == 3)
-        inx_B[count_b++] = i;
+  if((non_swi_AB + swi_AB) != 0) {
+    // add the end
+    double homo_swi_err = double(swi_AB)/(non_swi_AB + swi_AB);
+    if(count != len) {
+      swAB_idx[count] = len;
+      swAB_id[count++] = both[len - 1] + 1;
+      swAB_id.erase(count, len);
+      swAB_idx.erase(count, len); // snp index (relative to whole hap) to seperate entire snps into blocks
+      // switched heter within each correct homo region (get the switch error separately)
+      // Rcout << "homo_swi " << swAB_id << "\n";
+      // Rcout << "homo_swid "  << swAB_idx << "\n";
     }
-    for(i = 0, k = 1; k < count_a; ++i, ++k) {
-      Rcout << status[inx_A[i]] <<  status[inx_A[k]] << "\n";
-      if((status[inx_A[i]] == 2 && status[inx_A[k]] == 2) || 
-         (status[inx_A[i]] == 3 && status[inx_A[k]] == 3) || 
-         (status[inx_A[i]] == 6 && status[inx_A[k]] == 6) || 
-         (status[inx_A[i]] == 7 && status[inx_A[k]] == 7)) {
-        non_swi_one[j]++;
-      } else {
-        Rcout << "switch\n";
-        heter_sw[heter_c++] = both[inx_A[k]];
-        swi_one[j]++;
+    
+    IntegerVector swi_one(count - 1);
+    IntegerVector non_swi_one(count - 1); 
+    IntegerVector heter_sw(len);
+    int heter_c = 0;
+    int flag = 0;
+    for(j = 0; j < count - 1; ++j) {
+      IntegerVector inx_A(len);
+      IntegerVector inx_B(len);
+      int count_a = 0, count_b = 0;
+      // pick A sites and B sites
+      for(i = swAB_idx[j]; i < swAB_idx[j + 1]; ++i) {
+        if(status[i] == 10)
+          continue;
+        if(both_refer_type[i] == 2) //A
+          inx_A[count_a++] = i;
+        else if(both_refer_type[i] == 3)
+          inx_B[count_b++] = i;
+      }
+      if(count_a >= 2) {
+        for(i = 0, k = 1; k < count_a; ++i, ++k) {
+          // Rcout << status[inx_A[i]] <<  status[inx_A[k]] << "\n";
+          if((status[inx_A[i]] == 2 && status[inx_A[k]] == 2) || 
+             (status[inx_A[i]] == 3 && status[inx_A[k]] == 3) || 
+             (status[inx_A[i]] == 6 && status[inx_A[k]] == 6) || 
+             (status[inx_A[i]] == 7 && status[inx_A[k]] == 7)) {
+            non_swi_one[j]++;
+            flag = 1;
+          } else {
+            // Rcout << "switch\n";
+            heter_sw[heter_c++] = both[inx_A[k]];
+            swi_one[j]++;
+          }
+        }
+      }
+      if(count_b >= 2) {
+        for(i = 0, k = 1; k < count_b; ++i, ++k) {
+          // Rcout << status[inx_B[i]] <<  status[inx_B[k]] << "\n";
+          if((status[inx_B[i]] == 4 && status[inx_B[k]] == 4) || 
+             (status[inx_B[i]] == 5 && status[inx_B[k]] == 5) || 
+             (status[inx_B[i]] == 8 && status[inx_B[k]] == 8) || 
+             (status[inx_B[i]] == 9 && status[inx_B[k]] == 9)) {
+            non_swi_one[j]++;
+            flag = 1;
+          } else {
+            // Rcout << "switch\n";
+            heter_sw[heter_c++] = both[inx_B[k]];
+            swi_one[j]++;
+          }
+        }
       }
     }
-    for(i = 0, k = 1; k < count_b; ++i, ++k) {
-      Rcout << status[inx_B[i]] <<  status[inx_B[k]] << "\n";
-      if((status[inx_B[i]] == 4 && status[inx_B[k]] == 4) || 
-         (status[inx_B[i]] == 5 && status[inx_B[k]] == 5) || 
-         (status[inx_B[i]] == 8 && status[inx_B[k]] == 8) || 
-         (status[inx_B[i]] == 9 && status[inx_B[k]] == 9)) {
-        non_swi_one[j]++;
-      } else {
-        Rcout << "switch\n";
-        heter_sw[heter_c++] = both[inx_B[k]];
-        swi_one[j]++;
+    
+    if(heter_c != 0) {
+      NumericVector swi_er(count - 1);
+      int c = 0;
+      for(i = 0; i < count - 1; ++i) {
+        if(swi_one[i] == 0 && non_swi_one[i] == 0)
+          continue;
+        swi_er[c++] = double(swi_one[i])/(swi_one[i] + non_swi_one[i]);
       }
-    }
-  }
-  List sw;
-  if(heter_c) {
-    NumericVector swi_er(count - 1);
-    int c = 0;
-    for(i = 0; i < count - 1; ++i) {
-      if(swi_one[i] == 0 && non_swi_one[i] == 0)
-        continue;
-      swi_er[c++] = double(swi_one[i])/(swi_one[i] + non_swi_one[i]);
-    }
-    swi_er.erase(c, count - 1);
-    double heter_se = median(swi_er);
-    if(swi_AB) {
+      swi_er.erase(c, count - 1);
+      double heter_se = median(swi_er);
+      
+      if(swi_AB) {
+        sw = List::create (
+          Named("homo_sw_id") = swAB_id,
+          Named("homo_sw_err") = homo_swi_err,
+          // Named("heter_nswitch") = non_swi_one,
+          Named("heter_sw_err") = heter_se,
+          Named("heter_sw_id") = heter_sw[Range(0, heter_c - 1)]);
+      } else {
+        sw = List::create (
+          Named("heter_sw_id") = heter_sw[Range(0, heter_c - 1)],
+          Named("homo_sw_err") = 0,
+          Named("heter_sw_err") = heter_se);
+      }
+    } else if(heter_c == 0 && (non_swi_AB + swi_AB) != 0) {
+      // Rcout << "no heter\n";
+      double heter_se = 0;
+      if(!flag)
+        heter_se = NA_REAL;
       sw = List::create (
         Named("homo_sw_id") = swAB_id,
         Named("homo_sw_err") = homo_swi_err,
         // Named("heter_nswitch") = non_swi_one,
-        Named("heter_sw_err") = heter_se,
-        Named("heter_sw_id") = heter_sw[Range(0, heter_c - 1)]);
-    } else {
-      sw = List::create (
-        Named("heter_sw_id") = heter_sw[Range(0, heter_c - 1)],
-        Named("homo_sw_err") = 0,
         Named("heter_sw_err") = heter_se);
     }
-  } else if(!heter_c && swi_AB && non_swi_one) {
-    sw = List::create (
-      Named("homo_sw_id") = swAB_id,
-      Named("homo_sw_err") = homo_swi_err,
-      // Named("heter_nswitch") = non_swi_one,
-      Named("heter_sw_err") = 0);
   } else {
+    // Rcout << "both no\n";
     sw = List::create (
-      Named("heter_sw_err") = 0,
-      Named("homo_sw_err") = 0);
+      Named("heter_sw_err") = NA_REAL,
+      Named("homo_sw_err") = NA_REAL);
   }
- 
   return(sw);
 }
-// [[Rcpp::export]] 
+
 List find_snp(IntegerMatrix true_hap)  {
   unsigned int j, count = 0;
   
@@ -340,6 +362,167 @@ List tf_table(IntegerVector inferred_snp_type, IntegerVector snp_location,
     Named("true_match") = true_match,
     Named("both") = both);
   return(tf);
+}
+
+
+List get_hap_block (List dat_info, IntegerVector snp_loci, CharacterMatrix hmm_snp,
+                      CharacterMatrix real_snp, IntegerVector both_refer_type,
+                      IntegerVector both_true_type) {
+  // get switch error based on real linkage
+  // find hap blocks
+  IntegerVector index = dat_info["start_id"];
+  IntegerVector ref_pos = dat_info["ref_pos"];
+  IntegerVector length = dat_info["length"];
+  int hap_min_pos = dat_info["ref_start"];
+  
+  unsigned int j, i;
+  unsigned int len = snp_loci.size();
+  IntegerMatrix linkage = linkage_info(dat_info, snp_loci);
+  IntegerVector hap_block(len);
+  int count = 0;
+  hap_block[count++] = 0;
+  for(j = 0; j < len - 1; ++j) {
+    int ref_j1 = snp_loci[j] + hap_min_pos;
+    int ref_j2 = snp_loci[j + 1] + hap_min_pos;
+    int pass = 0;
+    for(i = 0; i < linkage.nrow(); ++i)  {
+      if (ref_pos[index[i]] <= ref_j1 && ref_j1 <= ref_pos[index[i] + length[i] - 1] 
+            && ref_j2 <= ref_pos[index[i] + length[i] - 1]) {
+        // Rcout << ref_j1 << " " << ref_j2 << ref_pos[index[i] + length[i] - 1] << "\n";
+        pass = 1;
+        break;
+      }
+    }
+    if(!pass)
+      hap_block[count++] = j + 1;
+  }
+  hap_block[count++] = len;
+  hap_block.erase(count, len);
+  NumericVector heter_sw_err(count - 1);
+  NumericVector homo_sw_err(count - 1);
+  Rcout << "hap block id" << hap_block << "\n";
+  for(i = 0; i < count - 1; ++i) {
+    // get snps location in block
+    IntegerVector both = snp_loci[Range(hap_block[i], hap_block[i + 1] - 1)];
+    CharacterMatrix alg_block_snp = hmm_snp(_, Range(hap_block[i], hap_block[i + 1] - 1));
+    CharacterMatrix real_block_snp = real_snp(_, Range(hap_block[i], hap_block[i + 1] - 1));
+    IntegerVector both_refer_btype = both_refer_type[Range(hap_block[i], hap_block[i + 1] - 1)];
+    IntegerVector both_true_btype = both_true_type[Range(hap_block[i], hap_block[i + 1] - 1)];
+    // Rcout << "both" << both << "\n";
+    // Rcout << "both_refer_btype" << both_refer_btype << "\n";
+    // Rcout << "both_true_btype" << both_true_btype << "\n";
+    List sw = switch_err(alg_block_snp, real_block_snp, both, both_refer_btype, both_true_btype);
+    heter_sw_err[i] = sw["heter_sw_err"];
+    homo_sw_err[i] = sw["homo_sw_err"]; 
+  }
+  // int num_block = count + 1;
+  List ls = List::create (
+    Named("linkage") = linkage,
+    Named("hap_block") = hap_block,
+    Named("heter_sw_err") = heter_sw_err,
+    Named("homo_sw_err") = homo_sw_err);
+  return(ls);
+}
+
+// [[Rcpp::export]] 
+List sw_hmm (CharacterMatrix inferred_snp, IntegerVector snp_location, int hap_length, int min_ref, 
+                IntegerMatrix true_hap, List dat_info) {
+  unsigned int j, k;
+  List true_info = find_snp(true_hap);
+  IntegerVector snp_type = true_info["snp_type"];
+  IntegerVector snp_id = true_info["snp_id"];
+  
+  IntegerVector inferred_snp_type(snp_location.size());
+  for(j = 0; j < snp_location.size(); ++j) {
+    if(inferred_snp(0, j) != inferred_snp(1, j)) {
+      inferred_snp_type[j] = 2;
+    }
+    else if(inferred_snp(2, j) != inferred_snp(3, j)) {
+      inferred_snp_type[j] = 3;
+    }
+    else if(inferred_snp(0, j) != inferred_snp(2, j) && inferred_snp(1, j) != inferred_snp(3, j)) {
+      inferred_snp_type[j] = 1;
+    }
+  }
+  
+  List tf_info = tf_table(inferred_snp_type, snp_location, snp_type, snp_id, hap_length, min_ref);
+  IntegerVector both = tf_info["both"];
+  IntegerVector refer_match = tf_info["refer_match"];
+  IntegerVector true_match = tf_info["true_match"];
+  
+  // switch error get the both snps first
+  int len = both.size();
+  CharacterMatrix hmm_snp(NUM_CLASS, len);
+  CharacterMatrix real_snp(NUM_CLASS, len);
+  
+  for(j = 0; j < len; ++j) {
+    hmm_snp(_, j) = inferred_snp(_, refer_match[j]);
+    for(k = 0; k < NUM_CLASS; ++k) {
+      real_snp(k, j) = iupac_to_char[true_hap(k, snp_id[true_match[j]])]; // to character
+    }
+  }
+  IntegerVector both_refer_type = inferred_snp_type[refer_match];
+  IntegerVector both_true_type = snp_type[true_match];
+  
+  int hap_min_pos = dat_info["ref_start"];
+  for(j = 0; j < len; ++j)
+    both[j] = both[j] - hap_min_pos;
+  List sw = get_hap_block (dat_info, both, hmm_snp, real_snp, both_refer_type, both_true_type);
+  IntegerVector homo = tf_info["homo"];
+  IntegerVector heter = tf_info["heter"];
+  IntegerVector non = tf_info["non"];
+  DataFrame confusion_metric = DataFrame::create(_["homo"] = homo, _["heter"] = heter, _["non"] = non);
+  
+  List snp_info = List::create (
+    Named("confusion metric") = confusion_metric,
+    Named("tsnp_id") = snp_id,
+    Named("switch") = sw
+  );
+  return snp_info;
+}
+
+// [[Rcpp::export]] 
+List sw_other (IntegerMatrix inferred_hap, int hap_length, int min_ref, 
+                      IntegerMatrix true_hap, List dat_info) {
+  unsigned int j, k;
+  List true_info = find_snp(true_hap);
+  IntegerVector snp_type = true_info["snp_type"];
+  IntegerVector snp_id = true_info["snp_id"];
+  
+  List ref_info = find_snp(inferred_hap);
+  IntegerVector inferred_snp_type = ref_info["snp_type"];
+  IntegerVector snp_location = ref_info["snp_id"];
+  
+  List tf_info = tf_table(inferred_snp_type, snp_location, snp_type, snp_id, hap_length, min_ref);
+  IntegerVector both = tf_info["both"];
+  IntegerVector refer_match = tf_info["refer_match"];
+  IntegerVector true_match = tf_info["true_match"];
+  
+  // switch error get the both snps first
+  int len = both.size();
+  CharacterMatrix hmm_snp(NUM_CLASS, len);
+  CharacterMatrix real_snp(NUM_CLASS, len);
+  
+  for(j = 0; j < len; ++j) {
+    for(k = 0; k < NUM_CLASS; ++k) {
+      hmm_snp(k, j) = iupac_to_char[inferred_hap(k, snp_location[refer_match[j]])]; // to character
+      real_snp(k, j) = iupac_to_char[true_hap(k, snp_id[true_match[j]])]; // to character
+    }
+  }
+  IntegerVector both_refer_type = inferred_snp_type[refer_match];
+  IntegerVector both_true_type = snp_type[true_match];
+  
+  List sw = get_hap_block (dat_info, both, hmm_snp, real_snp, both_refer_type, both_true_type);
+  IntegerVector homo = tf_info["homo"];
+  IntegerVector heter = tf_info["heter"];
+  IntegerVector non = tf_info["non"];
+  DataFrame confusion_metric = DataFrame::create(_["homo"] = homo, _["heter"] = heter, _["non"] = non);
+  
+  List snp_info = List::create (Named("confusion metric") = confusion_metric,
+                                Named("tsnp_id") = snp_id,
+                                Named("switch") = sw,
+                                Named("both") = both);
+  return snp_info;
 }
 
 // [[Rcpp::export]] 

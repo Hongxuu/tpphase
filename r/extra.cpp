@@ -547,6 +547,7 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
     // // now use MC to impute the missing nuc
     arma::mat uniqu_link = unique_rows(as<arma::mat>(link));
     IntegerMatrix sub_uni_link = wrap(uniqu_link);
+  
     IntegerMatrix mc_reads(sub_uni_link.nrow(), sub_uni_link.ncol());
     for(i = 0; i < sub_uni_link.nrow(); ++i) {
       int flag = 0;
@@ -561,7 +562,7 @@ IntegerMatrix mc_linkage(IntegerMatrix sub_link, int num) {
         continue;
       }
       IntegerVector tmp = sub_uni_link(i, _);
-      // Rcout << tmp << "\n";
+      Rcout << tmp << "\n";
       mc_reads(i, _) = best_branch(sub_uni_link, transition, initial, possi_nuc, i);
     }
     arma::mat uniqu = unique_rows(as<arma::mat>(mc_reads));

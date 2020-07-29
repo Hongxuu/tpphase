@@ -20,12 +20,11 @@ get_res_other <- function(parent_path, covergae, individual, name) {
   return(res_all)
 }
 
-
-error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
+error_rates <- function(res, truth_file, datfile, is_hmm, fdr = TRUE, old = 1) {
   truth <- read_fasta(truth_file)
   true_geno <- truth$reads
   
-  if(length(res) == 8) {
+  if(length(res) == 9) {
     a <- list()
     a[[1]] <- res
     res <- a
@@ -33,19 +32,47 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
   value <- list()
   for(i in 1:length(res)) {
     individual <- res[[i]]
+
     if(is_hmm) {
       snp_location <- individual$snp_location
       hap_length <- ncol(individual$haplotypes$hap_final)
       start_pos <- individual$start_pos
-      snp_call <- snp_stats(individual$snps, snp_location - 1, hap_length, start_pos, true_geno)
+      if(old) {
+        snp_call <- snp_stats(individual$snps, snp_location - 1, hap_length, start_pos, true_geno)
+      } else {
+        datafile <- datfile[[i]]
+        dat_info <- read_data(datafile, old_v = 0)
+        snp_call <- sw_hmm(inferred_snp = individual$snps, snp_location = individual$snp_location - 1, 
+             hap_length = ncol(individual$haplotypes$hap_final), individual$start_pos, true_geno, dat_info)
+        }
     } else {
       cat(individual, "\n");
       inferred <- read_fasta(individual)
       inferred_geno <- inferred$reads
-      snp_call <- snp_stats_other(inferred_hap = inferred_geno, hap_length = ncol(inferred_geno), min_ref = 0, true_hap = true_geno)
+      if(old) {
+        snp_call <- snp_stats_other(inferred_hap = inferred_geno, hap_length = ncol(inferred_geno),
+                                    min_ref = 0, true_hap = true_geno)
+      } else {
+        datafile <- datfile[[i]]
+        dat_info <- read_data(datafile, old_v = 0)
+        snp_call <- sw_other(dat_info = dat_info, inferred_hap = inferred_geno, hap_length = ncol(inferred_geno),
+               min_ref = 0, true_hap = true_geno)
+        }
     }
     heter_swe <- snp_call$switch$heter_sw_err
     homo_swe <- snp_call$switch$homo_sw_err
+    if(!old) {
+      len <- homo_swe %>% na.omit() %>% length()
+      if(len != 0)
+        homo_swe <- homo_swe %>% na.omit() %>% mean()
+      else
+        homo_swe <- NA
+      len <- heter_swe %>% na.omit() %>% length()
+      if(len != 0)
+        heter_swe <- heter_swe %>% na.omit() %>% mean()
+      else
+        heter_swe <- NA
+    }
     
     a <- sum(snp_call$`confusion metric`[, 2]) - snp_call$`confusion metric`[2, 2]
     b <- sum(snp_call$`confusion metric`[2, ]) - snp_call$`confusion metric`[2, 2]
@@ -64,18 +91,21 @@ error_rates <- function(res, truth_file, is_hmm, fdr = TRUE) {
     }
     
     # stats <- append(stats, snp_call[-3])
-    if(heter_swe != 0) {
-      heter_msw <- mean(diff(c(0, snp_call$switch$heter_sw_id)))
-      stats <- append(stats, list("heter_msw" = heter_msw))
-    } else {
-      stats <- append(stats, list("heter_msw" = NA))
+    if(old) {
+      if(!is.na(heter_swe)) {
+        heter_msw <- mean(diff(c(0, snp_call$switch$heter_sw_id)))
+        stats <- append(stats, list("heter_msw" = heter_msw))
+      } else {
+        stats <- append(stats, list("heter_msw" = NA))
       }
-    if(homo_swe != 0) {
-      homo_msw <- mean(diff(c(0, snp_call$switch$homo_sw_id)))
-      stats <- append(stats, list("homeo_msw" = homo_msw))
-    } else {
-      stats <- append(stats, list("homeo_msw" = NA))
+      if(!is.na(homo_swe)) {
+        homo_msw <- mean(diff(c(0, snp_call$switch$homo_sw_id)))
+        stats <- append(stats, list("homeo_msw" = homo_msw))
+      } else {
+        stats <- append(stats, list("homeo_msw" = NA))
+      }
     }
+    
     value[[i]] <- stats
   }
   if(length(res) == 8) {
@@ -132,7 +162,10 @@ get_res <- function(parent_path, covergae, individual, name) {
 iu_to_char_r <- function(x) {
   as.character(c("1" = "A", "8" = "T", "2" = "C", "4" = "G", "16" = "N")[as.character(x)])
 }
-
+datafile = "../../../../peanut_simu/homr0.005/cov16/hmm_res/out20hmm.txt"
+individual = read_rds(res)
+res = "../../../../peanut_simu/homr0.005/cov16/hmm_res/hmm_res20"
+truth_file = "../../../../peanut_simu/homr0.005/indiv20.fsa"
 get_mec <- function(datfile, res, is_hmm) {
   if(length(res) == 9) {
     a <- list()
@@ -155,7 +188,6 @@ get_mec <- function(datfile, res, is_hmm) {
       cov_record = individual$cov_record - dat_info$ref_start
     }
     mec <- MEC(dat_info, haps, cov_record)
-    
     value[i] <- mec
   }
   return(value)
@@ -163,7 +195,7 @@ get_mec <- function(datfile, res, is_hmm) {
 
 ## all error metric
 get_err <- function(individual, parent_path, res_all, covergae, is_hmm, 
-                    datfile_name = NULL, verbose = 0) {
+                    datfile_name = NULL, verbose = 0, old = 0, compute_mec = 1) {
   if(!is.null(datfile_name)) {
     datfile <- list()
     resfile <- list()
@@ -194,10 +226,11 @@ get_err <- function(individual, parent_path, res_all, covergae, is_hmm,
   summary <- data.frame()
   for(j in individual) {
     truth_file <- paste0(parent_path, "indiv", j, ".fsa")
-    tmp <- error_rates(res = res_all[[j + 1]], truth_file, is_hmm) %>% 
+   
+    tmp <- error_rates(res = res_all[[j + 1]], truth_file, datfile = datfile[[j + 1]], is_hmm, old = old) %>% 
       bind_rows() %>% 
       add_column(coverage = covergae, individual = j)
-    if(!is.null(datfile_name)) {
+    if(compute_mec) {
       mec <- get_mec(datfile = datfile[[j + 1]], res = resfile[[j + 1]], is_hmm)
       tmp <- tmp %>% add_column("mec" = mec, .before = 1)
     }

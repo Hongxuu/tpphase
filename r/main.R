@@ -67,6 +67,10 @@ foreach(m=1:length(datfile)) %dopar% {
 }
 read_sam(samfile = "../../../../peanut_simu/heter0.005/cov4/gatk_res/sim0test.sam")
 
+
+datafile = "../../../../peanut_simu/homr0.005/cov16/hmm_res/out20hmm.txt"
+alignment = "../../../../peanut_simu/homr0.005/cov16/hmm_res/uni0.fa"
+
 alignment = "../../data/roshan/real/target_homeo.fasta"
 ref_sam = "../../data/roshan/real/combine.sam" 
 alnA = "../../data/roshan/real/Tifguard_subset_A_WGS.sam"
