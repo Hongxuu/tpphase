@@ -2,14 +2,17 @@
 
 ### fasta from other methods
 
-get_res_other <- function(parent_path, covergae, individual, name) {
+get_res_other <- function(parent_path, covergae, individual, name, is_pair = 0) {
   res_all <- list()
   n_ind = 1
   for(j in individual) {
     res_ind <- list()
     count = 1
     for(i in covergae) {
-      coverage_path <- paste0(parent_path, "cov", i, "/", name, "_res")
+      if(is_pair)
+        coverage_path <- paste0(parent_path, "pair/cov", i, "/", name, "_res")
+      else
+        coverage_path <- paste0(parent_path, "pair/cov", i, "/", name, "_res")
       res_file <- paste0(coverage_path, "/sim", j, "_", name, ".fa")
       res_ind[[count]] <- res_file
       count = count + 1
@@ -122,14 +125,17 @@ error_rates <- function(res, truth_file, datfile, is_hmm, fdr = TRUE, old = 1) {
 # gatk <- gatk.0.005[[16]][[5]]
 
 
-get_res <- function(parent_path, covergae, individual, name) {
+get_res <- function(parent_path, covergae, individual, name, is_pair = 0) {
   res_all <- list()
   n_ind = 1
   for(j in individual) {
     res_ind <- list()
     count = 1
     for(i in covergae) {
-      coverage_path <- paste0(parent_path, "cov", i, "/", name)
+      if(is_pair)
+        coverage_path <- paste0(parent_path, "pair/cov", i, "/", name)
+      else
+        coverage_path <- paste0(parent_path, "single/cov", i, "/", name)
       res_file <- paste0(coverage_path, "/", name, j)
       res_ind[[count]] <- read_rds(res_file)
       count = count + 1
@@ -162,10 +168,7 @@ get_res <- function(parent_path, covergae, individual, name) {
 iu_to_char_r <- function(x) {
   as.character(c("1" = "A", "8" = "T", "2" = "C", "4" = "G", "16" = "N")[as.character(x)])
 }
-datafile = "../../../../peanut_simu/homr0.005/cov16/hmm_res/out20hmm.txt"
-individual = read_rds(res)
-res = "../../../../peanut_simu/homr0.005/cov16/hmm_res/hmm_res20"
-truth_file = "../../../../peanut_simu/homr0.005/indiv20.fsa"
+
 get_mec <- function(datfile, res, is_hmm) {
   if(length(res) == 9) {
     a <- list()
@@ -195,7 +198,7 @@ get_mec <- function(datfile, res, is_hmm) {
 
 ## all error metric
 get_err <- function(individual, parent_path, res_all, covergae, is_hmm, 
-                    datfile_name = NULL, verbose = 0, old = 0, compute_mec = 1) {
+                    datfile_name = NULL, verbose = 0, old = 0, compute_mec = 1, is_pair = 0) {
   if(!is.null(datfile_name)) {
     datfile <- list()
     resfile <- list()
@@ -205,7 +208,11 @@ get_err <- function(individual, parent_path, res_all, covergae, is_hmm,
       res_ind <- list()
       count = 1
       for(i in covergae) {
-        coverage_path <- paste0(parent_path, "cov", i, "/", datfile_name, "_res")
+        if(is_pair) {
+          coverage_path <- paste0(parent_path, "pair/cov", i, "/", datfile_name, "_res")
+        } else {
+          coverage_path <- paste0(parent_path, "single/cov", i, "/", datfile_name, "_res")
+        }
         data_f <- paste0(coverage_path, "/out", j, datfile_name, ".txt")
         if(datfile_name == "hmm") {
           res_f <- paste0(coverage_path, "/", datfile_name, "_res", j)
@@ -249,7 +256,22 @@ get_err <- function(individual, parent_path, res_all, covergae, is_hmm,
 }
 
 
-
+load_res <- function(parent_path, covergae, individual, datfile_name, true_sw, is_pair, compute_mec = 1) {
+  old = true_sw
+  if(datfile_name == "hmm") {
+    name = "hmm_res"
+    is_hmm = 1
+    res_all <- get_res(parent_path = parent_path, covergae = covergae, individual = individual, name = name)
+    
+  } else if(datfile_name == "gatk"){
+    name = "gatk"
+    is_hmm = 0
+    res_all <- get_res_other(parent_path = parent_path, covergae = covergae, individual = individual, name = name)
+  }
+  res <- get_err(individual = individual, parent_path = parent_path, res_all, covergae = covergae, 
+                 datfile_name = datfile_name, is_hmm = is_hmm, old = old, is_pair = is_pair, compute_mec = compute_mec)
+  return(res)
+}
 
 
 

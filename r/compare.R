@@ -21,54 +21,20 @@ individual <- c(0:49)
 # }
 
 ##################
-res_all.heter0.005 <- get_res(parent_path = "../../../../peanut_simu/heter0.005/", covergae, individual, name = "hmm_res")
-res_all.0.005 <- get_res(parent_path = "../../../../peanut_simu/homr0.005/", covergae, individual, name = "hmm_res")
-res_all.0.008 <- get_res(parent_path = "../../../../peanut_simu/homr0.008/", covergae, individual, name = "hmm_res")
-res_all.0.01 <- get_res(parent_path = "../../../../peanut_simu/homr0.01/", covergae, individual, name = "hmm_res")
 
-hmm_res.heter0.005 <- get_err(individual, parent_path = "../../../../peanut_simu/heter0.005/", 
-                              res_all.heter0.005, covergae, datfile_name = "hmm", is_hmm = 1, compute_mec = 0)
-hmm_res.0.01 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.01/", 
-                        res_all.0.01, covergae, datfile_name = "hmm", is_hmm = 1, compute_mec = 0)
-hmm_res.0.005 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.005/", 
-                         res_all.0.005, covergae , datfile_name = "hmm", is_hmm = 1, compute_mec = 0)
-hmm_res.0.008 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.008/", 
-                         res_all.0.008, covergae, datfile_name = "hmm", is_hmm = 1, compute_mec = 0)
+hmm_res.0.01.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.01/", covergae, individual, datfile_name = "hmm", 
+                              true_sw = 1, is_pair = 1, compute_mec = 1)
+hmm_res.0.005.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.005/", covergae, individual, datfile_name = "hmm", 
+                               true_sw = 1, is_pair = 1, compute_mec = 1)
+hmm_res.0.008.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.008/", covergae, individual, datfile_name = "hmm", 
+                               true_sw = 1, is_pair = 1, compute_mec = 1)
 
-
-
-############## original calculation
-hmm_res2.0.01 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.01/", 
-                        res_all.0.01, covergae, is_hmm = 1, old = 1)
-hmm_res2.0.005 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.005/", 
-                         res_all.0.005, covergae, is_hmm = 1, old = 1)
-hmm_res2.0.008 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.008/", 
-                         res_all.0.008, covergae, is_hmm = 1, old = 1)
-
-gatk.heter0.005 <- get_res_other(parent_path = "../../../../peanut_simu/heter0.005/", covergae, individual, name = "gatk")
-gatk_res.heter0.005 <- get_err(individual, parent_path = "../../../../peanut_simu/heter0.005/",
-                               gatk.heter0.005, covergae, datfile_name = "gatk", is_hmm = 0, compute_mec = 0)
-
-gatk_res2.heter0.005 <- get_err(individual = individual, parent_path = "../../../../peanut_simu/heter0.005/",
-                                res_all = gatk.heter0.005, covergae = covergae, old = 1, is_hmm = 0)
-
-gatk.0.005 <- get_res_other(parent_path = "../../../../peanut_simu/homr0.005/", covergae, individual, name = "gatk")
-gatk_res.0.005 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.005/",
-                          gatk.0.005, covergae, datfile_name = "gatk", is_hmm = 0, compute_mec = 0)
-gatk_res2.0.005 <- get_err(individual = individual, parent_path = "../../../../peanut_simu/homr0.005/",
-                                res_all = gatk.0.005, covergae = covergae, old = 1, is_hmm = 0)
-
-gatk.0.008 <- get_res_other(parent_path = "../../../../peanut_simu/homr0.008/", covergae, individual, name = "gatk")
-gatk_res.0.008 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.008/", 
-                          gatk.0.008, covergae, datfile_name = "gatk", is_hmm = 0, compute_mec = 0)
-gatk_res2.0.008 <- get_err(individual = individual, parent_path = "../../../../peanut_simu/homr0.008/",
-                           res_all = gatk.0.008, covergae = covergae, old = 1, is_hmm = 0)
-
-gatk.0.01 <- get_res_other(parent_path = "../../../../peanut_simu/homr0.01/", covergae, individual, name = "gatk")
-gatk_res.0.01 <- get_err(individual, parent_path = "../../../../peanut_simu/homr0.01/",
-                         gatk.0.01, covergae, datfile_name = "gatk", is_hmm = 0, compute_mec = 0)
-gatk_res2.0.01 <- get_err(individual = individual, parent_path = "../../../../peanut_simu/homr0.01/",
-                           res_all = gatk.0.01, covergae = covergae, old = 1, is_hmm = 0)
+gatk_res.0.01.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.01/", covergae, individual, datfile_name = "gatk", 
+                              true_sw = 1, is_pair = 1, compute_mec = 1)
+gatk_res.0.005.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.005/", covergae, individual, datfile_name = "gatk", 
+                               true_sw = 1, is_pair = 1, compute_mec = 1)
+gatk_res.0.008.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.008/", covergae, individual, datfile_name = "gatk", 
+                               true_sw = 1, is_pair = 1, compute_mec = 1)
 
 
 hmm_homo0.005 <- rbind(hmm_res.0.005, hmm_res.heter0.005) %>% 
@@ -81,36 +47,20 @@ gatk_homo0.005 <- rbind(gatk_res.0.005, gatk_res.heter0.005) %>%
   add_column(method = "gatk+hapcut2")
 
 res_0.005 <- rbind(hmm_res.0.005, gatk_res.0.005) %>% 
-  add_column(method = rep(c("hmm", "gatk+hapcut2"), each = nrow(gatk_res.0.005))) %>% 
+  add_column(method = rep(c("hmm", "gatk+hapcut2"), c(nrow(hmm_res.0.005), nrow(gatk_res.0.005)))) %>% 
   add_column("homeo_rate" = 0.005)
 res_0.008 <- rbind(hmm_res.0.008, gatk_res.0.008) %>% 
-  add_column(method = rep(c("hmm", "gatk+hapcut2"), each = nrow(gatk_res.0.008))) %>% 
+  add_column(method = rep(c("hmm", "gatk+hapcut2"), c(nrow(hmm_res.0.005), nrow(gatk_res.0.005)))) %>% 
   add_column("homeo_rate" = 0.008)
 res_0.01 <- rbind(hmm_res.0.01, gatk_res.0.01) %>% 
-  add_column(method = rep(c("hmm", "gatk+hapcut2"), each = nrow(gatk_res.0.01))) %>% 
+  add_column(method = rep(c("hmm", "gatk+hapcut2"), c(nrow(hmm_res.0.005), nrow(gatk_res.0.005)))) %>% 
   add_column("homeo_rate" = 0.01)
 
 all_res <- rbind(res_0.005, res_0.008, res_0.01) %>% 
   `colnames<-`(c("coverage", "variable", "error rate", "method", "homeo_rate"))
 
-res2_0.005 <- rbind(hmm_res2.0.005, gatk_res2.0.005) %>% 
-  add_column(method = rep(c("hmm", "gatk+hapcut2"), each = nrow(gatk_res2.0.005))) %>% 
-  add_column("homeo_rate" = 0.005)
-res2_0.008 <- rbind(hmm_res2.0.008, gatk_res2.0.008) %>% 
-  add_column(method = rep(c("hmm", "gatk+hapcut2"), each = nrow(gatk_res2.0.008))) %>% 
-  add_column("homeo_rate" = 0.008)
-res2_0.01 <- rbind(hmm_res2.0.01, gatk_res2.0.01) %>% 
-  add_column(method = rep(c("hmm", "gatk+hapcut2"), each = nrow(gatk_res2.0.01))) %>% 
-  add_column("homeo_rate" = 0.01)
-
-all_res2 <- rbind(res2_0.005, res2_0.008, res2_0.01) %>% 
-  `colnames<-`(c("coverage", "variable", "error rate", "method", "homeo_rate"))
-
 res_heter <- all_res %>% 
   filter(variable %in% c("heter_fdr", "heter_swe")) 
-
-res_heter2 <- all_res2 %>% 
-  filter(variable %in% c("heter_fdr", "heter_swe"))
   
 res_mec <- all_res %>% 
   filter(variable == "mec" & `error rate` != 0)

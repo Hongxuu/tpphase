@@ -23,7 +23,7 @@ sourceCpp("./r/universal_alignment.cpp")
 sourceCpp("./r/initialization.cpp")
 sourceCpp("./r/viterbi.cpp")
 
-parent_folder = "../../data/hmm/WGS/"
+parent_folder = "../data/peanut/peanut_simu/"
 ref_nameA = "Genome_A:0-5000"
 ref_nameB = "Genome_B:0-5000"
 registerDoParallel(cores = 16)
@@ -34,27 +34,27 @@ ref_alignment <- list()
 res_file <- list()
 uni_file <- list()
 for(i in c(0.005)) {
-  hr = paste0(parent_folder , "heter", i)
+  hr = paste0(parent_folder , "homr", i)
   alignment = paste0(hr, "/ref.fsa")
   ref_sam = paste0(hr, "/ref.sam")
   for(j in c(4, 8, 12, 16)) {
     for(l in c(0:49)) {
-      alnA = paste0(hr, "/cov", j, "/aln", l, "A.sam")
-      alnB = paste0(hr, "/cov", j, "/aln", l, "B.sam")
-      datafile = paste0(hr, "/cov", j, "/out", l, ".txt")
-      uni_geno = paste0(hr, "/cov", j, "/uni", l, ".fa")
-      call_aln(ref_nameA = ref_nameA,
-               ref_nameB = ref_nameB,
-               ref_fsa = alignment,
-               ref_sam = ref_sam,
-               alnA = alnA,
-               alnB = alnB,
-               out_file = datafile,
-               uni_geno_file = uni_geno)
+      alnA = paste0(hr, "/pair/cov", j, "/aln", l, "A.sam")
+      alnB = paste0(hr, "/pair/cov", j, "/aln", l, "B.sam")
+      datafile = paste0(hr, "/pair/cov", j, "/out", l, ".txt")
+      uni_geno = paste0(hr, "/pair/cov", j, "/uni", l, ".fa")
+      # call_aln(ref_nameA = ref_nameA,
+      #          ref_nameB = ref_nameB,
+      #          ref_fsa = alignment,
+      #          ref_sam = ref_sam,
+      #          alnA = alnA,
+      #          alnB = alnB,
+      #          out_file = datafile,
+      #          uni_geno_file = uni_geno)
       datfile[[m]] = datafile
       uni_file[[m]] = uni_geno
       ref_alignment[[m]] = alignment
-      res_file[[m]] = paste0(hr, "/cov", j, "/hmm_res", l)
+      res_file[[m]] = paste0(hr, "/pair/cov", j, "/hmm_res", l)
       m = m + 1
     }
   }   
