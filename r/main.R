@@ -33,7 +33,7 @@ datfile <- list()
 ref_alignment <- list()
 res_file <- list()
 uni_file <- list()
-for(i in c(0.005)) {
+for(i in c(0.008)) {
   hr = paste0(parent_folder , "homr", i)
   alignment = paste0(hr, "/ref.fsa")
   ref_sam = paste0(hr, "/ref.sam")
@@ -68,8 +68,8 @@ foreach(m=1:length(datfile)) %dopar% {
 read_sam(samfile = "../../../../peanut_simu/heter0.005/cov4/gatk_res/sim0test.sam")
 
 
-datafile = "../../../../peanut_simu/homr0.005/cov16/hmm_res/out20hmm.txt"
-alignment = "../../../../peanut_simu/homr0.005/cov16/hmm_res/uni0.fa"
+datafile = "../../../../peanut_simu/homr0.005/pair/cov16/hmm_res/out0hmm.txt"
+alignment = "../../../../peanut_simu/homr0.005/pair/cov16/hmm_res/uni0.fa"
 
 alignment = "../../data/roshan/real/target_homeo.fasta"
 ref_sam = "../../data/roshan/real/combine.sam" 

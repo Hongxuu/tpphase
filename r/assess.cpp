@@ -170,7 +170,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
       swAB_id.erase(count, len);
       swAB_idx.erase(count, len); // snp index (relative to whole hap) to seperate entire snps into blocks
       // switched heter within each correct homo region (get the switch error separately)
-      // Rcout << "homo_swi " << swAB_id << "\n";
+      Rcout << "homo_swi " << swAB_id << "\n";
       // Rcout << "homo_swid "  << swAB_idx << "\n";
     }
     
@@ -194,7 +194,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
       }
       if(count_a >= 2) {
         for(i = 0, k = 1; k < count_a; ++i, ++k) {
-          // Rcout << status[inx_A[i]] <<  status[inx_A[k]] << "\n";
+          Rcout << status[inx_A[i]] <<  status[inx_A[k]] << "\n";
           if((status[inx_A[i]] == 2 && status[inx_A[k]] == 2) || 
              (status[inx_A[i]] == 3 && status[inx_A[k]] == 3) || 
              (status[inx_A[i]] == 6 && status[inx_A[k]] == 6) || 
@@ -202,7 +202,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
             non_swi_one[j]++;
             flag = 1;
           } else {
-            // Rcout << "switch\n";
+            Rcout << "switch\n";
             heter_sw[heter_c++] = both[inx_A[k]];
             swi_one[j]++;
           }
@@ -210,7 +210,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
       }
       if(count_b >= 2) {
         for(i = 0, k = 1; k < count_b; ++i, ++k) {
-          // Rcout << status[inx_B[i]] <<  status[inx_B[k]] << "\n";
+          Rcout << status[inx_B[i]] <<  status[inx_B[k]] << "\n";
           if((status[inx_B[i]] == 4 && status[inx_B[k]] == 4) || 
              (status[inx_B[i]] == 5 && status[inx_B[k]] == 5) || 
              (status[inx_B[i]] == 8 && status[inx_B[k]] == 8) || 
@@ -218,7 +218,7 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
             non_swi_one[j]++;
             flag = 1;
           } else {
-            // Rcout << "switch\n";
+            Rcout << "switch\n";
             heter_sw[heter_c++] = both[inx_B[k]];
             swi_one[j]++;
           }
@@ -235,7 +235,8 @@ List switch_err(CharacterMatrix hmm_snp, CharacterMatrix real_snp, IntegerVector
         swi_er[c++] = double(swi_one[i])/(swi_one[i] + non_swi_one[i]);
       }
       swi_er.erase(c, count - 1);
-      double heter_se = median(swi_er);
+      Rcout << "swi: " << swi_er << "\n";
+      double heter_se = mean(swi_er);
       
       if(swi_AB) {
         sw = List::create (

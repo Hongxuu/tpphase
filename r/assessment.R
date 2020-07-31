@@ -23,6 +23,21 @@ get_res_other <- function(parent_path, covergae, individual, name, is_pair = 0) 
   return(res_all)
 }
 
+
+datafile2  = "../../../../peanut_simu/homr0.005/single/cov16/hmm_res/out0hmm.txt"
+individual2 = "../../../../peanut_simu/homr0.005/single/cov16/hmm_res/hmm_res0"
+individual2 <- read_rds(individual2)
+
+datafile  = "../../../../peanut_simu/homr0.005/pair/cov16/hmm_res/out0hmm.txt"
+individual = "../../../../peanut_simu/homr0.005/pair/cov16/hmm_res/hmm_res0"
+truth_file = "../../../../peanut_simu/homr0.005/indiv0.fsa"
+individual <- read_rds(individual)
+
+snp_location2 <- individual2$snp_location
+hap_length2 <- ncol(individual2$haplotypes$hap_final)
+start_pos2 <- individual2$start_pos
+snp_call2 <- snp_stats(individual2$snps, snp_location2 - 1, hap_length2, start_pos2, true_geno)
+
 error_rates <- function(res, truth_file, datfile, is_hmm, fdr = TRUE, old = 1) {
   truth <- read_fasta(truth_file)
   true_geno <- truth$reads
@@ -140,6 +155,7 @@ get_res <- function(parent_path, covergae, individual, name, is_pair = 0) {
       res_ind[[count]] <- read_rds(res_file)
       count = count + 1
     }
+   
     res_all[[n_ind]] <- res_ind
     n_ind = n_ind + 1
   }
@@ -261,12 +277,12 @@ load_res <- function(parent_path, covergae, individual, datfile_name, true_sw, i
   if(datfile_name == "hmm") {
     name = "hmm_res"
     is_hmm = 1
-    res_all <- get_res(parent_path = parent_path, covergae = covergae, individual = individual, name = name)
+    res_all <- get_res(parent_path = parent_path, covergae = covergae, individual = individual, name = name, is_pair = is_pair)
     
   } else if(datfile_name == "gatk"){
     name = "gatk"
     is_hmm = 0
-    res_all <- get_res_other(parent_path = parent_path, covergae = covergae, individual = individual, name = name)
+    res_all <- get_res_other(parent_path = parent_path, covergae = covergae, individual = individual, name = name, is_pair = is_pair)
   }
   res <- get_err(individual = individual, parent_path = parent_path, res_all, covergae = covergae, 
                  datfile_name = datfile_name, is_hmm = is_hmm, old = old, is_pair = is_pair, compute_mec = compute_mec)

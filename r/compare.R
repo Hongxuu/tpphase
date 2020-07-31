@@ -29,6 +29,13 @@ hmm_res.0.005.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.005/
 hmm_res.0.008.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.008/", covergae, individual, datfile_name = "hmm", 
                                true_sw = 1, is_pair = 1, compute_mec = 1)
 
+hmm_res.0.01.sig <- load_res(parent_path = "../../../../peanut_simu/homr0.01/", covergae, individual, datfile_name = "hmm", 
+                              true_sw = 1, is_pair = 0, compute_mec = 1)
+hmm_res.0.005.sig <- load_res(parent_path = "../../../../peanut_simu/homr0.005/", covergae, individual, datfile_name = "hmm", 
+                               true_sw = 1, is_pair = 0, compute_mec = 1)
+hmm_res.0.008.sig <- load_res(parent_path = "../../../../peanut_simu/homr0.008/", covergae, individual, datfile_name = "hmm", 
+                               true_sw = 1, is_pair = 0, compute_mec = 1)
+
 gatk_res.0.01.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.01/", covergae, individual, datfile_name = "gatk", 
                               true_sw = 1, is_pair = 1, compute_mec = 1)
 gatk_res.0.005.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.005/", covergae, individual, datfile_name = "gatk", 
@@ -36,6 +43,15 @@ gatk_res.0.005.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.005
 gatk_res.0.008.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.008/", covergae, individual, datfile_name = "gatk", 
                                true_sw = 1, is_pair = 1, compute_mec = 1)
 
+res_0.005 <- rbind(hmm_res.0.005.sig, hmm_res.0.005.pair) %>% 
+  add_column(method = rep(c("single", "pair"), c(nrow(hmm_res.0.005.sig), nrow(hmm_res.0.005.pair)))) %>% 
+  add_column("homeo_rate" = 0.005)
+res_0.008 <- rbind(hmm_res.0.008.sig, hmm_res.0.008.pair) %>% 
+  add_column(method = rep(c("single", "pair"), c(nrow(hmm_res.0.008.sig), nrow(hmm_res.0.008.pair)))) %>% 
+  add_column("homeo_rate" = 0.008)
+res_0.01 <- rbind(hmm_res.0.01.sig, hmm_res.0.01.pair) %>% 
+  add_column(method = rep(c("single", "pair"), c(nrow(hmm_res.0.01.sig), nrow(hmm_res.0.01.pair)))) %>% 
+  add_column("homeo_rate" = 0.01)
 
 hmm_homo0.005 <- rbind(hmm_res.0.005, hmm_res.heter0.005) %>% 
   add_column(heter_rate = rep(c(0.003, 0.005), each = nrow(hmm_res.0.005))) %>% 
@@ -75,7 +91,7 @@ rbind(res_heter, res_mec) %>%
   facet_grid(variable~homeo_rate, scales = "free") + 
   ylab("value")
 
-rbind(res_homeo, res_mec) %>% 
+ rbind(res_homeo, res_mec) %>% 
   ggplot(aes(coverage, `error rate`)) +
   geom_boxplot() + 
   facet_wrap(homeo_rate~variable, scales = "free", ncol = 5) + 
