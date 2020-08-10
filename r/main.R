@@ -33,16 +33,16 @@ datfile <- list()
 ref_alignment <- list()
 res_file <- list()
 uni_file <- list()
-for(i in c(0.008)) {
-  hr = paste0(parent_folder , "homr", i)
+for(i in c(0.007)) {
+  hr = paste0(parent_folder , "ale", i)
   alignment = paste0(hr, "/ref.fsa")
   ref_sam = paste0(hr, "/ref.sam")
   for(j in c(4, 8, 12, 16)) {
     for(l in c(0:49)) {
-      alnA = paste0(hr, "/pair/cov", j, "/aln", l, "A.sam")
-      alnB = paste0(hr, "/pair/cov", j, "/aln", l, "B.sam")
-      datafile = paste0(hr, "/pair/cov", j, "/out", l, ".txt")
-      uni_geno = paste0(hr, "/pair/cov", j, "/uni", l, ".fa")
+      alnA = paste0(hr, "/single/cov", j, "/aln", l, "A.sam")
+      alnB = paste0(hr, "/single/cov", j, "/aln", l, "B.sam")
+      datafile = paste0(hr, "/single/cov", j, "/hmm_res", "/out", l, ".txt")
+      uni_geno = paste0(hr, "/single/cov", j, "/hmm_res", "/uni", l, ".fa")
       # call_aln(ref_nameA = ref_nameA,
       #          ref_nameB = ref_nameB,
       #          ref_fsa = alignment,
@@ -54,7 +54,7 @@ for(i in c(0.008)) {
       datfile[[m]] = datafile
       uni_file[[m]] = uni_geno
       ref_alignment[[m]] = alignment
-      res_file[[m]] = paste0(hr, "/pair/cov", j, "/hmm_res", l)
+      res_file[[m]] = paste0(hr, "/single/cov", j, "/hmm_res", l)
       m = m + 1
     }
   }   

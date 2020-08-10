@@ -23,20 +23,20 @@ get_res_other <- function(parent_path, covergae, individual, name, is_pair = 0) 
   return(res_all)
 }
 
-
-datafile2  = "../../../../peanut_simu/homr0.005/single/cov16/hmm_res/out0hmm.txt"
-individual2 = "../../../../peanut_simu/homr0.005/single/cov16/hmm_res/hmm_res0"
-individual2 <- read_rds(individual2)
-
-datafile  = "../../../../peanut_simu/homr0.005/pair/cov16/hmm_res/out0hmm.txt"
-individual = "../../../../peanut_simu/homr0.005/pair/cov16/hmm_res/hmm_res0"
-truth_file = "../../../../peanut_simu/homr0.005/indiv0.fsa"
-individual <- read_rds(individual)
-
-snp_location2 <- individual2$snp_location
-hap_length2 <- ncol(individual2$haplotypes$hap_final)
-start_pos2 <- individual2$start_pos
-snp_call2 <- snp_stats(individual2$snps, snp_location2 - 1, hap_length2, start_pos2, true_geno)
+# 
+# datafile2  = "../../../../peanut_simu/homr0.005/single/cov16/hmm_res/out0hmm.txt"
+# individual2 = "../../../../peanut_simu/homr0.005/single/cov16/hmm_res/hmm_res0"
+# individual2 <- read_rds(individual2)
+# 
+# datafile  = "../../../../peanut_simu/homr0.005/pair/cov16/hmm_res/out0hmm.txt"
+# individual = "../../../../peanut_simu/homr0.005/pair/cov16/hmm_res/hmm_res0"
+# truth_file = "../../../../peanut_simu/homr0.005/indiv0.fsa"
+# individual <- read_rds(individual)
+# 
+# snp_location2 <- individual2$snp_location
+# hap_length2 <- ncol(individual2$haplotypes$hap_final)
+# start_pos2 <- individual2$start_pos
+# snp_call2 <- snp_stats(individual2$snps, snp_location2 - 1, hap_length2, start_pos2, true_geno)
 
 error_rates <- function(res, truth_file, datfile, is_hmm, fdr = TRUE, old = 1) {
   truth <- read_fasta(truth_file)

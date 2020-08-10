@@ -37,10 +37,6 @@ struct _ref_entry {
 	size_t start_B;
 	size_t end_A;
 	size_t end_B;
-	size_t real_sA; 		// start/end  position alfer alignment
-	size_t real_eA;
-	size_t real_sB;
-	size_t real_eB;
 	unsigned int strand_A;  	/* 0:forward, 1:reverse */
 	unsigned int strand_B;
 	int *idx_map;		 	/* which base in B is aligned to which in A  */
