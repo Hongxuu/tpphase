@@ -43,7 +43,7 @@ getOpt <- function(option = NULL) {
 
 altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
                           formula = mode~1|read_pos + ref_pos + qua + hap_nuc + qua:hap_nuc, max_iter = 100, 
-                          seed = 0, tol = 1e-05, use_MC = 1, ncores = 2, ...)  {
+                          seed = 0, tol = 1e-05, ncores = 2, ...)  {
   registerDoParallel(cores = ncores)  
   call <- sys.call(1)
   # Read in default opts and then replace with any that were passed in to the function
@@ -75,7 +75,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
   ## prepare data
   genotype_target = 0
   dat_info <- read_data(datafile, old_v = genotype_target)
-  
+  use_MC = 1
   HMM <- hmm_info(dat_info = dat_info, uni_alignment = universal, opt = opts)
   
   ########################## baum-welch (iterate until converge)
@@ -97,6 +97,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
   ## initialize hap
   set.seed(seed)
   hap_info <- sample_hap2(hmm_info = HMM, hap_length = hap_length, hap_min_pos = dat_info$ref_start)
+  
   hapinit <- hap_info$haplotype
   data <- format_data(dat_info = dat_info, haplotype = hapinit)
   weight_id <- NULL

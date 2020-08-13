@@ -1082,12 +1082,9 @@ List trans_permit(IntegerVector num_states, List overlap_info, List combination,
       
       IntegerVector location_t1 = loci[t - 1];
       IntegerVector location_t2 = loci[t];
-      
-      // Need to check if t0 contains t1 and t2
       int len = comb_t2.ncol() + comb_t1.ncol();
       IntegerVector index(len);
-     
-      // find the transition between t2 and t0, then map to the common between t1 and t0
+      
       // Rcout << location_t1 << "\n";
       // Rcout << location_t2 << "\n";
       // get the overlapped_id region, this might be different from the overlapped_id states we had
@@ -1118,25 +1115,25 @@ List trans_permit(IntegerVector num_states, List overlap_info, List combination,
           }
         }
         trans_permits(t - 1) = trans;
-      } else {
+      } else {// find the transition between t2 and t0, then map to the common between t1 and t0
         IntegerVector location_t0 = loci[overlapped_id[t]];
         IntegerMatrix comb_t0 = combination[overlapped_id[t]]; // overlapped_id t
         int count = 0;
         int id_t1 = -1;
-        // Rcout << t << " not overlapped with last\n";
+        Rcout << t << " not overlapped with last\n";
         for(j = 0; j < location_t0.size(); ++j) 
           if(location_t0[j] == location_t1[location_t1.size() - 1]) {
             index[count++] = j;
             id_t1 = j;
             break;
           }
-        if(id_t1 == -1)
+        if(id_t1 == -1) // t1 and t2 have no connection
           continue;
         
-        for(j = id_t1 + 1; j < location_t0.size(); ++j)
-          if(location_t0[j] == location_t1[j - id_t1])
-            index[count++] = j;
-          
+        // for(j = id_t1 + 1; j < location_t0.size(); ++j)
+        //   if(location_t0[j] == location_t1[j - id_t1])
+        //     index[count++] = j;
+
         for(j = 0; j < location_t0.size(); ++j) 
           if(location_t0[j] == location_t2[0]) {
             index[count++] = j;
@@ -1148,27 +1145,27 @@ List trans_permit(IntegerVector num_states, List overlap_info, List combination,
             index[count++] = j;
           
         index.erase(count, len);
-        
+        // Rcout << index << "\n";
+        int new_len = comb_t2.ncol() + 1;
         for(m = 0; m < num_states[t - 1]; ++m) {
           IntegerVector hap_t1 = comb_t1(m, _);
           for(w = 0; w < num_states[t]; ++w) {
             int flag = 0;
             IntegerVector hap_t2 = comb_t2(w, _);
-            // get this combination 
-            int new_len = hap_t2.size() + hap_t1.size();
+            // get this combination
             IntegerVector new_v(new_len);
-            for(int i = 0; i < hap_t1.size(); ++i)
-              new_v[i] = hap_t1[i];
-            for(j = 0; j < hap_t2.size(); ++j)
-              new_v[j + hap_t1.size()] = hap_t2[j];
-            // Rcout << "com " << new_v << "\n";
+            hap_t2.insert(0, hap_t1[hap_t1.size() - 1]);
+            // new_v[0] = hap_t1[hap_t1.size() - 1];
+            // for(j = 0; j < hap_t2.size(); ++j)
+            //   new_v[j + hap_t1.size()] = hap_t2[j];
+            // Rcout << "com " << hap_t2 << "\n";
             for(int i = 0; i < num_states[overlapped_id[t]]; ++i) {
               IntegerVector hap_t0 = comb_t0(i, _);
-              IntegerVector tmp = hap_t0[index];
+              IntegerVector tmp = hap_t0[index]; // get the sites has connection in t0
               // Rcout << tmp << "|| ";
               count = 0;
               for(j = 0; j < tmp.size(); ++j)
-                if(tmp[j] == new_v[j]) 
+                if(tmp[j] == hap_t2[j]) 
                   count++;
               if(count == tmp.size()) {
                 flag = 1;
