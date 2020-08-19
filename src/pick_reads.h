@@ -19,33 +19,33 @@ typedef struct _ref_entry ref_entry;
 typedef struct _ref_options options_rf;
 
 struct _ref_options {
-	char const * sam_file;			// reference sam file
-	const char * rsam_files[N_FILES]; 	// read sam files
-	const char *samtools_command;
-	const char * extracted_rf[N_FILES]; 	// targeted reference fsa files
-	const char * fsa_files[N_FILES];	// reference fsa files
-	char filter_unmapped;
-	char *delim_ref;
-	char *delim_len;
-	const char *fastq_file;
+  char const * sam_file;			// reference sam file
+  const char * rsam_files[N_FILES]; 	// read sam files
+  const char *samtools_command;
+  const char * extracted_rf[N_FILES]; 	// targeted reference fsa files
+  const char * fsa_files[N_FILES];	// reference fsa files
+  char filter_unmapped;
+  char *delim_ref;
+  char *delim_len;
+  const char *fastq_file;
 };
 
 struct _ref_entry {
-	char *name_A;
-	char *name_B;
-	size_t start_A;
-	size_t start_B;
-	size_t end_A;
-	size_t end_B;
-	unsigned int strand_A;  	/* 0:forward, 1:reverse */
-	unsigned int strand_B;
-	int *idx_map;		 	/* which base in B is aligned to which in A  */
+  char *name_A;
+  char *name_B;
+  size_t start_A;
+  size_t start_B;
+  size_t end_A;
+  size_t end_B;
+  unsigned int strand_A;  	/* 0:forward, 1:reverse */
+  unsigned int strand_B;
+  int *idx_map;		 	/* which base in B is aligned to which in A  */
 };
 
 
 struct _ref_info {
-	ref_entry *info;
-	sam *ref_sam;
+  ref_entry *info;
+  sam *ref_sam;
 };
 
 void ll_all_align(sam *sds, const char *ref_file);

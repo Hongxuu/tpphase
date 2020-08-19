@@ -43,6 +43,42 @@ gatk_res.0.005.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.005
 gatk_res.0.008.pair <- load_res(parent_path = "../../../../peanut_simu/homr0.008/", covergae, individual, datfile_name = "gatk", 
                                true_sw = 1, is_pair = 1, compute_mec = 1)
 
+
+######compare alleic rate 
+hmm_res.0.003.p <- load_res(parent_path = "../../../../peanut_simu/ale0.003/", covergae, individual, datfile_name = "hmm", 
+                              true_sw = 1, is_pair = 1, compute_mec = 1)
+hmm_res.0.005.p <- load_res(parent_path = "../../../../peanut_simu/ale0.005/", covergae, individual, datfile_name = "hmm", 
+                              true_sw = 1, is_pair = 1, compute_mec = 1)
+hmm_res.0.007.p <- load_res(parent_path = "../../../../peanut_simu/ale0.007/", covergae, individual, datfile_name = "hmm", 
+                              true_sw = 1, is_pair = 1, compute_mec = 1)
+
+hmm_res.0.003.sig <- load_res(parent_path = "../../../../peanut_simu/ale0.003/", covergae, individual, datfile_name = "hmm", 
+                             true_sw = 1, is_pair = 0, compute_mec = 1)
+hmm_res.0.005.sig <- load_res(parent_path = "../../../../peanut_simu/ale0.005/", covergae, individual, datfile_name = "hmm", 
+                              true_sw = 1, is_pair = 0, compute_mec = 1)
+hmm_res.0.007.sig <- load_res(parent_path = "../../../../peanut_simu/ale0.007/", covergae, individual, datfile_name = "hmm", 
+                              true_sw = 1, is_pair = 0, compute_mec = 1)
+
+hmm0.005.sig <- load_res(parent_path = "../../../../peanut_simu/hom_ale0.005/", covergae, individual, datfile_name = "hmm", 
+                              true_sw = 1, is_pair = 0, compute_mec = 1)
+hmm0.003.sig <- load_res(parent_path = "../../../../peanut_simu/homr0.005/", covergae, individual, datfile_name = "hmm", 
+                              true_sw = 1, is_pair = 0, compute_mec = 1)
+
+all_res.p <- rbind(hmm_res.0.003.p, hmm_res.0.005.p) %>% 
+  add_column(heter_rate = rep(c(0.003, 0.005), each = nrow(hmm_res.0.003.p))) %>% 
+  filter(variable %in% c("homeo_fdr", "homeo_swe", "heter_fdr", "heter_swe", "mec")) %>% 
+  add_column(method = "hmm")
+
+all_res2 <- rbind(hmm0.003.sig, hmm0.005.sig) %>% 
+  add_column(heter_rate = rep(c(0.003, 0.005), each = nrow(hmm0.003.sig))) %>% 
+  filter(variable %in% c("homeo_fdr", "homeo_swe", "heter_fdr", "heter_swe", "mec")) %>% 
+  add_column(method = "hmm")
+
+all_res <- rbind(hmm_res.0.03.sig, hmm_res.0.005.sig) %>% 
+  add_column(heter_rate = rep(c(0.003, 0.005), each = nrow(hmm_res.0.03.sig))) %>% 
+  filter(variable %in% c("homeo_fdr", "homeo_swe", "heter_fdr", "heter_swe", "mec")) %>% 
+  add_column(method = "hmm")
+
 res_0.005 <- rbind(hmm_res.0.005.sig, hmm_res.0.005.pair) %>% 
   add_column(method = rep(c("single", "pair"), c(nrow(hmm_res.0.005.sig), nrow(hmm_res.0.005.pair)))) %>% 
   add_column("homeo_rate" = 0.005)
@@ -84,6 +120,17 @@ res_mec <- all_res %>%
 res_homeo <- all_res %>% 
   filter(variable %in% c("homeo_fdr", "homeo_swe", "heter_fdr", "heter_swe") & method == "hmm")
 
+res_mec2 <- all_res2 %>% 
+  filter(variable == "mec" & value != 0)
+
+res_homeo2 <- all_res2 %>% 
+  filter(variable %in% c("homeo_fdr", "homeo_swe", "heter_fdr", "heter_swe") & method == "hmm")
+
+res_mec.p <- all_res.p %>% 
+  filter(variable == "mec" & value != 0)
+
+res_homeo.p <- all_res.p %>% 
+  filter(variable %in% c("homeo_fdr", "homeo_swe", "heter_fdr", "heter_swe") & method == "hmm")
 
 rbind(res_heter, res_mec) %>% 
   ggplot(aes(coverage, `error rate`)) +
@@ -91,10 +138,29 @@ rbind(res_heter, res_mec) %>%
   facet_grid(variable~homeo_rate, scales = "free") + 
   ylab("value")
 
- rbind(res_homeo, res_mec) %>% 
-  ggplot(aes(coverage, `error rate`)) +
-  geom_boxplot() + 
-  facet_wrap(homeo_rate~variable, scales = "free", ncol = 5) + 
+dat <- rbind(res_homeo, res_mec)
+dat$heter_rate <- as.factor(dat$heter_rate)
+dat2 <- rbind(res_homeo2, res_mec2)
+dat2$heter_rate <- as.factor(dat2$heter_rate)
+dat.p <- rbind(res_homeo.p, res_mec.p)
+dat.p$heter_rate <- as.factor(dat.p$heter_rate)
+
+dat %>% 
+  ggplot(aes(coverage, value)) +
+  geom_boxplot(aes(fill = heter_rate)) + 
+  facet_wrap(variable~., scales = "free", ncol = 4) + 
+  ylab("value")
+
+dat2 %>% 
+  ggplot(aes(coverage, value)) +
+  geom_boxplot(aes(fill = heter_rate)) + 
+  facet_wrap(variable~., scales = "free", ncol = 4) + 
+  ylab("value")
+
+dat.p %>% 
+  ggplot(aes(coverage, value)) +
+  geom_boxplot(aes(fill = heter_rate)) + 
+  facet_wrap(variable~., scales = "free", ncol = 4) + 
   ylab("value")
 
 rbind(hmm_homo0.005, gatk_homo0.005) %>% 

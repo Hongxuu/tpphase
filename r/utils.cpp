@@ -301,3 +301,4 @@ void print_intmat(IntegerMatrix m) {
     Rcout << "\n";
   }
 }
+

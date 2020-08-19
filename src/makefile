@@ -18,8 +18,8 @@ LDFLAGS = -lm -lncurses
 
 # -e YUDI=1
 ifdef YUDI
-	CFLAGS += -DYUDI -I/usr/local/Cellar/r/3.6.0/include/ -I/usr/local/Cellar/openblas/0.3.5/include/
-	LDFLAGS += -L/usr/local/Cellar/r/3.6.0/lib/ -L/usr/local/opt/openblas/lib
+	CFLAGS += -DYUDI -I/usr/local/Cellar/r/4.0.2_1/include/ -I/usr/local/Cellar/openblas/0.3.5/include/
+	LDFLAGS += -L/usr/local/Cellar/r/4.0.2_1/lib/ -L/usr/local/opt/openblas/lib
 endif
 
 # Local variables

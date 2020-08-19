@@ -698,11 +698,11 @@ void adjust_alignment(sam_entry *se, data_t *ref, unsigned int strand, int *id_u
     
     se->aln_len = new_len;
 #ifdef STANDALONE
-    PRINT_VECTOR(se->rd_map, length);
+    //	PRINT_VECTOR(se->rd_map, length);
     printf("alignment of read to universal, start from %zu, length %zu\n", se->new_pos, se->aln_len);
-    PRINT_VECTOR(se->uni_aln, new_len);
+    PRINT_VECTOR(se->uni_aln, se->aln_len);
     printf("alignment of ref\n");
-    for (size_t j = 0; j < new_len; ++j) {
+    for (size_t j = 0; j < se->aln_len; ++j) {
       printf("%d\t", iupac_to_xy[ref[se->new_pos + j]]); // se->new_pos is 0 based
     }
 #endif

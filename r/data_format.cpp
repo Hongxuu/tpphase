@@ -655,14 +655,14 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
     Named("time_pos") = time_pos, // emission start position
     Named("n_in_t") = n_in_t, // reads index in each t 
     Named("t_max") = t_max, //biggest t
-    Named("cov_record") = record // samll cov
+    Named("cov_record") = record // record small cov loci
     ); 
   
   return ls;
 }
 
 // [[Rcpp::export]]
-IntegerMatrix linkage_info(List dat_info, IntegerVector undecided_pos) {
+List linkage_info(List dat_info, IntegerVector undecided_pos) {
   IntegerMatrix ref_index = dat_info["ref_idx"];
   IntegerVector obs = dat_info["nuc"];
   IntegerVector index = dat_info["start_id"];
@@ -670,17 +670,22 @@ IntegerMatrix linkage_info(List dat_info, IntegerVector undecided_pos) {
   IntegerVector length = dat_info["length"];
   int hap_min_pos = dat_info["ref_start"];
   int n_observation = dat_info["n_observation"];
-  IntegerMatrix link(n_observation, undecided_pos.size());
+  
+  unsigned int len = undecided_pos.size();
+  IntegerMatrix link(n_observation, len);
+  IntegerVector coverage(len);
   unsigned int i, j;
   int idx;
   
-  for (j = 0; j < undecided_pos.size(); ++j) {
+  for (j = 0; j < len; ++j) {
     unsigned int ref_j = undecided_pos[j] + hap_min_pos;
     for (i = 0; i < n_observation; i++) {
       if (ref_pos[index[i]] <= ref_j && ref_j <= ref_pos[index[i] + length[i] - 1]) {
         idx = ref_index(i, ref_j - hap_min_pos); // read pos, start from 0
-        if (idx != -1)
+        if (idx != -1) {
           link(i, j) = obs[index[i] + idx];
+          coverage[j]++;
+        }
         else 
           link(i, j) = 4; // meaning deletion
       } 
@@ -688,7 +693,12 @@ IntegerMatrix linkage_info(List dat_info, IntegerVector undecided_pos) {
         link(i, j) = -1; // meaning not covered
     }
   }
-  return(link);
+ 
+  List ls = List::create(
+    Named("linkage") = link,
+    Named("coverage") = coverage
+  );
+  return(ls);
 }
 // 
 // IntegerMatrix len_hapGap(List dat_info, List hap_info) {
