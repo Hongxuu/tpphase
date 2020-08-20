@@ -441,7 +441,7 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
   /* Find the number of reads with alignment start from each t (hash) */
   IntegerVector read_start(n_observation);
   for(i = 0; i < n_observation; ++i)
-    read_start(i) = ref_pos[index[i]];
+    read_start[i] = ref_pos[index[i]];
   
   List start_t = unique_map(read_start); // start might not from 0 (e.g. ailgnment starts from 2)
   IntegerVector n_t = start_t["lengths"];
@@ -611,7 +611,7 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
         // }
       IntegerVector hap_site = nuc_unique[j];
       IntegerVector sum_site = nuc_count[j];
-      // Rcout << num << "|||" << hap_site << ": " << sum_site << "\n";
+      // Rcout << num << "|||" << hap_site << ": " << sum_site;
       if(sbs) {
         List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment, opt);
         n_row[j] = out["n_row"];
@@ -634,13 +634,16 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
   IntegerVector record;
   if(cov_count != 0)
     record = record_cov[Range(0, cov_count - 1)];
-
+  
   // find the number of hidden states at each t
   IntegerVector num_states(t_max, 1);
   for(t = 0; t < t_max; ++t)
     for(j = time_pos[t] - hap_min_pos; j < time_pos[t] + p_tmax[t] - hap_min_pos; ++j)
       num_states[t] *= n_row[j];
   
+  if(!more_than1)
+    stop("Filtering did not find any SNPs (neither homeologous or allelic)\n");
+ 
  // compute the number of hidden states
   List ls = List::create(
     Named("undecided_pos") = undecided_pos[Range(0, more_than1 - 1)],

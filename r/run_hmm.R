@@ -2,7 +2,7 @@
 opts <- new.env()
 assign("majority", 0.9, envir = opts)
 assign("cut_off", 0, envir = opts)
-assign("three_hap", 0.62, envir = opts)
+assign("three_hap", 0.65, envir = opts)
 assign("third_nuc", 0, envir = opts)
 assign("two_hap", 0.45, envir = opts)
 assign("left_range", 1.2, envir = opts)
@@ -58,8 +58,6 @@ altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
   }
   ## make universal reference
   cat("preparing data: \n");
-  universal <- read_lines(alignment)[2] %>% str_split("") %>% unlist()
-  
   # align <- read_fasta(alignment)
   # if(nrow(align$reads) != 1) { #only read in one reference pair
   #   universal <- make_universal(alignment = align, for_hmm = 1, ref_idx = 0)
@@ -72,12 +70,36 @@ altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
   # }
   # rm(align)
   
-  ## prepare data
+  ## prepare data (use individual information if needed)
+  ## can use parallel to get this
   genotype_target = 0
-  dat_info <- read_data(datafile, old_v = genotype_target)
   use_MC = 1
-  HMM <- hmm_info(dat_info = dat_info, uni_alignment = universal, opt = opts)
-  
+  dat_info <- list()
+  HMM <- list()
+  n_ind = length(datafile)
+  if(n_ind == 1) {
+    universal <- read_lines(alignment)[2] %>% str_split("") %>% unlist()
+    dat_info <- read_data(datafile, old_v = genotype_target)
+    HMM <- hmm_info(dat_info = dat_info, uni_alignment = universal, opt = opts)
+  } else {
+    pos <- list()
+    ref_start <- c()
+    nuc_unique <- list()
+    if(n_ind >= 3) {
+      for(i in 1:n_ind) {
+        universal <- read_lines(alignment[[i]])[2] %>% str_split("") %>% unlist()
+        dat_info[[i]] <- read_data(datafile[[i]], old_v = genotype_target)
+        HMM[[i]] <- hmm_info(dat_info = dat_info[[i]], uni_alignment = universal, opt = opts)
+        pos[[i]] <- HMM[[i]]$undecided_pos + dat_info[[i]]$ref_start
+        ref_start[i] <- dat_info[[i]]$ref_start
+        nuc_unique[[i]] <- HMM[[i]]$nuc_unique
+      }
+    } else
+      stop("Input at least  individuals together, otherwise call this function individually")
+    #### exclude variant for sites (find the union covered variant sites first)
+    pos <- unique(unlist(pos))
+    excluded_pos <- adjust_variants(nuc_unique, ref_start, pos)
+  }
   ########################## baum-welch (iterate until converge)
   
   ## initialization

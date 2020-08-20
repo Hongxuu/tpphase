@@ -75,10 +75,10 @@ alignment = "../../../alleotetraploid/data/roshan/real/target_homeo.fasta"
 ref_sam = "../../../alleotetraploid/data/roshan/real/combine.sam" 
 alnA = "../alleotetraploid/data/roshan/real/Tifguard_subset_A_WGS.sam"
 alnB = "../alleotetraploid/data/roshan/real/Tifguard_subset_B_WGS.sam"
-datafile = "../../out1.txt"
-uni_geno = "../../uni1.fa"
-res <- altraphase(datafile = "../../../../out1.txt", 
-                  alignment = "../../../../uni1.fa", max_iter = 2)
+datafile = "../../../../out.txt"
+uni_geno = "../../../../uni.fa"
+res <- altraphase(datafile = "../../../../out.txt", 
+                  alignment = "../../../../uni.fa", max_iter = 2)
 alnA = "../../../alleotetraploid/data/hmm/WGS/real/high_cov_genotypes/SRR8361736-A_subset.sam"
 alnB = "../../../alleotetraploid/data/hmm/WGS/real/high_cov_genotypes/SRR8361736-B_subset.sam"
 #######################real data

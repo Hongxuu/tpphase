@@ -44,11 +44,19 @@ int make_alignment(options opt) {
   ref_info *rf_info = NULL;
   fastq_data *fdr = NULL;
   
-  if ((err = read_fastq(opt.uni_genome, &fdr, &fop)))
+  if ((err = read_fastq(opt.uni_genome, &fdr, &fop))) {
+#ifdef STANDALONE
     exit(mmessage(ERROR_MSG, INTERNAL_ERROR, "Reading '%s' "
                     "failed with error '%s' (%d).\n",
                     opt.uni_genome, fastq_error_message(err),
                     err));
+#else
+    error("Reading '%s' failed with error '%s' (%d).\n",
+          opt.uni_genome, fastq_error_message(err),
+          err);
+#endif
+  }
+  
   // get the selected reference (match the name)
   unsigned int A_id = 0, B_id = 0;
   unsigned int rptr = 0, rptr_b = 0;
@@ -103,8 +111,14 @@ int make_alignment(options opt) {
   FILE *uni_fa = NULL;
   if (opt.uni_geno_file) {
     uni_fa = fopen(opt.uni_geno_file, "w");
-    if (!uni_fa)
+    if (!uni_fa) {
+#ifdef STANDALONE
       exit(mmessage(ERROR_MSG, FILE_OPEN_ERROR, opt.uni_geno_file));
+#else
+      error("%s open error", opt.uni_geno_file);
+#endif
+    }
+    
     // output the universal alignment
     fprintf(uni_fa, ">uni_genome\n");
     for (j = 0; j < fdr->n_lengths[A_id]; ++j) {
@@ -192,10 +206,17 @@ int make_alignment(options opt) {
       rchar += strlen(se->ref_name) + 1;
     }
     //		printf("\n");
-    if (!found)
+    if (!found) {
+#ifdef STANDALONE
       exit(mmessage(ERROR_MSG, INVALID_USER_INPUT, "no "
                       "reference '%s' in fasta file '%s'",
                       opt.ref_names[j], opt.sbam_files[j]));
+#else
+      error("no reference '%s' in fasta file '%s'",
+            opt.ref_names[j], opt.sbam_files[j]);
+#endif
+    }
+    
     
     /* hash sam file to reference (use n_se since some references are repeated in the targted sam file) */
     hash_sam(sds[j], &by_name[j], HASH_REFERENCE, my_refs[j], rf_info->ref_sam->n_se,
@@ -330,10 +351,16 @@ int make_alignment(options opt) {
     unsigned int max_id = 0;
     for (j = 0; j < N_FILES; ++j) {
       //			printf("genome %d\n", j);
+#ifdef STANDALONE
       if (me->count[j] > 1)
         exit(mmessage(ERROR_MSG, INTERNAL_ERROR,
                       "Read %u aligns twice in genome %s.\n",
-                      j, sds[j]->se[me->indices[j][0]].name_s));
+                      sds[j]->se[me->indices[j][0]].name_s, j));
+#else
+      if (me->count[j] > 1)
+        error("Read %u aligns twice in genome %s.\n",
+              sds[j]->se[me->indices[j][0]].name_s, j);
+#endif
       
       se = &sds[j]->se[me->indices[j][0]];
       if (j == 0) {
