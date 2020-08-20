@@ -320,29 +320,29 @@ int make_alignment(options opt) {
     
     // only mapped to one reference, adjust the alignment to universal
     if (me->nfiles != N_FILES) {
-      me->exclude = 1;
-      if (me->indices[0]) {
-        se = &sds[0]->se[me->indices[0][0]]; // indices[0] represents A
-        strand_genome = re->strand_A;
-        id_uni = id_A;
-        rf_id = rptr;
-        //				uni_len = fdr->n_lengths[A_id] - gap_a;
-        real_id = real_id_A;
-      } else {
-        se = &sds[1]->se[me->indices[1][0]];
-        strand_genome = re->strand_B;
-        id_uni = id_B;
-        rf_id = rptr_b;
-        //				uni_len = fdr->n_lengths[A_id] - gap_b;
-        real_id = real_id_B;
-      }
-#ifdef STANDALONE
-      printf("%s is ajusted\ndata\n", se->name_s);
-#endif
-      adjust_alignment(se, &fdr->reads[rf_id], strand_genome, id_uni, fdr->n_lengths[A_id], real_id);
-      // output the final alignment
-      output_data(fp, se, n_read);
-      n_read++;
+      //			me->exclude = 1;
+      //			if (me->indices[0]) {
+      //				se = &sds[0]->se[me->indices[0][0]]; // indices[0] represents A
+      //				strand_genome = re->strand_A;
+      //				id_uni = id_A;
+      //				rf_id = rptr;
+      //				//				uni_len = fdr->n_lengths[A_id] - gap_a;
+      //				real_id = real_id_A;
+      //			} else {
+      //				se = &sds[1]->se[me->indices[1][0]];
+      //				strand_genome = re->strand_B;
+      //				id_uni = id_B;
+      //				rf_id = rptr_b;
+      //				//				uni_len = fdr->n_lengths[A_id] - gap_b;
+      //				real_id = real_id_B;
+      //			}
+      //#ifdef STANDALONE
+      //			printf("%s is ajusted\ndata\n", se->name_s);
+      //#endif
+      //			adjust_alignment(se, &fdr->reads[rf_id], strand_genome, id_uni, fdr->n_lengths[A_id], real_id);
+      //			// output the final alignment
+      //			output_data(fp, se, n_read);
+      //			n_read++;
       continue;
     }
     

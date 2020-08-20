@@ -343,10 +343,11 @@ return NO_ERROR;
       for (merge_hash *me = mh; me != NULL; me = me->hh.next) {
         sam_entry *se;
         if (me->nfiles != N_FILES) {
-          if (me->indices[0])
-            se = &sds[0]->se[me->indices[0][0]];
-          else
-            se = &sds[1]->se[me->indices[1][0]];
+          //			if (me->indices[0])
+          //				se = &sds[0]->se[me->indices[0][0]];
+          //			else
+          //				se = &sds[1]->se[me->indices[1][0]];
+          continue;
         } else {
           se = &sds[0]->se[me->indices[0][0]];
         }
