@@ -600,18 +600,10 @@ List hmm_info(List dat_info, CharacterVector uni_alignment,
         nuc_unique[j] = key;
         nuc_count[j] = val;
       }
-     
-        // if only deletion appears
-        // if(num == 1 && keys[0] == -1) {
-        //   nuc_unique[j] = key[Range(0, 1)];
-        //   nuc_count[j] = val[Range(0, 1)];
-        //   num++; //for using the condition num == 2
-        // } else {
-     
-        // }
+
       IntegerVector hap_site = nuc_unique[j];
-      IntegerVector sum_site = nuc_count[j];
-      // Rcout << num << "|||" << hap_site << ": " << sum_site;
+      IntegerVector sum_site = nuc_count[j]; // if there are three and minor are the same amount, order the minor two by the quality score, and eliminate the bad one
+      // Rcout << j << "|||" << hap_site << ": " << sum_site << "\n";
       if(sbs) {
         List out = sbs_state(num, ref_j, hap_site, sum_site, uni_alignment, opt);
         n_row[j] = out["n_row"];

@@ -158,12 +158,47 @@ List aux_noN_S3(IntegerVector sum_site, IntegerVector hap_site, List opt) {
   
   return ls; 
 }
+
+//3 different nuc with gaps in the alignment
+List N3_gap(IntegerVector hap_site, IntegerVector sum_site, unsigned int ref_j, CharacterVector uni_alignment) {
+  double r = double(sum_site[1])/(sum_site[2] + sum_site[1]);
+  int n_row;
+  List ls(2);
+  if(r >= 0.45 && r <= 0.55) {
+    IntegerVector temp(4 * NUM_CLASS);
+    if (uni_alignment[ref_j] != "M")
+      temp = {-1, -1, hap_site[1], hap_site[2], -1, -1, //J in universal alignment
+              hap_site[2], hap_site[1], hap_site[1], hap_site[2], -1,  -1,
+              hap_site[2],hap_site[1], -1, -1};
+    temp.attr("dim") = Dimension(4, 4); // by column
+    IntegerMatrix final = as<IntegerMatrix>(temp);
+    ls["temp"] = final;
+    n_row = 4;
+  } else {
+    IntegerVector tp = {sum_site[1], sum_site[2]};
+    int id = which_max(tp) + 1;
+    if(uni_alignment[ref_j] != "M") {
+      IntegerVector temp(2 * NUM_CLASS);
+      temp = {-1, hap_site[id], -1, hap_site[id], hap_site[id], -1, hap_site[id], -1};
+      temp.attr("dim") = Dimension(2, 4);
+      IntegerMatrix final = as<IntegerMatrix>(temp);
+      ls["temp"] = final;
+      n_row = 2;
+    } else {
+      IntegerVector temp(NUM_CLASS);
+      temp = {hap_site[id], hap_site[id], hap_site[id], hap_site[id]};
+      n_row = 1;
+      ls["temp"] = temp;
+    }
+  }
+  ls["n_row"] = n_row;
+  return ls;
+}
 /*
  * determine the number of hidden states site by site
  */
 List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, IntegerVector sum_site, 
                CharacterVector uni_alignment, List opt) {
-  unsigned int l, m;
   double sum;
   unsigned int n_row;
   List haplotype(1);
@@ -174,16 +209,20 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
     n_row = 1;
   }
   else if (num == 2) {
-    if(hap_site[0] == -1) {
-      IntegerVector temp(NUM_CLASS);
-      if(uni_alignment[ref_j] == "I")
-        temp = {-1, -1, hap_site[1], hap_site[1]};
-      else if (uni_alignment[ref_j] == "J")
-        temp = {hap_site[1], hap_site[1], -1, -1};
-      else
+    sum = sum_site[0] + sum_site[1];
+    if(hap_site[0] == -1 && sum_site[0]/sum >= 0.4) {
+      IntegerVector temp;
+      if(uni_alignment[ref_j] != "M") {
+        temp = IntegerVector(2 * NUM_CLASS);
+        temp = {-1, hap_site[1], -1, hap_site[1],hap_site[1], -1, hap_site[1], -1}; //gaps
+        temp.attr("dim") = Dimension(2, 4);
+        n_row = 2;
+      } else {
+        temp = IntegerVector(NUM_CLASS);
         temp = {hap_site[1], hap_site[1], hap_site[1], hap_site[1]};
+        n_row = 1;
+      }
       haplotype[0] = temp;
-      n_row = 1;
     } else { // if N not appears
       List out = aux_noN_S2(sum_site, hap_site, opt);
       haplotype[0] = out["temp"];
@@ -193,18 +232,11 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
   else if (num == 3) {
     sum = sum_site[2] + sum_site[1] + sum_site[0];
     if (hap_site[0] == -1) {
-      // if N appears, 4 possibilities
-      if(sum_site[0]/sum >= 0.45) {
-        IntegerVector temp(2 * NUM_CLASS);
-        if (uni_alignment[ref_j] == "I")
-          temp = {-1, -1,  -1, -1, hap_site[1], hap_site[2], //J in universal alignment
-                  hap_site[2], hap_site[1]};
-        else if (uni_alignment[ref_j] == "J")
-          temp = {hap_site[1], hap_site[2], hap_site[2],hap_site[1],  //I in universal alignment
-                  -1,  -1,  -1, -1};
-        temp.attr("dim") = Dimension(2, 4); // by column
-        haplotype[0] = temp;
-        n_row = 2;
+      // if N appears
+      if(sum_site[0]/sum >= 0.4) {
+        List out = N3_gap(hap_site,sum_site, ref_j, uni_alignment);
+        haplotype[0] = out["temp"];
+        n_row = out["n_row"];
       } else {
         IntegerVector sum_site_cleaned = {sum_site[1], sum_site[2]};
         IntegerVector hap_site_cleaned = {hap_site[1], hap_site[2]};
@@ -221,28 +253,7 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
   else if (num == 4) {
     sum = sum_site[3] + sum_site[2] + sum_site[1] + sum_site[0];
     if(hap_site[0] == -1) {
-      if(sum_site[0]/sum >= 0.45) {
-        arma::Mat<int> temp;
-        IntegerMatrix inner_tmp(2, NUM_CLASS);
-        for(l = 0; l < num; ++l)
-          for(m = l + 1; m < num; ++m) {
-            if(uni_alignment[ref_j] == "I") //deletion in B genome
-              inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 0);
-            else if(uni_alignment[ref_j] == "J")
-              inner_tmp = call_permute_N({hap_site[l], hap_site[m]}, 1);
-            temp = join_cols(temp, as<arma::Mat<int>>(inner_tmp));
-          }
-        haplotype[0] = wrap(temp);
-        n_row = 2;
-      } else {
-        IntegerVector sum_site_cleaned = {sum_site[1], sum_site[2], sum_site[3]};
-        IntegerVector hap_site_cleaned = {hap_site[1], hap_site[2], hap_site[3]};
-        List out = aux_noN_S3(sum_site_cleaned, hap_site_cleaned, opt);
-        haplotype[0] = out["temp"];
-        n_row = out["n_row"];
-      }
-    } else {
-      // if (min(sum_site) != max(sum_site)) {
+      if(sum_site[0]/sum >= 0.4) {
         int min_id = which_min(sum_site);
         IntegerVector sum_site2(3);
         IntegerVector hap_site2(3);
@@ -253,14 +264,30 @@ List sbs_state(unsigned int num, unsigned int ref_j, IntegerVector hap_site, Int
             hap_site2[num] = hap_site[i];
             num++;
           }
+          List out = N3_gap(hap_site2, sum_site2, ref_j, uni_alignment);
+          haplotype[0] = out["temp"];
+          n_row = out["n_row"];
+      } else {
+        IntegerVector sum_site_cleaned = {sum_site[1], sum_site[2], sum_site[3]};
+        IntegerVector hap_site_cleaned = {hap_site[1], hap_site[2], hap_site[3]};
+        List out = aux_noN_S3(sum_site_cleaned, hap_site_cleaned, opt);
+        haplotype[0] = out["temp"];
+        n_row = out["n_row"];
+      }
+    } else {
+      int min_id = which_min(sum_site);
+      IntegerVector sum_site2(3);
+      IntegerVector hap_site2(3);
+      int num = 0;
+      for (unsigned int i = 0; i < 4; ++i)
+        if (i != min_id) {
+          sum_site2[num] = sum_site[i];
+          hap_site2[num] = hap_site[i];
+          num++;
+        }
         List out = aux_noN_S3(sum_site2, hap_site2, opt);
         haplotype[0] = out["temp"];
         n_row = out["n_row"];
-      // } else {
-      //   IntegerMatrix temp = call_permute({hap_site[0], hap_site[1], hap_site[2], hap_site[3]});
-      //   haplotype[0] = temp;
-      //   n_row = 24;
-      // }
     }
   }
   List ls = List::create(
@@ -415,7 +442,7 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
   for(j = 0; j < link.ncol(); ++j) {
     // Rcout << j << "\t";
     IntegerVector nuc = possi_nuc[j];
-    if(link(i, j) != -1) {
+    if(link(i, j) != -1) {// if nuc at j is known
       for(l = 0 ; l < nuc.size(); ++l)
         if(link(i, j) == nuc[l]) {
           id = l;
@@ -429,7 +456,7 @@ IntegerVector best_branch(IntegerMatrix link, List transition, NumericVector ini
           NumericMatrix trans = transition[j - 1];
           IntegerVector nuc2 = possi_nuc[j - 1];
           int id1 = 0;
-          if(link(i, j - 1) != -1) {
+          if(link(i, j - 1) != -1) {// if nuc at j-1 is known, trans prob is known
             for(l = 0 ; l < nuc2.size(); ++l)
               if(link(i, j - 1) == nuc2[l]) {
                 // Rcout << "nuc(j-1) " << nuc2[l] << "\t";

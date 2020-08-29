@@ -85,7 +85,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
     pos <- list()
     ref_start <- c()
     nuc_unique <- list()
-    if(n_ind >= 3) {
+    if(n_ind >= 4) {
       for(i in 1:n_ind) {
         universal <- read_lines(alignment[[i]])[2] %>% str_split("") %>% unlist()
         dat_info[[i]] <- read_data(datafile[[i]], old_v = genotype_target)
@@ -95,7 +95,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
         nuc_unique[[i]] <- HMM[[i]]$nuc_unique
       }
     } else
-      stop("Input at least  individuals together, otherwise call this function individually")
+      stop("Input at least 4 individuals together, otherwise call this function individually")
     #### exclude variant for sites (find the union covered variant sites first)
     pos <- unique(unlist(pos))
     excluded_pos <- adjust_variants(nuc_unique, ref_start, pos)
@@ -108,7 +108,7 @@ altragenotype <- function(datafile = NULL, alignment = NULL, res_file = NULL,
   linkage_in <- linkage_info(dat_info = dat_info, undecided_pos = HMM$undecided_pos)
   overlap_info <- get_overlap(p_tmax = HMM$p_tmax, time_pos = HMM$time_pos, num_states = HMM$num_states, 
                               undecided_pos = HMM$undecided_pos, t_max = HMM$t_max, hap_min_pos = dat_info$ref_start)
-  hap_full_info <- full_hap_new(HMM, linkage_in, overlap_info, hap_length, dat_info$ref_start, use_MC = use_MC)
+  hap_full_info <- full_hap_new(HMM, linkage_in$linkage, overlap_info, hap_length, dat_info$ref_start, use_MC = use_MC)
   hap_full <- hap_full_info$full_hap
   HMM$num_states <- hap_full_info$new_num_states
   ###indicate which transfer could happen
